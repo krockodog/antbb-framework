@@ -1,0 +1,13 @@
+{
+  "playbook_id": "probenkarte",
+  "title": "Probenkarte",
+  "kind": "probe",
+  "summary": "Die Probe bleibt ein Name im Scope. Nichts wird ausgeführt.",
+  "destructive": false,
+  "requires_oversight": true,
+  "stub": true,
+  "stub_note": "geplant/Mock. Kein Ausführen der Probe.",
+  "needs_probe": true,
+  "brand": "All and One - RED-BLUE-Yellow-Ant-Team",
+  "builtin": true
+}

@@ -16,6 +16,7 @@ from typing import Optional
 
 from .agents import WORKER_AGENTS
 from .agents.blue import BLUE_AGENTS, BLUE_PHASES
+from .agents.yellow import YELLOW_AGENTS, YELLOW_PHASES
 
 _SECRET_MARKERS = ("api_key", "apikey", "token", "secret", "password", "minimax")
 
@@ -314,9 +315,12 @@ def _tasks_for(pb: dict) -> list[dict]:
              "oversight": bool(pb.get("oversight_required"))} for t in items]
 
 
-def build_registry(agents=None, include_blue: bool = True) -> dict:
+def build_registry(agents=None, include_blue: bool = True,
+                   include_yellow: bool = True) -> dict:
     if agents is None:
-        agents = list(WORKER_AGENTS) + (list(BLUE_AGENTS) if include_blue else [])
+        agents = (list(WORKER_AGENTS)
+                  + (list(BLUE_AGENTS) if include_blue else [])
+                  + (list(YELLOW_AGENTS) if include_yellow else []))
     soldiers = []
     pb_count = 0
     tool_count = 0
@@ -384,6 +388,8 @@ def build_registry(agents=None, include_blue: bool = True) -> dict:
         "octogent_phases": OCTOGENT_PHASES,
         "blue_phases": list(BLUE_PHASES),
         "blue_soldier_count": sum(1 for s in soldiers if s.get("colony") == "blue"),
+        "yellow_phases": list(YELLOW_PHASES),
+        "yellow_soldier_count": sum(1 for s in soldiers if s.get("colony") == "yellow"),
         "scope_suggestions": SCOPE_SUGGESTIONS,
         "prompt_categories": list(__import__("antbb.prompts", fromlist=["PROMPT_TEMPLATES"]).PROMPT_TEMPLATES),
     }

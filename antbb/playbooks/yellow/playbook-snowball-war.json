@@ -1,0 +1,11 @@
+{
+  "playbook_id": "playbook-snowball-war",
+  "title": "playbook-snowball-war",
+  "kind": "re-playbook",
+  "summary": "use when reconstructing a bounded DOS minigame (Snowball War pattern: MZ via Ghidra/r2 → Rust/SDL2-style rebuild notes); explain why/what/next in plain German (Erklärbär)",
+  "destructive": false,
+  "requires_oversight": true,
+  "body_ref": "playbook-snowball-war.md",
+  "brand": "All and One - RED-BLUE-Yellow-Ant-Team",
+  "builtin": true
+}

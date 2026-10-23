@@ -14,8 +14,8 @@ import threading
 import time
 from typing import Any, Optional
 
-from fastapi import (FastAPI, Form, HTTPException, Request, WebSocket,
-                     WebSocketDisconnect)
+from fastapi import (FastAPI, File, Form, HTTPException, Request, UploadFile,
+                     WebSocket, WebSocketDisconnect)
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -2361,6 +2361,93 @@ def history_page(request: Request):
     return templates.TemplateResponse(request, "history.html", {
         "runs": runs, "exports": _export_index(), "disclaimer": DISCLAIMER_TEXT,
     })
+
+
+# ======================= Yellow Queen (Reverse Engineering) =======================
+@app.get("/yellow", response_class=HTMLResponse)
+def yellow_page(request: Request):
+    """Gelbe Koenigin - Reverse-Engineering-Kolonie (Soldaten, Proben, Erklaerpfad)."""
+    cap = svc.yellow_capabilities()
+    yellows = cap.get("soldiers") or []
+    uploads = []
+    try:
+        uploads = svc.list_uploads()
+    except Exception:
+        uploads = []
+    yellow_stats = {
+        "soldiers": int(cap.get("soldier_count") or len(yellows)),
+        "playbooks": cap.get("playbook_count", 0),
+        "tasks": cap.get("task_count", 0),
+        "samples": len(uploads),
+    }
+    return templates.TemplateResponse(request, "yellow.html", {
+        "yellow_stats": yellow_stats, "soldiers": yellows,
+        "uploads": uploads, "phases": cap.get("yellow_phases", []),
+        "disclaimer": DISCLAIMER_TEXT,
+    })
+
+
+@app.get("/yellow/upload", response_class=HTMLResponse)
+def yellow_upload_page(request: Request):
+    """Upload-Ansicht fuer RE-Proben (read-only, lokal gespeichert)."""
+    try:
+        uploads = svc.list_uploads()
+    except Exception:
+        uploads = []
+    return templates.TemplateResponse(request, "yellow_upload.html", {
+        "uploads": uploads, "disclaimer": DISCLAIMER_TEXT,
+    })
+
+
+@app.post("/yellow/upload")
+async def yellow_upload_post(file: UploadFile = File(...)):
+    """Nimmt eine RE-Probe entgegen und speichert sie read-only unter data/uploads."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Leere Datei.")
+    if len(data) > 64 * 1024 * 1024:
+        raise HTTPException(413, "Probe zu gross (max 64 MiB).")
+    info = svc.save_upload(file.filename or "sample", data)
+    return JSONResponse({"ok": True, **info})
+
+
+@app.get("/yellow/brain", response_class=HTMLResponse)
+def yellow_brain_page(request: Request):
+    """Gelber Anteil am gemeinsamen Neural Brain (derselbe Brain, eingefaerbt)."""
+    return templates.TemplateResponse(request, "brain.html", {
+        "disclaimer": DISCLAIMER_TEXT, "colony": "yellow",
+    })
+
+
+@app.get("/api/yellow")
+def api_yellow():
+    return JSONResponse(svc.yellow_capabilities())
+
+
+@app.post("/api/yellow/run")
+def api_yellow_run(payload: Optional[dict] = None):
+    payload = payload or {}
+    sample = payload.get("sample") or payload.get("sample_path")
+    deep = bool(payload.get("deep"))
+    ack = payload.get("oversight_ack")
+    if ack is not None:
+        ack = bool(ack)
+    try:
+        result = svc.run_yellow(sample_path=sample, deep=deep, oversight_ack=ack)
+    except OversightError as exc:
+        raise HTTPException(403, str(exc))
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+    return JSONResponse({
+        "ok": True, "run_id": result.run_id,
+        "finding_count": len(result.findings),
+        "severity": result.by_severity(),
+        "status": result.by_status(),
+        "findings": [{"title": f.title, "severity": f.severity,
+                      "status": f.status, "category": f.category,
+                      "agent": f.agent} for f in result.findings[:80]],
+    })
+
 
 
 # ---------------- Routen-Reihenfolge: literale /api/brain/*-Pfade zuerst ----------------

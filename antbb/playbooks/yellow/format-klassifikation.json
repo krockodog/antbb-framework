@@ -1,0 +1,13 @@
+{
+  "playbook_id": "format-klassifikation",
+  "title": "Format-Klassifikation",
+  "kind": "classify",
+  "summary": "Probename einordnen und die Werkzeugfolge planen. Die Datei bleibt zu.",
+  "destructive": false,
+  "requires_oversight": true,
+  "stub": true,
+  "stub_note": "geplant/Mock. Keine Datei wird geöffnet.",
+  "needs_probe": true,
+  "brand": "All and One - RED-BLUE-Yellow-Ant-Team",
+  "builtin": true
+}

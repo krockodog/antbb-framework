@@ -1,0 +1,11 @@
+{
+  "playbook_id": "playbook-paper-rs-canvas",
+  "title": "playbook-paper-rs-canvas",
+  "kind": "re-playbook",
+  "summary": "use when recovering infinite-canvas / design-app structure (paper-rs pattern); explain why/what/next in plain German (Erklärbär)",
+  "destructive": false,
+  "requires_oversight": true,
+  "body_ref": "playbook-paper-rs-canvas.md",
+  "brand": "All and One - RED-BLUE-Yellow-Ant-Team",
+  "builtin": true
+}

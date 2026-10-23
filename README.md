@@ -1,48 +1,79 @@
-# 🐜 antbb – Ameisen-Schwarm Bug-Bounty / Pentest Framework (lokal)
+# All and One - RED-BLUE-Yellow-Ant-Team
+
+![Red Queen](https://img.shields.io/badge/Rot-Pentest%20%26%20Bug%20Bounty-crimson?style=for-the-badge)
+![Blue Queen](https://img.shields.io/badge/Blau-Schutz%20%26%20Hardening-008080?style=for-the-badge)
+![Yellow Queen](https://img.shields.io/badge/Gelb-Reverse%20Engineering-f0ad4e?style=for-the-badge)
+![Neural Brain](https://img.shields.io/badge/Neural%20Brain-Superhirn-8a2be2?style=for-the-badge)
 
 ![Python](https://img.shields.io/badge/Python-3.11--3.13-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Web%20%2B%20JSON--API-009688?logo=fastapi&logoColor=white)
-![Status](https://img.shields.io/badge/Status-v1.0.0-success)
-![Nur autorisiert](https://img.shields.io/badge/Einsatz-nur%20autorisiert%20(%C2%A7%20202a--c%20StGB)-critical)
+![Linux](https://img.shields.io/badge/Linux-lokal-FCC624?logo=linux&logoColor=black)
 ![Local first](https://img.shields.io/badge/Betrieb-lokal%20(127.0.0.1)-informational)
+![Nur autorisiert](https://img.shields.io/badge/Einsatz-nur%20autorisiert%20(%C2%A7%20202a--c%20StGB%20%2F%20CFAA)-critical)
 
-Öffentliches Framework-Repo: [krockodog/antbb-framework](https://github.com/krockodog/antbb-framework). Keyfrei, anonymisiert, MIT.
+Drei Königinnen unter einem Dach, mit gemeinsamem Neural Brain. Ich habe die
+offensive, die defensive und die Reverse-Engineering-Kolonie in **eine** lokale
+Plattform zusammengeführt — ein Prozess, eine Oberfläche, ein Superhirn.
 
-> **Eine Königin, ein Schwarm aus 18 spezialisierten Ameisen-Soldaten.** antbb ist
-> eine lokale, KI-gestützte Pentest-/Bug-Bounty-Plattform: Die Königin orchestriert
-> den Schwarm über klare Phasen (Recon → Scan → Analyse → Report), hart abgesichert
-> durch **default-deny Scope** und ein **Human-Oversight-Gate**. Läuft standardmäßig
-> rein lokal unter `http://127.0.0.1` – nichts wird ohne deine Freigabe nach außen
-> getragen.
+![Oberfläche](docs/screenshots/01-startseite.png)
 
-## Funktionsumfang (vollständige Plattform)
+## Drei Königinnen
 
-> **Dies ist die VOLLSTÄNDIGE antbb-Plattform**, nur keyfrei und anonymisiert.
-> Der Produktivcode liegt im Package `antbb/` (Königin, alle Agenten/Soldaten,
-> WLAN-Scope/Coverage/Offensiv-Airgorah, Scope/Oversight/Proof-Gate, Web-
-> Frontend+Backend, Neural-Brain, Reports). Die Dateien unter **`tests/`** sind
-> nur Selbsttests (Smoke-Tests), **nicht** der Produktivcode. Eine komplette
-> Datei-/Modulübersicht steht in **MANIFEST.md**.
->
-> Enthalten u. a.: `queen.py` (Orchestrierung) · `agents/*` (recon, scanning,
-> osint, auth, mobile, fuzz, poc, ssrf, takeover, verify, reporting, codeaudit,
-> llmsec, threatintel, infra, cloud, wifi, analysis, api) · `wlan_survey.py` /
-> `wlan_offensive.py` / `wlan_airgorah.py` · `scope`/`oversight`/`proofgate` ·
-> `web/` (FastAPI-Backend + Templates + Static/Neural-Brain) · Reports/Rating.
->
-> **Blue Queen (Grundgerüst):** Verteidigungs-Kolonie unter `/blue` –
-> Softwarescan, Hardening-Audit, Remediation-Verify, Detection-Regeln,
-> Honeypot-Rezepte, Job-Scheduler, optionaler Splunk-HEC-Adapter.
-> Siehe Abschnitt „🐜 Vision".
+| Königin | Rolle | Oberfläche | Was sie macht |
+| --- | --- | --- | --- |
+| 🔴 **Rote Königin** | Red-Teaming | `/` | Bug Bounty & Pentest, nur im Scope. Recon, Scan, Auth, Fuzz, Verify, Report. |
+| 🔵 **Blaue Königin** | Blue Safety-Teaming | `/blue` | Schutz & Hardening: Softwarescan, Hardening-Audit, Remediation-Verify, Detection, Honeypots, Jobs. |
+| 🟡 **Gelbe Königin** | Yellow Reverse-Teaming | `/yellow`, `/yellow/upload` | Reverse Engineering mit Erklärpfad: Tools-Doctor, Probenaufnahme, Strings/Krypto, ELF/Mach-O/PE/APK/.NET, Ghidra, Dossier. Read-only, tiefe Schritte nur mit Oversight. |
 
-## Schnellstart (neu hier?)
+Gemeinsames **Neural Brain** als Superhirn unter `/brain` (eingefärbt auch unter
+`/yellow/brain`): führt die Kolonien zu einem nachvollziehbaren Bild zusammen —
+Ameisenteams, Spuren, durchgehende Logs. Jeder Schritt bleibt lesbar.
+
+## Lokal bauen & starten
+
+Voraussetzungen: Linux, `python3` (3.11–3.13) mit `venv`/`pip`, optional `node`
+(nur für UI-Rebuild). RE-Tools (radare2, binutils, binwalk, apktool, jadx …)
+sind optional und werden vom Doctor geprüft.
 
 ```bash
-bash install-and-start.sh
-# → Startseite z. B. http://127.0.0.1:1001/
+git clone https://github.com/krockodog/antbb-framework.git
+cd antbb-framework
+./install.sh --doctor              # Preflight: Python + Toolchain je Königin prüfen
+./install.sh                       # AI-Setup je Königin, dann venv + deps + Start
+# oder nicht-interaktiv:  ./install.sh --noninteractive
 ```
 
-Beim Start optional Key abfragen (Enter = ohne Key). Details: **INSTALL.md**. Secrets (Provider-API-Keys, Tunnel-Token) werden nur zur Laufzeit als Umgebungsvariablen gesetzt – nie eingebettet. Diese Distribution ist keyfrei und anonymisiert.
+Weitere Flags: `--install-tools` (fehlende System-Tools via apt nachziehen),
+`--dry-run` (alles vorbereiten, Server nicht starten), `--host`, `--port`.
+Danach läuft die Oberfläche lokal, Standard `http://127.0.0.1:8000/`
+(Port via `ANTBB_PORT` / `--port`). Neural Brain zuerst: `…/brain`.
+
+## KI pro Königin — frei zuweisbar
+
+Das AI-Setup im Installer ordnet **jeder Königin einen eigenen Anbieter** zu —
+Mehrfachauswahl aus **9 Providern**: OpenAI, Anthropic, Gemini, MiniMax,
+Moonshot/Kimi, Mistral, DeepSeek, xAI und lokalem Ollama. Beispiel: Rot→Claude,
+Blau→Ollama, Gelb→MiniMax. Die Zuordnung landet in `antbb.env` (chmod 600);
+**Keys kommen nur zur Laufzeit aus der Umgebung und liegen nie im Repo**. Fehlt
+ein Key, wird der Provider sauber übersprungen.
+
+## Skills & Playbooks verwalten
+
+Gebrandete Builtins liegen pro Königin unter `antbb/agents/skills/` und
+`antbb/playbooks/` (Gelb zusätzlich als Referenzbibliothek unter
+`antbb/agents/skills/reference/yellow/`). Eigene Skills/Playbooks lassen sich pro
+Königin **hinzufügen, erstellen und löschen** — einfach Dateien in
+`antbb/agents/skills/custom/{red,blue,yellow}/` bzw.
+`antbb/playbooks/custom/{red,blue,yellow}/` pflegen.
+
+## Recht
+
+> ⚠️ **Nur für autorisierte Security-Arbeit.** Pentests, Bug-Bounty und Reverse
+> Engineering OHNE Erlaubnis sind strafbar (§ 202a–c StGB in DE, Computer Fraud
+> and Abuse Act / CFAA in US). Jede aktive Aktion erfordert autorisierten Scope
+> **und** eine manuelle Freigabe (Human-Oversight). Default: rein lesend/lokal.
+
+---
 
 Ein **rein lokales** Framework zum Üben von Bug-Bounty-/Pentest-Workflows.
 Es tritt **keiner** externen Plattform (HackerOne, Bugcrowd, …) bei und führt

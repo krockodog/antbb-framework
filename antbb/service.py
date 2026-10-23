@@ -932,6 +932,74 @@ class AntBBService:
         from .jobs import JobScheduler
         return JobScheduler(self.store, logger=self.logger).tick()
 
+    # ---------------- Yellow Queen (Reverse-Engineering-Kolonie) ----------------
+    def yellow_capabilities(self) -> dict:
+        """Yellow-Soldaten aus der Registry (colony=yellow)."""
+        reg = self.capabilities(rebuild=True)
+        yellows = [s for s in reg.get("soldiers", []) if s.get("colony") == "yellow"]
+        import os as _os
+        pb_dir = _os.path.join(_os.path.dirname(__file__), "playbooks", "yellow")
+        try:
+            pb_files = len([f for f in _os.listdir(pb_dir)
+                            if f.endswith(".md") or f.endswith(".json")])
+        except Exception:
+            pb_files = 0
+        pb_n = sum(len(s.get("playbooks") or []) for s in yellows)
+        task_n = sum(((s.get("skill") or {}).get("task_count") or 0) for s in yellows)
+        return {
+            "yellow_phases": reg.get("yellow_phases", []),
+            "soldier_count": len(yellows),
+            "playbook_count": pb_n,
+            "task_count": task_n,
+            "playbook_file_count": pb_files,
+            "soldiers": yellows,
+            "soldier_ids": [s.get("name") for s in yellows],
+        }
+
+    def yellow_uploads_dir(self) -> str:
+        import os as _os
+        d = _os.environ.get("ANTBB_YELLOW_UPLOADS") or _os.path.join(
+            _os.path.dirname(__file__), "..", "data", "uploads")
+        d = _os.path.abspath(d)
+        _os.makedirs(d, exist_ok=True)
+        return d
+
+    def save_upload(self, filename: str, data: bytes) -> dict:
+        """Speichert eine hochgeladene RE-Probe read-only unter data/uploads."""
+        import os as _os, hashlib, re as _re
+        safe = _re.sub(r"[^A-Za-z0-9._-]", "_", (filename or "sample"))[:128] or "sample"
+        sha = hashlib.sha256(data).hexdigest()
+        dest = _os.path.join(self.yellow_uploads_dir(), f"{sha[:16]}_{safe}")
+        with open(dest, "wb") as fh:
+            fh.write(data)
+        return {"path": dest, "name": safe, "sha256": sha, "size": len(data)}
+
+    def list_uploads(self) -> list:
+        import os as _os
+        d = self.yellow_uploads_dir()
+        out = []
+        for fn in sorted(_os.listdir(d)):
+            fp = _os.path.join(d, fn)
+            if _os.path.isfile(fp):
+                out.append({"name": fn, "path": fp, "size": _os.path.getsize(fp)})
+        return out
+
+    def run_yellow(self, sample_path: Optional[str] = None,
+                   target_id: Optional[int] = None,
+                   phases: Optional[tuple] = None, deep: bool = False,
+                   oversight_ack: Optional[bool] = None,
+                   params: Optional[dict] = None,
+                   emit: Optional[Callable[[dict], None]] = None):
+        """Startet die Reverse-Engineering-Kolonie (Yellow Queen). Default: read-only."""
+        from .yellow_queen import YellowQueen, PHASES as YP
+        p = dict(params or {})
+        if sample_path:
+            p["sample"] = sample_path
+        queen = YellowQueen(self.store, logger=self.logger, emit=emit, use_llm=False)
+        return queen.run_colony_sync(
+            target_id=target_id, phases=phases or YP,
+            deep=deep, oversight_ack=oversight_ack, params=p)
+
     def softwarescan(self, online: bool = True, ecosystems=None) -> dict:
         """Direkter Software-/Versions-Scan (ohne Kolonie-Lauf)."""
         from . import softwarescan as sw
