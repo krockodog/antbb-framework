@@ -1,0 +1,302 @@
+# antbb – Standard-Konfiguration (wird beim Start von CLI und Webserver geladen).
+#
+# ╔════════════════════════════════════════════════════════════════════════╗
+# ║ ZENTRALE REGEL: Kein einzelnes LLM aktiviert von sich aus einen Schwarm. ║
+# ║ Das Schwarm-Verhalten (Königin + Spezial-Agenten, Phasen, Dispatch)      ║
+# ║ kommt AUSSCHLIESSLICH aus dem antbb-Framework. Die hier konfigurierten   ║
+# ║ LLMs sind nur austauschbare Denk-/Text-Bausteine, die der Router pro     ║
+# ║ Aufgabe aufruft.                                                         ║
+# ╚════════════════════════════════════════════════════════════════════════╝
+#
+# Diese Datei enthält NIEMALS API-Keys oder Tokens. Keys kommen ausschließlich
+# aus Umgebungsvariablen (siehe providers.*.key_env); OAuth-Tokens liegen
+# verschlüsselt in data/oauth_tokens.enc (Fernet-Key in data/oauth.key).
+llm:
+  # Standard-Provider, wenn der Router keinen passenderen findet.
+  default_provider: minimax
+  # Basis-Defaults (bleiben als Fallback erhalten): Königin=Hauptmodell,
+  # schnelle Agenten-Schritte=Flash-Modell.
+  main_model: MiniMax-M3
+  fast_model: MiniMax-M3.1-Flash
+
+  providers:
+    # ---------------------------------------------------------------------
+    # Austauschbare LLM-Provider. api_style bestimmt Request-/Response-Format:
+    #   openai    -> POST {base_url}/chat/completions, Bearer-Key (OpenAI-kompat.)
+    #   anthropic -> POST {base_url}/v1/messages, Header x-api-key + anthropic-version
+    #   gemini    -> POST {base_url}/models/{model}:generateContent?key=... (Google)
+    #   ollama    -> POST {base_url}/api/chat (lokal, keine Auth)
+    # Keys kommen AUSSCHLIESSLICH aus den genannten Env-Vars zur Laufzeit.
+    # Es ist KEIN Key im Repo hinterlegt; fehlt der Key -> Provider wird sauber
+    # uebersprungen (kein Crash).
+    # ---------------------------------------------------------------------
+    openai:
+      base_url: https://api.openai.com/v1
+      api_style: openai
+      auth_mode: key
+      # Einheitliches Auth-Modell: pro Provider waehlbar "api_key" ODER "oauth"
+      # (nur wo der Provider OAuth offiziell anbietet). Default hier: api_key.
+      auth_method: api_key
+      oauth_available: true
+      key_env: OPENAI_API_KEY
+      default_model: gpt-4o
+      fast_model: gpt-4o-mini
+      oauth:
+        # "Sign in with ChatGPT" = OAuth 2.0 Authorization Code + PKCE (S256) + OIDC.
+        # Quelle: developers.openai.com/siwc (auth.openai.com). Die client_id
+        # entsteht zur Laufzeit (dynamische Registrierung) und wird NICHT
+        # hartkodiert; ein evtl. noetiges Client-Secret kommt nur via ENV.
+        flow: authorization_code
+        authorize_url: https://auth.openai.com/api/accounts/authorize
+        token_url: https://auth.openai.com/api/accounts/oauth/token
+        redirect_path: /auth/openai/callback
+        scopes: "openid profile email offline_access"
+        # client_id: (leer -> dynamische Registrierung)
+        # client_secret_env: OPENAI_OAUTH_CLIENT_SECRET   # optional, nur ENV
+
+    anthropic:
+      # Anthropic Messages API (docs.anthropic.com). Eigenes Format.
+      base_url: https://api.anthropic.com
+      api_style: anthropic
+      auth_mode: key
+      auth_method: api_key   # key-only: kein dokumentierter OAuth-Flow
+      oauth_available: false
+      key_env: ANTHROPIC_API_KEY
+      default_model: claude-3-5-sonnet-latest
+      fast_model: claude-3-5-haiku-latest
+
+    gemini:
+      # Google Generative Language API (ai.google.dev). Key als Query-Param.
+      # Akzeptiert GEMINI_API_KEY ODER GOOGLE_API_KEY (siehe llm_providers.py).
+      base_url: https://generativelanguage.googleapis.com/v1beta
+      api_style: gemini
+      auth_mode: key
+      auth_method: api_key   # key-only: kein dokumentierter OAuth-Flow
+      oauth_available: false
+      key_env: GEMINI_API_KEY
+      default_model: gemini-1.5-pro
+      fast_model: gemini-1.5-flash
+
+    minimax:
+      base_url: https://api.minimax.io/v1
+      api_style: openai
+      auth_mode: key
+      auth_method: api_key   # key-only: kein dokumentierter OAuth-Flow
+      oauth_available: false
+      key_env: MINIMAX_API_KEY
+      default_model: MiniMax-M3
+      fast_model: MiniMax-M3.1-Flash
+
+    moonshot:
+      # Moonshot / Kimi Open Platform (OpenAI-kompatibel) nutzt API-Keys.
+      # ZUSAETZLICH bietet der separate "Kimi Code"-Managed-Service einen
+      # dokumentierten Device-Code-OAuth-Flow (RFC 8628). Quelle:
+      # github.com/MoonshotAI/kimi-cli (auth.kimi.com). Die client_id ist ein
+      # oeffentlicher, dokumentierter Wert des offiziellen Kimi-CLI (kein Secret).
+      # Default bleibt api_key; "oauth" waehlbar fuer den Kimi-Code-Service.
+      base_url: https://api.moonshot.ai/v1
+      api_style: openai
+      auth_mode: key
+      auth_method: api_key
+      oauth_available: true
+      key_env: MOONSHOT_API_KEY
+      default_model: kimi-k2-0905-preview
+      fast_model: kimi-k2-0905-preview
+      oauth:
+        flow: device_code
+        device_authorization_url: https://auth.kimi.com/api/oauth/device_authorization
+        token_url: https://auth.kimi.com/api/oauth/token
+        client_id: "17e5f671-d194-4dfb-9706-5516cb48c098"   # oeffentl. Kimi-CLI-Client
+        scopes: ""
+        # Hinweis: adressiert den Kimi-Code-Managed-Service (api.kimi.com/coding/v1),
+        # nicht die Moonshot-Open-Platform-API.
+
+    mistral:
+      # Mistral AI (OpenAI-kompatible Chat-Completions, docs.mistral.ai).
+      base_url: https://api.mistral.ai/v1
+      api_style: openai
+      auth_mode: key
+      auth_method: api_key   # key-only: kein dokumentierter OAuth-Flow
+      oauth_available: false
+      key_env: MISTRAL_API_KEY
+      default_model: mistral-large-latest
+      fast_model: mistral-small-latest
+
+    deepseek:
+      # DeepSeek (OpenAI-kompatibel, api-docs.deepseek.com).
+      base_url: https://api.deepseek.com/v1
+      api_style: openai
+      auth_mode: key
+      auth_method: api_key   # key-only: kein dokumentierter OAuth-Flow
+      oauth_available: false
+      key_env: DEEPSEEK_API_KEY
+      default_model: deepseek-chat
+      fast_model: deepseek-chat
+
+    xai:
+      # xAI Grok (OpenAI-kompatibel, docs.x.ai). Modellnamen aendern sich haeufig
+      # -> ueber Env/Config anpassbar. TODO: aktuellen Modellnamen pruefen.
+      base_url: https://api.x.ai/v1
+      api_style: openai
+      auth_mode: key
+      auth_method: api_key   # key-only: kein dokumentierter OAuth-Flow
+      oauth_available: false
+      key_env: XAI_API_KEY
+      default_model: grok-2-latest
+      fast_model: grok-2-latest
+
+    ollama:
+      base_url: http://localhost:11434
+      api_style: ollama
+      auth_mode: none
+      oauth_available: false
+      key_env: null
+      default_model: llama3.1
+      fast_model: llama3.2
+
+  # Router-Schwellen (nachvollziehbare Regeln, siehe antbb/router.py).
+  router:
+    # Aufgabentypen, die als "kritisch" gelten → können Nutzer-Rückfrage auslösen.
+    critical_task_types: [strategy, attack_plan, prioritization, exploit_decision]
+    # Komplexitäts-Schwelle (0..1), ab der ein starkes Modell gewählt wird.
+    complexity_threshold: 0.5
+
+# ── Scan-Parameter für die ECHTEN, defensiven Module (Recon/Scan/Infra/API) ──
+# Rein defensiv/nicht-destruktiv. Rate-Limiting schützt die Ziele vor Last.
+scan:
+  max_rps_per_host: 2        # max. Requests pro Sekunde pro Host
+  request_delay: 0.3         # zusätzliche Mindestpause (s) zwischen Requests/Host
+  http_timeout: 8.0          # HTTP-Timeout (s)
+  user_agent: "antbb/1.0 (local authorized scan)"
+  verify_tls: false          # Scanner akzeptiert auch ungültige Zertifikate (nur lesend)
+  recon:
+    enable_portscan: true
+    ports: [80, 443, 8080, 8443, 22, 21, 25, 3306]
+    port_timeout: 1.0        # kurzer TCP-Connect-Timeout (s)
+    dns_timeout: 3.0
+    subdomain_wordlist: [www, api, dev, staging, admin, mail, test, cdn, blog, app]
+  scanner:
+    paths: ["/", "/robots.txt", "/.git/", "/admin/", "/backup/", "/.env", "/server-status"]
+    reflect_param: "antbbtest"
+
+  # ── TIEFE, KONTROLLIERTE AKTIVE VERIFIKATION ────────────────────────────────
+  # Verifiziert Befunde aktiv (statt sie nur zu vermuten). SICHERHEITS-SCHALTER:
+  # enabled=false als Default. Die aktiven Checks laufen NUR, wenn dieser Schalter
+  # true ist ODER der Lauf ausdrücklich mit --active (CLI) bzw. der Web-Checkbox
+  # "Aktive Verifikation (autorisiert)" gestartet wird. Zusätzlich gelten weiterhin
+  # Scope-Gate (default-deny) und Oversight-Häkchen. KEINE destruktiven Payloads,
+  # kein Brute-Force, keine Last-Erzeugung; nur wenige Payloads je Parameter.
+  active_verification:
+    enabled: false              # DEFAULT AUS – muss ausdrücklich freigeschaltet werden
+    max_payloads_per_param: 4   # harte Obergrenze an Payloads/Parametern je Check
+    time_based_threshold: 4.0   # Delay-Schwelle (s) für time-based SQLi (konservativ)
+    time_based_delay: 3         # angefordertes SLEEP (s)
+    time_based_attempts: 2      # wenige Versuche
+    checks: [xss, sqli, open_redirect, path_traversal, exposed_artifact, cors, missing_auth, ssrf]
+    param_candidates: [q, s, search, query, name, id, page, lang, ref]
+    ssrf_max_params: 12
+    ssrf_param_candidates: [url, uri, u, link, src, source, dest, destination, redirect, redirect_uri, next, target, callback, webhook, image, img, imageurl, image_url, fetch, load, feed, proxy, data, domain, host, site]
+    redirect_param_candidates: [next, url, redirect, redirect_uri, return, returnUrl, dest, destination, r, u, to]
+    file_param_candidates: [file, path, page, template, doc, include, view]
+
+  # ── KONTROLLIERTES OFFENSIVES FUZZING ───────────────────────────────────────
+  # Content-/Path-Discovery und Parameter-Fuzzing (nur GET, gutartige Marker).
+  # SICHERHEITS-SCHALTER: enabled=false als Default. Läuft NUR, wenn dieser
+  # Schalter true ist ODER der Lauf mit --fuzz (CLI) bzw. der Web-Checkbox
+  # "Offensives Fuzzing (autorisiert)" gestartet wird (Env: ANTBB_FUZZ=1).
+  # Unabhängig von active_verification. Zusätzlich gelten Scope-Gate
+  # (default-deny) und Oversight-Häkchen. KEINE destruktiven Methoden,
+  # kein Brute-Force, keine Last-Erzeugung. Catch-all/WAF-Schutz über Baseline
+  # (Zufallspfade): nur von der Baseline abweichende Treffer werden gemeldet.
+  fuzz:
+    enabled: false                 # DEFAULT AUS – muss ausdrücklich freigeschaltet werden
+    max_requests: 200              # harte Obergrenze an Fuzz-Requests je Basis-URL
+    baseline_samples: 3            # Anzahl Zufalls-Baseline-Pfade
+    length_tolerance: 64           # Content-Length-Toleranz (Bytes) ggü. Baseline
+    wordlist:
+      - /admin
+      - /admin/
+      - /login
+      - /login/
+      - /wp-admin/
+      - /wp-login.php
+      - /dashboard
+      - /manage
+      - /console
+      - /phpmyadmin/
+      - /pma/
+      - /api
+      - /api/v1
+      - /api/v2
+      - /graphql
+      - /swagger.json
+      - /openapi.json
+      - /.git/HEAD
+      - /.git/config
+      - /.env
+      - /.env.local
+      - /.DS_Store
+      - /backup
+      - /backup/
+      - /backups/
+      - /dump.sql
+      - /db.sql
+      - /config.php.bak
+      - /server-status
+      - /server-info
+      - /actuator
+      - /actuator/health
+      - /robots.txt
+      - /sitemap.xml
+      - /.well-known/security.txt
+      - /debug
+      - /trace
+      - /test
+      - /tmp
+      - /old
+      - /bak
+      - /config
+      - /config.json
+      - /package.json
+      - /composer.json
+      - /uploads/
+      - /files/
+      - /static/
+      - /assets/
+      - /user
+      - /users
+      - /account
+      - /settings
+      - /panel
+    param_candidates: [q, s, search, query, id, page, file, path, lang, ref]
+    param_markers: ["antbbFUZZ1", "../antbb", "antbb'\"<>"]
+
+
+# ── Startseiten-Laufschrift: "Neueste Schwachstellen" (Threat-Feed) ──────────
+# Speist die durchlaufende Laufschrift + Späher-Liste auf der Startseite aus
+# ECHTEN, öffentlichen Quellen (kein Login/Token). Server-seitig gecacht (TTL),
+# höflicher User-Agent, Timeout. Fällt alles aus -> Frontend zeigt statische
+# Infosec-Fakten (Fallback). Optik im Ameisen-/Schwarz-Theme.
+threatfeed:
+  enabled: true
+  cache_ttl_seconds: 10800     # 3h – respektiert NVD-/Instanz-Rate-Limits
+  http_timeout: 8.0
+  max_items: 30
+  nvd:
+    enabled: true
+    lookback_days: 7           # zuletzt veröffentlichte CVEs der letzten N Tage
+    results_per_page: 15
+  mastodon:
+    enabled: true
+    instance: mastodon.social  # öffentliche Hashtag-Timeline (kein Token nötig)
+    tags: [cve, vulnerability, infosec]
+    limit_per_tag: 10
+    # Öffentliche Infosec-/CVE-Konten (user@instanz) – Account-Timelines sind
+    # ohne Login abrufbar. Beliebig erweiterbar/ersetzbar.
+    accounts:
+      - cvedatabase@infosec.exchange    # CVEDatabase.com
+      - EUVD_Bot@mastodon.social        # EUVD (ENISA) – CVSS, Vendor, Datum
+      - shodansafari@infosec.exchange   # Shodan Safari
+      - urldna@infosec.exchange         # urlDNA.io
+      - securityfeed@infosec.exchange   # Security Feed (News-Digests)
+    limit_per_account: 6

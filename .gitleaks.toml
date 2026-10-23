@@ -1,0 +1,18 @@
+# antbb-framework – gitleaks config
+# Erlaubt bewusst synthetische Token-Fixtures in Smoke-Tests (kein echtes Secret).
+title = "antbb-framework"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetische Test-Fixtures und Beispiel-Platzhalter"
+paths = [
+  '''tests/smoke_test_codeaudit\.py''',
+]
+regexes = [
+  '''sk_live_ABCDEFGH12345678ZZ''',
+  '''sk_live_SHOULDNOTappear9999''',
+  '''tskey-auth-\.\.\.''',
+  '''AKIAIOSFODNN7EXAMPLE''',
+]
