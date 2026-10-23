@@ -299,6 +299,55 @@ CREATE TABLE IF NOT EXISTS run_history (
     created_at    REAL NOT NULL
 );
 
+-- ---- Blue Queen: wiederholbare Jobs ------------------------------------
+CREATE TABLE IF NOT EXISTS blue_jobs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    enabled       INTEGER NOT NULL DEFAULT 1,
+    interval_sec  INTEGER NOT NULL DEFAULT 86400,
+    target_id     INTEGER,
+    params_json   TEXT NOT NULL DEFAULT '{}',
+    last_run_at   REAL,
+    next_run_at   REAL,
+    created_at    REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS blue_job_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id        INTEGER NOT NULL,
+    run_id        TEXT,
+    status        TEXT DEFAULT 'done',
+    finding_count INTEGER NOT NULL DEFAULT 0,
+    closed_count  INTEGER NOT NULL DEFAULT 0,
+    summary_json  TEXT NOT NULL DEFAULT '{}',
+    error         TEXT DEFAULT '',
+    started_at    REAL,
+    finished_at   REAL,
+    created_at    REAL NOT NULL,
+    FOREIGN KEY(job_id) REFERENCES blue_jobs(id) ON DELETE CASCADE
+);
+
+-- ---- Blue Queen: permanenter Attack-Log (append-only) -------------------
+CREATE TABLE IF NOT EXISTS attack_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type    TEXT NOT NULL,
+    source        TEXT DEFAULT '',
+    action        TEXT DEFAULT '',
+    countermeasure TEXT DEFAULT '',
+    outcome       TEXT DEFAULT '',
+    before_json   TEXT NOT NULL DEFAULT '{}',
+    after_json    TEXT NOT NULL DEFAULT '{}',
+    evidence_json TEXT NOT NULL DEFAULT '{}',
+    run_id        TEXT DEFAULT '',
+    target_id     INTEGER,
+    severity      TEXT DEFAULT 'info',
+    ts            REAL NOT NULL,
+    created_at    REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attack_events_ts ON attack_events(ts);
+CREATE INDEX IF NOT EXISTS idx_attack_events_run ON attack_events(run_id);
+
 """
 
 
@@ -1246,3 +1295,134 @@ class Store:
         self._conn.execute("DELETE FROM targets")  # CASCADE: scopes/findings/reports/oversight
         self._conn.commit()
         return counts
+
+
+    # ---------------- Blue Queen Jobs ----------------
+    def add_blue_job(self, name: str, kind: str, interval_sec: int = 86400,
+                     target_id: Optional[int] = None, params: Optional[dict] = None,
+                     enabled: bool = True) -> int:
+        now = _now()
+        cur = self._conn.execute(
+            "INSERT INTO blue_jobs(name, kind, enabled, interval_sec, target_id, "
+            "params_json, next_run_at, created_at) VALUES (?,?,?,?,?,?,?,?)",
+            (name, kind, 1 if enabled else 0, int(interval_sec), target_id,
+             json.dumps(params or {}), now, now))
+        self._conn.commit()
+        return int(cur.lastrowid)
+
+    def list_blue_jobs(self, enabled_only: bool = False) -> list:
+        q = "SELECT * FROM blue_jobs"
+        if enabled_only:
+            q += " WHERE enabled=1"
+        q += " ORDER BY id"
+        return list(self._conn.execute(q).fetchall())
+
+    def get_blue_job(self, job_id: int):
+        return self._conn.execute(
+            "SELECT * FROM blue_jobs WHERE id=?", (job_id,)).fetchone()
+
+    def set_blue_job_enabled(self, job_id: int, enabled: bool) -> None:
+        self._conn.execute("UPDATE blue_jobs SET enabled=? WHERE id=?",
+                           (1 if enabled else 0, job_id))
+        self._conn.commit()
+
+    def delete_blue_job(self, job_id: int) -> None:
+        self._conn.execute("DELETE FROM blue_jobs WHERE id=?", (job_id,))
+        self._conn.commit()
+
+    def mark_blue_job_ran(self, job_id: int, interval_sec: Optional[int] = None) -> None:
+        now = _now()
+        row = self.get_blue_job(job_id)
+        iv = int(interval_sec if interval_sec is not None
+                 else (row["interval_sec"] if row else 86400))
+        self._conn.execute(
+            "UPDATE blue_jobs SET last_run_at=?, next_run_at=? WHERE id=?",
+            (now, now + iv, job_id))
+        self._conn.commit()
+
+    def due_blue_jobs(self, now: Optional[float] = None) -> list:
+        now = now if now is not None else _now()
+        return list(self._conn.execute(
+            "SELECT * FROM blue_jobs WHERE enabled=1 AND "
+            "(next_run_at IS NULL OR next_run_at<=?) ORDER BY id", (now,)).fetchall())
+
+    def add_blue_job_run(self, job_id: int, run_id: str = "", status: str = "done",
+                         finding_count: int = 0, closed_count: int = 0,
+                         summary: Optional[dict] = None, error: str = "",
+                         started_at: Optional[float] = None,
+                         finished_at: Optional[float] = None) -> int:
+        now = _now()
+        cur = self._conn.execute(
+            "INSERT INTO blue_job_runs(job_id, run_id, status, finding_count, "
+            "closed_count, summary_json, error, started_at, finished_at, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (job_id, run_id, status, int(finding_count), int(closed_count),
+             json.dumps(summary or {}), error or "",
+             started_at or now, finished_at or now, now))
+        self._conn.commit()
+        return int(cur.lastrowid)
+
+    def list_blue_job_runs(self, job_id: Optional[int] = None, limit: int = 50) -> list:
+        if job_id is not None:
+            return list(self._conn.execute(
+                "SELECT * FROM blue_job_runs WHERE job_id=? ORDER BY id DESC LIMIT ?",
+                (job_id, int(limit))).fetchall())
+        return list(self._conn.execute(
+            "SELECT * FROM blue_job_runs ORDER BY id DESC LIMIT ?",
+            (int(limit),)).fetchall())
+
+
+
+    # ---------------- Attack-Log (append-only) ----------------
+    def append_attack_event(self, event: dict) -> int:
+        """Append-only Persistenz. Kein Truncate/Delete über diese API."""
+        import json as _json
+        now = _now()
+        cur = self._conn.execute(
+            "INSERT INTO attack_events(event_type, source, action, countermeasure, "
+            "outcome, before_json, after_json, evidence_json, run_id, target_id, "
+            "severity, ts, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (event.get("event_type") or "info",
+             event.get("source") or "",
+             event.get("action") or "",
+             event.get("countermeasure") or "",
+             event.get("outcome") or "",
+             _json.dumps(event.get("before") or {}),
+             _json.dumps(event.get("after") or {}),
+             _json.dumps(event.get("evidence") or {}),
+             event.get("run_id") or "",
+             event.get("target_id"),
+             event.get("severity") or "info",
+             float(event.get("ts") or now),
+             now))
+        self._conn.commit()
+        return int(cur.lastrowid)
+
+    def list_attack_events(self, run_id=None, event_type=None,
+                           limit: int = 200, since=None) -> list:
+        import json as _json
+        q = "SELECT * FROM attack_events WHERE 1=1"
+        args = []
+        if run_id:
+            q += " AND run_id=?"; args.append(run_id)
+        if event_type:
+            q += " AND event_type=?"; args.append(event_type)
+        if since is not None:
+            q += " AND ts>=?"; args.append(float(since))
+        q += " ORDER BY id DESC LIMIT ?"; args.append(int(limit))
+        rows = list(self._conn.execute(q, args).fetchall())
+        out = []
+        for r in rows:
+            d = dict(r)
+            for k, jk in (("before", "before_json"), ("after", "after_json"),
+                          ("evidence", "evidence_json")):
+                try:
+                    d[k] = _json.loads(d.get(jk) or "{}")
+                except Exception:
+                    d[k] = {}
+            out.append(d)
+        return out
+
+    def count_attack_events(self) -> int:
+        row = self._conn.execute("SELECT COUNT(*) AS c FROM attack_events").fetchone()
+        return int(row["c"] if row else 0)

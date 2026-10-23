@@ -418,6 +418,163 @@ def brain_page(request: Request):
     })
 
 
+
+@app.get("/blue", response_class=HTMLResponse)
+def blue_page(request: Request):
+    """Blue Queen – Verteidigungs-Kolonie (Soldaten, Jobs, Splunk-Status)."""
+    import time as _t
+    targets = [_rowdict(t) for t in svc.list_targets()]
+    jobs = []
+    for j in svc.blue_jobs_list():
+        d = _rowdict(j)
+        lr = d.get("last_run_at")
+        d["last_run_label"] = (_t.strftime("%Y-%m-%d %H:%M", _t.localtime(lr))
+                               if lr else "—")
+        jobs.append(d)
+    job_runs = [_rowdict(r) for r in svc.blue_job_runs(limit=20)]
+    cap = svc.blue_capabilities()
+    blues = cap.get("soldiers") or []
+    pb_n = sum(len(s.get("playbooks") or []) for s in blues)
+    task_n = sum(((s.get("skill") or {}).get("task_count") or 0) for s in blues)
+    ledger_rows = []
+    lst = {"open_total": 0, "closed_total": 0, "tracked": 0, "updated_at": 0}
+    try:
+        from .. import blue_checks as _bc
+        led = _bc.ledger_load()
+        lst = _bc.ledger_stats(led)
+        _sevrank = {"high": 0, "medium": 1, "low": 2, "info": 3}
+        for cid, e in (led.get("checks") or {}).items():
+            since = e.get("failed_since") if e.get("status") == "fail" else e.get("closed_at")
+            ledger_rows.append({
+                "check_id": cid, "title": e.get("title", cid), "status": e.get("status", "?"),
+                "severity": e.get("severity", "low"), "detail": e.get("last_detail", ""),
+                "since": (_t.strftime("%Y-%m-%d %H:%M", _t.localtime(since)) if since else "—"),
+                "closed_count": int(e.get("closed_count", 0)),
+            })
+        ledger_rows.sort(key=lambda r: (0 if r["status"] == "fail" else 1,
+                                        _sevrank.get(r["severity"], 9), r["check_id"]))
+    except Exception:
+        pass
+    blue_stats = {
+        "soldiers": int(cap.get("soldier_count") or len(blues)),
+        "playbooks": pb_n,
+        "tasks": task_n,
+        "jobs": len(jobs),
+        "open": lst.get("open_total", 0),
+        "closed": lst.get("closed_total", 0),
+        "tracked": lst.get("tracked", 0),
+        "updated": (_t.strftime("%Y-%m-%d %H:%M", _t.localtime(lst["updated_at"]))
+                    if lst.get("updated_at") else ""),
+    }
+    return templates.TemplateResponse(request, "blue.html", {
+        "targets": targets, "jobs": jobs, "job_runs": job_runs,
+        "splunk": cap.get("splunk", {}),
+        "blue_stats": blue_stats, "ledger_rows": ledger_rows,
+        "disclaimer": DISCLAIMER_TEXT,
+    })
+
+
+@app.get("/api/blue")
+def api_blue():
+    return JSONResponse(svc.blue_capabilities())
+
+
+@app.post("/api/blue/run")
+def api_blue_run(payload: Optional[dict] = None):
+    payload = payload or {}
+    tid = payload.get("target_id")
+    apply_fixes = bool(payload.get("apply_fixes"))
+    ack = payload.get("oversight_ack")
+    if ack is not None:
+        ack = bool(ack)
+    params = {"online": bool(payload.get("online", True))}
+    if payload.get("ecosystems"):
+        params["ecosystems"] = payload["ecosystems"]
+    try:
+        result = svc.run_blue(target_id=tid, apply_fixes=apply_fixes,
+                              oversight_ack=ack, params=params)
+    except OversightError as exc:
+        raise HTTPException(403, str(exc))
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+    return JSONResponse({
+        "ok": True, "run_id": result.run_id,
+        "finding_count": len(result.findings),
+        "closed_count": result.closed_count(),
+        "severity": result.by_severity(),
+        "status": result.by_status(),
+        "findings": [{"title": f.title, "severity": f.severity,
+                      "status": f.status, "category": f.category,
+                      "agent": f.agent} for f in result.findings[:80]],
+    })
+
+
+@app.get("/api/blue/jobs")
+def api_blue_jobs():
+    return JSONResponse([_rowdict(j) for j in svc.blue_jobs_list()])
+
+
+@app.post("/api/blue/jobs")
+def api_blue_jobs_create(payload: dict):
+    try:
+        jid = svc.blue_job_create(
+            payload.get("name") or "job",
+            payload.get("kind") or "swscan",
+            interval_sec=int(payload.get("interval_sec") or 86400),
+            target_id=payload.get("target_id"),
+            params=payload.get("params") or {})
+        return {"ok": True, "id": jid}
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+
+
+@app.post("/api/blue/jobs/{job_id}/run")
+def api_blue_job_run(job_id: int):
+    try:
+        return JSONResponse(svc.blue_job_run(job_id))
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+
+
+@app.get("/api/blue/jobs/{job_id}/runs")
+def api_blue_job_runs(job_id: int, limit: int = 50):
+    return JSONResponse([_rowdict(r) for r in svc.blue_job_runs(job_id, limit)])
+
+
+@app.post("/api/blue/jobs/tick")
+def api_blue_jobs_tick():
+    return JSONResponse({"results": svc.blue_jobs_tick()})
+
+
+
+@app.get("/api/blue/attacklog")
+def api_blue_attacklog(limit: int = 50, run_id: str = "", event_type: str = ""):
+    return JSONResponse(svc.attack_log_list(limit=limit, run_id=run_id,
+                                            event_type=event_type))
+
+
+@app.post("/api/blue/watcher")
+def api_blue_watcher(payload: Optional[dict] = None):
+    payload = payload or {}
+    try:
+        return JSONResponse(svc.watcher_run(
+            events=payload.get("events") or [],
+            active=bool(payload.get("active") or payload.get("oversight_ack")),
+            apply_protect=bool(payload.get("apply_protect")),
+            kinds=payload.get("kinds"),
+            run_id=payload.get("run_id") or "",
+            target_id=payload.get("target_id"),
+        ))
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"},
+                            status_code=400)
+
+
+@app.get("/api/blue/softwarescan")
+def api_blue_softwarescan(online: int = 1):
+    return JSONResponse(svc.softwarescan(online=bool(online)))
+
+
 # ---------------- Form-Handler (HTML) – rufen nur Service-Funktionen ----------------
 @app.post("/target/add")
 def html_add_target(name: str = Form(...), description: str = Form(""),

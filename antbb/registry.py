@@ -15,6 +15,7 @@ import time
 from typing import Optional
 
 from .agents import WORKER_AGENTS
+from .agents.blue import BLUE_AGENTS, BLUE_PHASES
 
 _SECRET_MARKERS = ("api_key", "apikey", "token", "secret", "password", "minimax")
 
@@ -210,6 +211,95 @@ TASK_CATALOG: dict[str, list[str]] = {
                             "Rogue-AP + Captive-Portal zeitbegrenzt (operator-getrieben)",
                             "Credentials nur als Nachweis (maskiert/gehasht)",
                             "Auto-Purge nach Report"],
+    # --- blue queen ---
+    "sw-inventory": ["Paketmanager rein lesend abfragen (dpkg/rpm/pip)",
+                     "Paketname+Version erfassen", "keine Secrets"],
+    "sw-cve-match-osv": ["Inventar gegen OSV abgleichen", "CVE-IDs nur aus OSV übernehmen",
+                         "nie erfundene Schwachstellen"],
+    "hardening-audit": ["SSH-Config prüfen", "Firewall-Status prüfen",
+                        "world-writable Dateien in /etc finden", "sysctl-Härtung prüfen"],
+    "hardening-apply": ["Fix-Vorschlag NUR mit Oversight anwenden (default-deny)",
+                        "nie automatisch ohne Freigabe"],
+    "detection-ruleset": ["Detection-Regeln bereitstellen", "Quellen zuordnen"],
+    "splunk-forward": ["Events an HEC spiegeln wenn konfiguriert",
+                       "ohne Config sauber überspringen"],
+    "remediation-plan": ["Finding→Fix-Schritt ableiten", "konkreten Behebungsschritt vorschlagen"],
+    "remediation-verify": ["rein lesender Re-Check", "Vorher/Nachher-Evidence",
+                           "nachweislich geschlossen belegen"],
+    "honeypot-recipes": ["sichere Decoy-Rezepte dokumentieren"],
+    "honeypot-deploy": ["Decoy NUR mit Oversight starten (default-deny, Scaffold)"],
+    # --- blue extras (watcher / attacklog / web / net / supply / ir) ---
+    "watcher-detect": ["Events entgegennehmen", "Signal-Katalog anwenden",
+                       "Treffer mit Evidence erfassen", "Ohne Events: honest-empty"],
+    "watcher-divert-protect": ["Divert je Detection planen",
+                               "Sofortschutz empfehlen (rate-limit/block)",
+                               "Aktives Anwenden nur mit Oversight"],
+    "watcher-traceback": ["Sources korrelieren", "Fingerprints/Sessions sammeln",
+                          "Keine erfundenen IPs/Identitäten",
+                          "Attribution im Attack-Log ablegen"],
+    "watcher-full-run": ["Oversight prüfen", "run_watch ausführen",
+                         "Log-IDs zurückgeben", "Summary melden"],
+    "attacklog-append": ["Event normalisieren", "Secrets redakten",
+                         "In Store schreiben", "Optional Splunk spiegeln"],
+    "attacklog-review": ["Events lesen (Limit)", "Nach Typ zählen",
+                         "Nach Outcome zählen", "Keine Delete-API nutzen"],
+    "attacklog-integrity": ["EVENT_TYPES prüfen", "delete_api=False bestätigen",
+                            "Summary erzeugen"],
+    "patch-recheck": ["Audit erneut laufen", "Status je Check erfassen",
+                      "Abweichungen melden", "Passes als geschlossen markieren"],
+    "patch-verify-finding": ["Finding-Key lesen", "verify_closed aufrufen",
+                             "Evidence Vorher/Nachher speichern"],
+    "ir-triage": ["Signal klassifizieren", "Business-Impact schätzen",
+                  "Severity setzen", "On-Call informieren"],
+    "ir-containment": ["Betroffene Assets isolieren", "Credentials rotieren (geplant)",
+                       "Honeypot-Umleitung prüfen", "Firewall-Regel temporär"],
+    "ir-eradication-recovery": ["Root-Cause eingrenzen", "Patches einspielen",
+                                "Services wiederherstellen", "Lessons-Learned"],
+    "ir-comms": ["Stakeholder-Liste", "Status-Update-Takt",
+                 "Externe Meldepflichten", "Keine Secrets in Comms"],
+    "backup-inventory": ["Standard-Pfade prüfen", "mtime/Alter berechnen",
+                         "Veraltete Backups melden", "Fehlende Locations melden"],
+    "backup-restore-drill-plan": ["Ziel-System definieren", "Restore-Fenster wählen",
+                                  "Erfolgskriterien festlegen", "Kein Auto-Restore"],
+    "net-listen-audit": ["ss/netstat lesen", "Ports extrahieren",
+                         "Gegen Risiko-Katalog matchen", "Empfehlungen geben"],
+    "net-firewall-status": ["Tool erkennen", "Aktiv-Status lesen",
+                            "Default-Deny empfehlen wenn inaktiv"],
+    "net-exposure-report": ["Findings aggregieren", "Priorität setzen",
+                            "Härtungsmaßnahmen vorschlagen"],
+    "web-security-headers": ["HTTP-Response holen", "Header-Katalog prüfen",
+                             "Fehlende Header als Finding", "Empfehlungen geben"],
+    "web-cookie-flags": ["Set-Cookie lesen", "Flags prüfen", "Lücken melden"],
+    "web-tls-basics": ["TLS-Handshake", "Version lesen", "Schwache Protokolle melden"],
+    "cred-key-permissions": ["Standard-Pfade scannen", "mode/world-readable prüfen",
+                             "Findings ohne Klartext-Secrets", "chmod-Empfehlung"],
+    "cred-hygiene-report": ["Treffer zählen", "High-Findings priorisieren",
+                            "Remediation-Hinweise bündeln"],
+    "sc-manifest-inventory": ["Manifeste finden", "Pakete+Versionen parsen",
+                              "Inventar-Finding erzeugen"],
+    "sc-osv-audit": ["Pakete mit Version wählen", "OSV abfragen",
+                     "CVE-IDs nur aus OSV", "Offline sauber skippen"],
+    "sc-remediation-hints": ["fixed-Version aus OSV", "Priorität nach Severity",
+                             "Kein automatisches Upgrade"],
+    "logging-splunk-status": ["ENV-Status lesen", "configured ja/nein",
+                              "Index/Sourcetype melden", "Token nie ausgeben"],
+    "logging-event-map": ["Beispiel-Finding mappen", "Felder prüfen",
+                          "Ohne Config Skip bestätigen"],
+    "logging-forward-smoke": ["send_events aufrufen", "skipped/ok auswerten",
+                              "Fehler ehrlich melden"],
+    "honeypot-divert-plan": ["Signal klassifizieren", "Decoy wählen",
+                             "Umleitungs-Schritte dokumentieren",
+                             "Sofortschutz-Empfehlung anhängen"],
+    "patch-posture": ["ausstehende Updates lesen", "Paketlisten-Alter",
+                      "Reboot-Pflicht", "Auto-Security-Updates"],
+    "patch-policy-check": ["unattended-upgrades prüfen", "OS-Release erfassen"],
+    "patch-apply": ["Oversight prüfen", "Updates nur mit Freigabe",
+                    "Dokumentieren statt blind installieren"],
+    "fw-ruleset-audit": ["ufw/nft/iptables Status", "aktive Regeln prüfen"],
+    "fw-exposure-review": ["Wildcard-Listener", "Risiko-Ports", "IP-Forwarding"],
+    "fw-rule-apply": ["Oversight prüfen", "Default-Deny vorschlagen",
+                      "nur mit Freigabe anwenden"],
+
 }
 
 
@@ -224,8 +314,9 @@ def _tasks_for(pb: dict) -> list[dict]:
              "oversight": bool(pb.get("oversight_required"))} for t in items]
 
 
-def build_registry(agents=None) -> dict:
-    agents = agents if agents is not None else WORKER_AGENTS
+def build_registry(agents=None, include_blue: bool = True) -> dict:
+    if agents is None:
+        agents = list(WORKER_AGENTS) + (list(BLUE_AGENTS) if include_blue else [])
     soldiers = []
     pb_count = 0
     tool_count = 0
@@ -291,6 +382,8 @@ def build_registry(agents=None) -> dict:
         "wordlists": wl_status,
         "plugins": plugins_block,
         "octogent_phases": OCTOGENT_PHASES,
+        "blue_phases": list(BLUE_PHASES),
+        "blue_soldier_count": sum(1 for s in soldiers if s.get("colony") == "blue"),
         "scope_suggestions": SCOPE_SUGGESTIONS,
         "prompt_categories": list(__import__("antbb.prompts", fromlist=["PROMPT_TEMPLATES"]).PROMPT_TEMPLATES),
     }

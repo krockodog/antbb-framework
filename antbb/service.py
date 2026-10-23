@@ -870,3 +870,101 @@ class AntBBService:
             "fast_model": llm_mod.FAST_MODEL,
             "providers": llm_mod.status_all(),
         }
+
+    # ---------------- Blue Queen (Verteidigungs-Kolonie) ----------------
+    def blue_capabilities(self) -> dict:
+        """Blue-Soldaten aus der Registry (colony=blue)."""
+        reg = self.capabilities(rebuild=True)
+        blues = [s for s in reg.get("soldiers", []) if s.get("colony") == "blue"]
+        import os as _os
+        pb_dir = _os.path.join(_os.path.dirname(__file__), "playbooks", "blue")
+        try:
+            pb_md = len([f for f in _os.listdir(pb_dir) if f.endswith(".md")])
+        except Exception:
+            pb_md = 0
+        pb_n = sum(len(s.get("playbooks") or []) for s in blues)
+        task_n = sum(((s.get("skill") or {}).get("task_count") or 0) for s in blues)
+        return {
+            "blue_phases": reg.get("blue_phases", []),
+            "soldier_count": len(blues),
+            "playbook_count": pb_n,
+            "task_count": task_n,
+            "playbook_md_count": pb_md,
+            "soldiers": blues,
+            "soldier_ids": [s.get("name") for s in blues],
+            "splunk": __import__("antbb.splunk", fromlist=["status"]).status(),
+        }
+
+    def run_blue(self, target_id: Optional[int] = None,
+                 phases: Optional[tuple] = None, apply_fixes: bool = False,
+                 oversight_ack: Optional[bool] = None,
+                 params: Optional[dict] = None,
+                 emit: Optional[Callable[[dict], None]] = None):
+        """Startet die Verteidigungs-Kolonie (Blue Queen). Default: read-only."""
+        from .blue_queen import BlueQueen, PHASES as BP
+        queen = BlueQueen(self.store, logger=self.logger, emit=emit, use_llm=False)
+        return queen.run_colony_sync(
+            target_id=target_id, phases=phases or BP,
+            apply_fixes=apply_fixes, oversight_ack=oversight_ack,
+            params=params)
+
+    def blue_jobs_list(self, enabled_only: bool = False):
+        from .jobs import JobScheduler
+        return JobScheduler(self.store, logger=self.logger).list(enabled_only)
+
+    def blue_job_create(self, name: str, kind: str, interval_sec: int = 86400,
+                        target_id: Optional[int] = None,
+                        params: Optional[dict] = None) -> int:
+        from .jobs import JobScheduler
+        return JobScheduler(self.store, logger=self.logger).create(
+            name, kind, interval_sec=interval_sec, target_id=target_id,
+            params=params)
+
+    def blue_job_run(self, job_id: int) -> dict:
+        from .jobs import JobScheduler
+        return JobScheduler(self.store, logger=self.logger).run_once(job_id)
+
+    def blue_job_runs(self, job_id: Optional[int] = None, limit: int = 50):
+        from .jobs import JobScheduler
+        return JobScheduler(self.store, logger=self.logger).runs(job_id, limit)
+
+    def blue_jobs_tick(self) -> list:
+        from .jobs import JobScheduler
+        return JobScheduler(self.store, logger=self.logger).tick()
+
+    def softwarescan(self, online: bool = True, ecosystems=None) -> dict:
+        """Direkter Software-/Versions-Scan (ohne Kolonie-Lauf)."""
+        from . import softwarescan as sw
+        rep = sw.scan(ecosystems=ecosystems, online=online)
+        return {
+            "summary": rep.summary(),
+            "packages": [{"name": p.name, "version": p.version,
+                          "ecosystem": p.ecosystem, "source": p.source}
+                         for p in rep.packages],
+            "matches": [{"package": m.package, "version": m.version,
+                         "ecosystem": m.ecosystem, "vuln_id": m.vuln_id,
+                         "summary": m.summary, "severity": m.severity,
+                         "fixed": m.fixed, "aliases": m.aliases}
+                        for m in rep.matches],
+        }
+
+    def attack_log_list(self, limit: int = 50, run_id: str = "",
+                        event_type: str = ""):
+        from .attack_log import AttackLog
+        alog = AttackLog(self.store)
+        return {
+            "events": alog.list(run_id=run_id, event_type=event_type, limit=limit),
+            "total": alog.count(),
+            "summary": alog.summary(),
+        }
+
+    def watcher_run(self, events=None, active: bool = False,
+                    apply_protect: bool = False, kinds=None,
+                    run_id: str = "", target_id=None) -> dict:
+        from . import watcher as _w
+        report = _w.run_watch(
+            events or [], active=active, apply_protect=apply_protect,
+            kinds=kinds, store=self.store, run_id=run_id or "",
+            target_id=target_id)
+        return report.to_dict()
+
