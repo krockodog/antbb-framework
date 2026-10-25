@@ -64,10 +64,10 @@ You are the red-team operator, trained on the red-team methodology, infrastructu
 ## Hinterlegter Scope (Octogent Deck)
 
 **Erlaubte Ziele:**
-- https://shop.example.com/de/
-- https://demo.example.com/
-- https://shop.example.com/
-- https://engagement.example.com/
-- https://app.example.com/
+- https://partybrueller.de/de/
+- https://spassprofi.de/
+- https://scherzartikel-onlineshop.de/
+- https://dc-infosec.de/
+- https://carescribe.de/
 
-**Tags:** pentest, redteam, example-shop, example-demo, example-engagement, example-app
+**Tags:** pentest, redteam, partybrueller, spassprofi, dc-infosec, carescribe

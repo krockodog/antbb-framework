@@ -300,10 +300,11 @@ CREATE TABLE IF NOT EXISTS run_history (
 );
 
 -- ---- Blue Queen: wiederholbare Jobs ------------------------------------
+-- Jobs sind Definitionen (Art, Intervall, Params). Runs halten den Verlauf.
 CREATE TABLE IF NOT EXISTS blue_jobs (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     name          TEXT NOT NULL,
-    kind          TEXT NOT NULL,
+    kind          TEXT NOT NULL,          -- swscan | hardening | remediate | colony
     enabled       INTEGER NOT NULL DEFAULT 1,
     interval_sec  INTEGER NOT NULL DEFAULT 86400,
     target_id     INTEGER,
@@ -317,7 +318,7 @@ CREATE TABLE IF NOT EXISTS blue_job_runs (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id        INTEGER NOT NULL,
     run_id        TEXT,
-    status        TEXT DEFAULT 'done',
+    status        TEXT DEFAULT 'done',   -- done | error | skipped
     finding_count INTEGER NOT NULL DEFAULT 0,
     closed_count  INTEGER NOT NULL DEFAULT 0,
     summary_json  TEXT NOT NULL DEFAULT '{}',
@@ -596,6 +597,19 @@ class Store:
             (key, str(value), _now()),
         )
         self._conn.commit()
+
+    # ---------------- WLAN-Zustand (letzter Scan, letzte Schätzung) ----------------
+    def set_wlan_state(self, key: str, value: str) -> None:
+        """Persistiert WLAN-Status (z.B. letzter Scan / Grundriss-Schätzung).
+        Nur Messdaten/Darstellung – niemals Secrets."""
+        self.set_setting(f"wlan.{key}", value)
+
+    def get_wlan_state(self, key: str) -> Optional[str]:
+        """Liest WLAN-Status; None wenn nicht vorhanden."""
+        row = self._conn.execute(
+            "SELECT value FROM settings WHERE key=?", (f"wlan.{key}",)
+        ).fetchone()
+        return row["value"] if row else None
 
     # ---------------- Auth / Multi-User (optional) ----------------
     def count_users(self) -> int:
@@ -1147,6 +1161,24 @@ class Store:
         return self._conn.execute(
             "SELECT * FROM findings WHERE id=?", (int(finding_id),)
         ).fetchone()
+
+    def close_finding(self, finding_id: int, remediation_evidence: dict) -> bool:
+        """Markiert einen Befund erst nach erfolgreichem Re-Check geschlossen."""
+        row = self.get_finding(finding_id)
+        if row is None:
+            return False
+        try:
+            evidence = json.loads(row["evidence"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            evidence = {}
+        evidence["remediation"] = remediation_evidence
+        cur = self._conn.execute(
+            "UPDATE findings SET category='blue-remediation-verified', status='GESCHLOSSEN', "
+            "severity='info', evidence=? WHERE id=?",
+            (json.dumps(evidence, ensure_ascii=False), int(finding_id)),
+        )
+        self._conn.commit()
+        return cur.rowcount == 1
 
     def count_findings(self, target_id: Optional[int] = None) -> int:
         if target_id is None:

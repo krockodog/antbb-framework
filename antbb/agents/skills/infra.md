@@ -59,10 +59,10 @@ You are the network and infrastructure penetration-testing expert. You focus on 
 ## Hinterlegter Scope (Octogent Deck)
 
 **Erlaubte Ziele:**
-- https://shop.example.com/de/
-- https://demo.example.com/
-- https://shop.example.com/
-- https://engagement.example.com/
-- https://app.example.com/
+- https://partybrueller.de/de/
+- https://spassprofi.de/
+- https://scherzartikel-onlineshop.de/
+- https://dc-infosec.de/
+- https://carescribe.de/
 
-**Tags:** pentest, network, example-shop, example-demo, example-engagement, example-app
+**Tags:** pentest, network, partybrueller, spassprofi, dc-infosec, carescribe

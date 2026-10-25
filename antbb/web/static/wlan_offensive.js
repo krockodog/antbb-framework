@@ -94,6 +94,7 @@
     // Airgorah-Aktionen
     const dis = armed ? "" : "disabled";
     h += `<div class="card"><strong>🗡️ Airgorah-Aktionen (Gate-pflichtig)</strong>
+      <label class="wlan-check" title="Echte Pakete senden – nur eigenes Netz!"><input type="checkbox" id="ao-scharf"> scharf (echte Ausführung, sonst Dry-Run)</label>
       <p class="hint">Browser startet Tools im dry_run (Status/Gate-Test). Scharfer Lauf nur
         CLI/operator mit Hardware+Root. Keine autonomen Ketten.</p>
       <div class="wlan-air-actions">
@@ -159,13 +160,13 @@
     };
 
     root.querySelectorAll("[data-act]").forEach(b=> b.onclick = async ()=>{
-      const out = g("ao-out"); out.textContent="läuft (dry_run / Gate-Check)…";
+      const out = g("ao-out"); out.textContent=(document.getElementById("ao-scharf")||{}).checked?"läuft SCHARF…":"läuft (dry_run / Gate-Check)…";
       const res = await j(`/api/wlan/offensive/${b.dataset.act}`, {method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({bssid:val("ao-bssid"), ssid:val("ao-ssid"),
           client_mac:val("ao-cmac"), capture_path:val("ao-cap"),
           channel: val("ao-channel") ? parseInt(val("ao-channel"),10) : null,
-          dry_run:true})});
+          dry_run:!(document.getElementById("ao-scharf")||{}).checked})});
       out.textContent = (res.allowed?"✅ ":"⛔ ") + (res.reason||"") +
         (res.honest_empty?" [honest-empty]":"") + (res.tool?(" tool="+res.tool):"") +
         (res.detail && res.detail.warning ? ("\n⚠ "+res.detail.warning) : "");

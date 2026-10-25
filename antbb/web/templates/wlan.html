@@ -58,6 +58,44 @@
   </div>
 
   <div id="wlan-view">lädt…</div>
+
+  <!-- EIN-KLICK Client-Enumeration (passiv, Monitor-Mode automatisch an/aus) -->
+  <div class="wlan-queen-box" id="wlan-clients-box">
+    <div class="wlan-queen-head">
+      <strong>📱 WLAN-Clients abfragen</strong>
+      <span class="hint">ein Klick · nur passiv (Mithören) · kein Deauth/Injection</span>
+    </div>
+    <div class="wlan-queen-actions">
+      <label class="wlan-field wlan-check" title="Human Oversight">
+        <input type="checkbox" id="clients-oversight">
+        Oversight bestätigen (Pflicht – Monitor-Mode ist eine aktive Aktion)
+      </label>
+      <button type="button" id="btn-clients" class="wlan-primary wlan-queen-btn">
+        📱 Clients abfragen
+      </button>
+    </div>
+    <div id="clients-status" class="wlan-status">Bereit – Oversight setzen, dann ein Klick.</div>
+    <table id="clients-table" class="clients-table"></table>
+  </div>
+
+  <!-- EIN-KLICK Geraete-Erkennung (nmap, read-only): Router/Repeater/Mesh/IoT -->
+  <div class="wlan-queen-box" id="wlan-devices-box">
+    <div class="wlan-queen-head">
+      <strong>🔎 Geräte-Scan (nmap)</strong>
+      <span class="hint">lokales Subnetz · read-only · erkennt FritzBox, Repeater/Mesh, IoT + Firmware-Hinweise</span>
+    </div>
+    <div class="wlan-queen-actions">
+      <label class="wlan-field wlan-check" title="Human Oversight">
+        <input type="checkbox" id="devices-oversight">
+        Oversight bestätigen (Pflicht – aktiver Scan im eigenen Netz)
+      </label>
+      <button type="button" id="btn-devices" class="wlan-primary wlan-queen-btn">
+        🔎 Geräte im Netz finden
+      </button>
+    </div>
+    <div id="devices-status" class="wlan-status">Bereit – Oversight setzen, dann ein Klick.</div>
+    <table id="devices-table" class="clients-table"></table>
+  </div>
 </section>
 
 <!-- (2b) HEATMAP – WLAN-Coverage-Karte (passiv, verortete RSSI) -->
@@ -101,6 +139,13 @@
 
   <div id="heat-status" class="wlan-status">Bereit. „📡 Hier messen“ startet einen passiven Scan.</div>
 
+  <!-- Grundriss aus WLAN schätzen (wird direkt auf der Heatmap-Karte gezeichnet) -->
+  <div class="wlan-heat-toolbar">
+    <button type="button" id="btn-estimate-floorplan" class="wlan-primary">🏠 Grundriss aus WLAN schätzen</button>
+    <span class="hint">wird auf der Karte im Heatmap-Stil gezeichnet – Upload nur optional</span>
+  </div>
+  <div id="floorplan-estimate-note" class="hint"></div>
+
   <div class="wlan-heat-stage">
     <canvas id="heat-canvas" width="900" height="560"
             aria-label="WLAN-Coverage-Heatmap"></canvas>
@@ -134,7 +179,8 @@ kein GTK-Embed. Deauth/Evil-Twin/Capture nur operator-getriggert, keine autonome
 <script src="/static/wlan_scope.js"></script>
 <script src="/static/wlan.js"></script>
 <script src="/static/wlan_offensive.js"></script>
-<script src="/static/wlan_heatmap.js"></script>
+<script src="/static/wlan_heatmap.js?v=202610240315"></script>
+<script src="/static/wlan_features.js?v=202610240315"></script>
 <script>
 (function () {
   "use strict";

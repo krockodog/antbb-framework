@@ -69,16 +69,32 @@ def check_ssh_root_login() -> CheckResult:
                        fix_command="sudo sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config")
 
 
+def _listdir(path: str) -> list[str]:
+    try:
+        return sorted(os.listdir(path))
+    except OSError:
+        return []
+
+
 def check_ssh_password_auth() -> CheckResult:
-    cfg = _read("/etc/ssh/sshd_config")
     cid, title = "ssh-password-auth", "SSH: PasswordAuthentication deaktiviert"
-    if not cfg:
+    # sshd-Konfig: Drop-ins wirken vor der Hauptdatei (Include am Anfang),
+    # sshd nutzt den ERSTEN gefundenen Wert. Drop-ins also zuerst, First-Match-Wins.
+    chunks = [
+        _read("/etc/ssh/sshd_config.d/" + name)
+        for name in _listdir("/etc/ssh/sshd_config.d")
+        if name.endswith(".conf")
+    ]
+    chunks.append(_read("/etc/ssh/sshd_config"))
+    cfg = "\n".join(c for c in chunks if c)
+    if not cfg.strip():
         return CheckResult(cid, title, "info", "Keine sshd_config gefunden.")
     val = ""
     for line in cfg.splitlines():
         s = line.strip()
         if s.lower().startswith("passwordauthentication"):
             val = s.split()[1].lower() if len(s.split()) > 1 else ""
+            break
     if val == "no":
         return CheckResult(cid, title, "pass", "PasswordAuthentication no")
     return CheckResult(cid, title, "fail",

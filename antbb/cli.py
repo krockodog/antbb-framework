@@ -644,7 +644,7 @@ def cmd_attackpath(svc, args):
 
 # ---------------- Parser ----------------
 def cmd_remote_status(svc, args):
-    st = svc.remote_full_status() if getattr(args, "full", False) else svc.remote_status()
+    st = svc.remote_status()
     print(f"Fernzugriff-Modus: {st['mode']}  (Default: off = nur lokal)")
     print(f"Lokal:      {st['local_url']}")
     if st['active_url']:
@@ -653,40 +653,16 @@ def cmd_remote_status(svc, args):
     if ts['installed']:
         state = 'laeuft' if ts['running'] else 'inaktiv'
         ip = ts['ip'] or '-'
-        host = ts.get('hostname') or '-'
-        print(f"Tailscale:  installiert · {state} · IP {ip} · MagicDNS {host}")
-        print(f"            ({ts['detail']})")
-        fun = ts.get("funnel") or {}
-        if fun:
-            print(f"  Funnel:   {fun.get('detail', '')}"
-                  + (f" · {fun['url']}" if fun.get("url") else ""))
+        print(f"Tailscale:  installiert · {state} · IP {ip}  ({ts['detail']})")
     else:
         print("Tailscale:  nicht installiert (honest-empty)")
     cf = st['cloudflare']
     if cf['installed']:
-        print(f"cloudflared: installiert · {cf['version'] or 'Version unbekannt'}"
-              + (" · Token-Env gesetzt" if cf.get("token_env_present") else ""))
+        print(f"cloudflared: installiert · {cf['version'] or 'Version unbekannt'}")
     else:
         print("cloudflared: nicht installiert (honest-empty)")
-    if "api" in cf:
-        print(f"CF-API:     {cf['api'].get('detail', '')}")
-    if "access" in cf:
-        print(f"Access:     {cf['access'].get('detail', '')}")
-    if "dns" in cf:
-        print(f"DNS:        {cf['dns'].get('detail', '')}")
-    if "warp" in st:
-        print(f"WARP:       {st['warp'].get('detail', '')}")
-    summary = svc.remote_capability_summary()
-    print("Zusammenfassung: installed=" + str(len(summary["installed"]))
-          + " skipped=" + str(len(summary["skipped"]))
-          + " failed=" + str(len(summary["failed"])))
-    for x in summary["installed"]:
-        print(f"  [installed] {x}")
-    for x in summary["skipped"]:
-        print(f"  [skipped]   {x}")
-    for x in summary["failed"]:
-        print(f"  [failed]    {x}")
-    print("Hinweis: Praeferenz speichern exponiert nichts. Start/Stop braucht Oversight.")
+    print("Hinweis: Auswahl speichert nur die Praeferenz – es wird nichts "
+          "gestartet oder exponiert.")
 
 
 def cmd_remote_set(svc, args):
@@ -694,36 +670,6 @@ def cmd_remote_set(svc, args):
     print(f"Fernzugriff-Modus gespeichert: {m}  (nichts gestartet/exponiert)")
     for step in svc.remote_setup_steps(m):
         print(f"  - {step}")
-
-
-def cmd_remote_tailscale_up(svc, args):
-    if not args.oversight:
-        print("ABGELEHNT: 'tailscale up' nur mit --oversight.")
-        return
-    res = svc.enable_tailscale(oversight=True)
-    print(("OK: " if res.get("ok") else "FEHLER: ") + res.get("reason", ""))
-    if res.get("url"):
-        print(f"  GUI im Tailnet: {res['url']}")
-    if res.get("login_url"):
-        print(f"  Login-URL: {res['login_url']}")
-
-
-def cmd_remote_tailscale_down(svc, args):
-    if not args.oversight:
-        print("ABGELEHNT: 'tailscale down' nur mit --oversight.")
-        return
-    res = svc.disable_tailscale(oversight=True)
-    print(("OK: " if res.get("ok") else "FEHLER: ") + res.get("reason", ""))
-
-
-def cmd_remote_funnel(svc, args):
-    if not args.oversight:
-        print("ABGELEHNT: Funnel nur mit --oversight (oeffentliches Internet).")
-        return
-    res = svc.tailscale_funnel(enable=not args.off, oversight=True)
-    print(("OK: " if res.get("ok") else "FEHLER: ") + res.get("reason", ""))
-    if res.get("url"):
-        print(f"  Funnel-URL: {res['url']}")
 
 
 def cmd_remote_tunnel_status(svc, args):
@@ -737,11 +683,17 @@ def cmd_remote_tunnel_status(svc, args):
 
 
 def cmd_remote_tunnel_start(svc, args):
+    from . import remote_access as ra
     if not args.oversight:
         print("ABGELEHNT: Start nur mit --oversight (menschliche Bestaetigung). "
               "Ein Cloudflare-Tunnel macht die GUI oeffentlich erreichbar.")
         return
-    res = svc.start_cloudflare_tunnel(oversight=True, named=args.named)
+    res = ra.start_cloudflare_tunnel(oversight=True, named=args.named)
+    try:
+        if res.get("ok"):
+            svc.set_remote_mode("cloudflare")
+    except Exception:
+        pass
     print(("OK: " if res.get("ok") else "FEHLER: ") + res.get("reason", ""))
     if res.get("url"):
         print(f"  Oeffentliche URL: {res['url']}")
@@ -750,18 +702,9 @@ def cmd_remote_tunnel_start(svc, args):
 
 
 def cmd_remote_tunnel_stop(svc, args):
-    res = svc.stop_cloudflare_tunnel()
+    from . import remote_access as ra
+    res = ra.stop_cloudflare_tunnel()
     print(("OK: " if res.get("ok") else "FEHLER: ") + res.get("reason", ""))
-
-
-def cmd_remote_access_steps(svc, args):
-    for step in svc.cloudflare_access_setup_steps(args.hostname or ""):
-        print(f"  - {step}")
-
-
-def cmd_remote_warp_steps(svc, args):
-    for step in svc.warp_setup_steps():
-        print(f"  - {step}")
 
 
 def build_parser():
@@ -950,26 +893,13 @@ def build_parser():
     a.set_defaults(fn=cmd_attackpath)
 
     # ---- Fernzugriff / Remote-Access ----
-    rmp = sub.add_parser("remote", help="Fernzugriff (off|tailscale|cloudflare): Status + Steuerung")\
+    rmp = sub.add_parser("remote", help="Fernzugriff (off|tailscale|cloudflare): Status + Praeferenz")\
         .add_subparsers(dest="sub", required=True)
     a = rmp.add_parser("status", help="Ehrlicher, rein lesender Fernzugriff-Status")
-    a.add_argument("--full", action="store_true", help="inkl. Funnel/Access/DNS/WARP/API")
     a.set_defaults(fn=cmd_remote_status)
     a = rmp.add_parser("set", help="Praeferenz setzen (startet/exponiert NICHTS)")
     a.add_argument("mode", choices=["off", "tailscale", "cloudflare"])
     a.set_defaults(fn=cmd_remote_set)
-    # Tailscale aktiv
-    a = rmp.add_parser("up", help="tailscale up – NUR mit --oversight")
-    a.add_argument("--oversight", action="store_true", help="menschliche Bestaetigung (Pflicht)")
-    a.set_defaults(fn=cmd_remote_tailscale_up)
-    a = rmp.add_parser("down", help="tailscale down – NUR mit --oversight")
-    a.add_argument("--oversight", action="store_true", help="menschliche Bestaetigung (Pflicht)")
-    a.set_defaults(fn=cmd_remote_tailscale_down)
-    a = rmp.add_parser("funnel", help="Tailscale Funnel an/aus – NUR mit --oversight")
-    a.add_argument("--oversight", action="store_true", help="menschliche Bestaetigung (Pflicht)")
-    a.add_argument("--off", action="store_true", help="Funnel deaktivieren")
-    a.set_defaults(fn=cmd_remote_funnel)
-    # Cloudflare Tunnel
     tn = rmp.add_parser("tunnel", help="Cloudflare-Tunnel aktiv starten/stoppen (oversight-gated)")\
         .add_subparsers(dest="tsub", required=True)
     a = tn.add_parser("status", help="Laufzeit-Status des verwalteten Tunnels")
@@ -980,12 +910,6 @@ def build_parser():
     a.set_defaults(fn=cmd_remote_tunnel_start)
     a = tn.add_parser("stop", help="verwalteten Tunnel stoppen")
     a.set_defaults(fn=cmd_remote_tunnel_stop)
-    # Free-Tier Doku-Helfer
-    a = rmp.add_parser("access-steps", help="Zero Trust Access (E-Mail-OTP) Setup-Schritte")
-    a.add_argument("--hostname", default="", help="Tunnel-Hostname fuer die Beispiele")
-    a.set_defaults(fn=cmd_remote_access_steps)
-    a = rmp.add_parser("warp-steps", help="WARP-Client Setup-Schritte (optional)")
-    a.set_defaults(fn=cmd_remote_warp_steps)
 
     return p
 

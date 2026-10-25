@@ -171,6 +171,14 @@
       <p class="hint">Default-deny: ohne dieses Human-Oversight-Häkchen wird jede
         aktive/offensive Aktion serverseitig verweigert – es wird nichts gestartet.</p>
     </div>
+    
+    <fieldset id="scan-depth-box" style="margin:.6rem 0;padding:.55rem .7rem;border:1px solid rgba(240,180,90,.4);border-radius:10px">
+      <legend style="padding:0 .35rem;color:#f0b45a;font-size:.8rem">Scan-Tiefe · Königin-Vorschlag</legend>
+      <p class="hint" id="scan-depth-reason">Die Königin empfiehlt eine Tiefe – überschreibbar.</p>
+      <label style="margin-right:1rem"><input type="radio" name="depth" value="light" id="scan-depth-light"> Leicht</label>
+      <label><input type="radio" name="depth" value="intense" id="scan-depth-intense" checked> Intensiv</label>
+    </fieldset>
+
     <button type="submit" {% if not confirmed %}disabled title="Oversight fehlt"{% endif %}>
       🐜 Schwarm starten (asynchron · Live-Feed unten)</button>
   </form>
@@ -201,6 +209,26 @@
   })();
   </script>
   {% if not confirmed %}<p class="blocked">Button deaktiviert: erst Oversight bestätigen.</p>{% endif %}
+
+<script src="/static/scan-depth.js?v=1"></script>
+<script>
+(function(){
+  var form=document.getElementById("scan-form"); if(!form||!window.AntbbDepth) return;
+  var reason=document.getElementById("scan-depth-reason");
+  var light=document.getElementById("scan-depth-light");
+  var intense=document.getElementById("scan-depth-intense");
+  var scopeText = (document.body.innerText||"").slice(0,800);
+  var s=window.AntbbDepth.suggest(scopeText, document.title||"");
+  if(s.depth==="intense"){ if(intense) intense.checked=true; } else { if(light) light.checked=true; }
+  if(reason) reason.textContent="Königin: "+s.reason+" (manuell überschreibbar)";
+  form.querySelectorAll('input[name="depth"]').forEach(function(r){
+    r.addEventListener("change", function(){
+      if(reason) reason.textContent="Manuell gewählt: "+(r.value==="intense"?"Intensiv":"Leicht");
+    });
+  });
+})();
+</script>
+
 </section>
 
 <section class="card" id="live">
@@ -214,15 +242,38 @@
 <section class="card">
   <h3>Findings ({{ findings|length }}) <small>nach Severity</small></h3>
   <table>
-    <thead><tr><th>Schwere</th><th>Titel</th><th>Asset</th><th>Agent</th></tr></thead>
+    <thead><tr><th>Schwere</th><th>Titel</th><th>Asset</th><th>Agent</th><th>Blau</th></tr></thead>
     <tbody id="findings-body">
     {% for f in findings %}
-      <tr class="sev-{{ f.severity }}"><td>{{ f.severity }}</td><td>{{ f.title }}</td><td>{{ f.asset }}</td><td>{{ f.agent }}</td></tr>
+      <tr class="sev-{{ f.severity }}"><td>{{ f.severity }}</td><td>{{ f.title }}</td><td>{{ f.asset }}</td><td>{{ f.agent }}</td><td><button type="button" class="btn-to-blue" data-fid="{{ f.id }}" data-title="{{ f.title|e }}">In Blau reparieren</button></td></tr>
     {% else %}
-      <tr><td colspan="4">Noch keine Findings.</td></tr>
+      <tr><td colspan="5">Noch keine Findings.</td></tr>
     {% endfor %}
     </tbody>
   </table>
+
+<script>
+(function(){
+  document.querySelectorAll(".btn-to-blue").forEach(function(btn){
+    btn.addEventListener("click", async function(){
+      btn.disabled=true; var old=btn.textContent; btn.textContent="…";
+      try{
+        var r=await fetch("/api/findings/"+btn.dataset.fid+"/to-blue", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({target_id: {{ target.id }}, title: btn.dataset.title||""})
+        });
+        var d=await r.json();
+        if(!r.ok || d.ok===false){ alert(d.detail||d.error||"Fehler"); btn.disabled=false; btn.textContent=old; return; }
+        btn.textContent="✓ Blue #"+d.job_id;
+        if(confirm("Finding als Blue-Remediate-Job #"+d.job_id+" angelegt. Zur Blue Queen?")){
+          location.href="/blue#blue-runs";
+        }
+      }catch(e){ alert(String(e)); btn.disabled=false; btn.textContent=old; }
+    });
+  });
+})();
+</script>
+
 </section>
 
 <section class="card" id="report-download">

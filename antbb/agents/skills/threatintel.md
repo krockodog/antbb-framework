@@ -61,10 +61,10 @@ You are the threat-intelligence and context analyst. You enrich pentest findings
 ## Hinterlegter Scope (Octogent Deck)
 
 **Erlaubte Ziele:**
-- https://shop.example.com/de/
-- https://demo.example.com/
-- https://shop.example.com/
-- https://engagement.example.com/
-- https://app.example.com/
+- https://partybrueller.de/de/
+- https://spassprofi.de/
+- https://scherzartikel-onlineshop.de/
+- https://dc-infosec.de/
+- https://carescribe.de/
 
-**Tags:** pentest, threat-intel, example-shop, example-demo, example-engagement, example-app
+**Tags:** pentest, threat-intel, partybrueller, spassprofi, dc-infosec, carescribe

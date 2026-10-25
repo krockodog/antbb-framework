@@ -1,75 +1,57 @@
-"""Blue-Soldat: Honeypot/Decoy + Umleitungs-API.
+"""Blue-Soldat: Honeypot/Decoy (Playbook + Scaffold, Start nur gated).
 
-Stellt sichere Decoy-Rezepte bereit und plant/wendet (gated) Umleitungen an.
-Start/Deploy default-deny; ohne Oversight nur Plan + Playbook-Schritte.
+Stellt einfache, sichere Honeypot-/Decoy-Rezepte bereit (Doku + Playbook). Ein
+tatsächliches Starten eines Honeypots ist default-deny und nur mit Oversight-
+Freigabe (ctx.active) erlaubt; im Scaffold wird NICHTS gestartet – es werden
+ausschließlich sichere Konfigurationen beschrieben.
 """
 from __future__ import annotations
 
 from .base import BlueAgent, AgentFinding, Playbook, Task
-from ... import honeypot as _hp
+
+HONEYPOT_RECIPES = [
+    {"id": "ssh-decoy", "title": "SSH-Decoy (low-interaction)",
+     "desc": "Fake-SSH auf unüblichem Port, der nur Verbindungs-/Login-Versuche "
+             "protokolliert (z.B. cowrie im low-interaction-Modus, isoliert).",
+     "safety": "In isoliertem Netz/Container, keine echten Credentials, Logs lokal."},
+    {"id": "http-canary", "title": "HTTP-Canary-Endpoint",
+     "desc": "Unverlinkter Pfad/Token, dessen Abruf einen Alarm auslöst "
+             "(Canarytoken-Prinzip).",
+     "safety": "Kein echter Dienst dahinter; nur Zugriffs-Logging."},
+    {"id": "decoy-file", "title": "Decoy-Dokument (Canary)",
+     "desc": "Köder-Datei mit eingebettetem Canary, die beim Öffnen/Exfil meldet.",
+     "safety": "Enthält keine echten Daten; rein als Tripwire."},
+]
 
 
 class HoneypotAnt(BlueAgent):
     name = "blue-honeypot"
     specialty = "blue-honeypot-keeper"
-    role = ("Honeypots/Decoys: sichere Köder-Rezepte und Umleitungs-API. "
-            "Deploy/Divert default-deny, nur mit Oversight.")
-    blue_phases = ("defend", "watch")
+    role = ("Honeypots/Decoys: sichere, einfache Köder-Rezepte als Playbook. "
+            "Start default-deny, nur mit Oversight (Scaffold: nichts gestartet).")
+    blue_phases = ("defend",)
     playbooks = (
         Playbook("honeypot-recipes", "defensive", False,
-                 ["ssh-decoy", "http-canary", "decoy-file", "smtp-decoy"],
-                 "Sichere Honeypot-/Decoy-Rezepte (Doku) bereitstellen.",
-                 tasks=["Rezepte auflisten", "Safety-Hinweise prüfen",
-                        "Passendes Rezept je Signal-Klasse wählen"]),
-        Playbook("honeypot-divert-plan", "defensive", False,
-                 ["divert-plan"],
-                 "Umleitung in Decoy planen (Playbook-Schritte, nichts starten).",
-                 tasks=["Signal klassifizieren", "Decoy wählen",
-                        "Umleitungs-Schritte dokumentieren",
-                        "Sofortschutz-Empfehlung anhängen"]),
+                 ["ssh-decoy", "http-canary", "decoy-file"],
+                 "Sichere Honeypot-/Decoy-Rezepte (Doku) bereitstellen."),
         Playbook("honeypot-deploy", "defensive", True,
-                 ["divert-apply", "start-decoy"],
-                 "Umleitung/Deploy NUR mit Oversight (default-deny).",
-                 tasks=["Oversight prüfen", "Divert-Entscheidung setzen",
-                        "Netz-Backend nur wenn konfiguriert",
-                        "Ergebnis im Attack-Log dokumentieren"]),
+                 ["start-decoy"],
+                 "Einen Decoy tatsächlich starten – NUR mit Oversight "
+                 "(default-deny, Scaffold/dokumentiert)."),
     )
 
     async def work(self, task: Task) -> list[AgentFinding]:
         findings: list[AgentFinding] = []
-        recipes = _hp.list_recipes()
-        self.ctx.log(f"[blue-honeypot] 🍯 {len(recipes)} Decoy-Rezept(e).")
-        for r in recipes:
+        self.ctx.log(f"[blue-honeypot] 🍯 {len(HONEYPOT_RECIPES)} Decoy-Rezept(e) bereitgestellt.")
+        for r in HONEYPOT_RECIPES:
             findings.append(AgentFinding(
                 agent=self.name, title=f"Honeypot: {r['title']}",
                 category="blue-honeypot-recipe", severity="info", asset="decoy",
                 description=f"{r['desc']} · Sicherheit: {r['safety']}",
-                evidence={"recipe_id": r["id"], "safety": r["safety"],
-                          "protocol": r.get("protocol"),
-                          "divert_port": r.get("divert_port")},
+                evidence={"recipe_id": r["id"], "safety": r["safety"]},
                 status="REFERENZ", dedup_key=f"blue-honeypot:{r['id']}"))
-
-        # Optional: Plan aus params.signal
-        signal = (task.params or {}).get("signal") or {}
-        if signal:
-            plan = _hp.divert_plan(signal, recipe_id=signal.get("recipe") or "http-canary")
-            findings.append(AgentFinding(
-                agent=self.name, title=f"Divert-Plan → {plan.recipe_id}",
-                category="blue-honeypot-divert", severity="info", asset="decoy",
-                description=plan.reason + " · " + " | ".join(plan.playbook_steps[:3]),
-                evidence=plan.to_dict(), status="REFERENZ",
-                dedup_key=f"blue-honeypot-divert:{plan.recipe_id}"))
-            if self.active_allowed():
-                applied = _hp.divert_apply(signal, recipe_id=plan.recipe_id, active=True)
-                findings.append(AgentFinding(
-                    agent=self.name, title=f"Divert-Apply: {applied.status}",
-                    category="blue-honeypot-divert-apply",
-                    severity="info", asset="decoy",
-                    description=applied.reason,
-                    evidence=applied.to_dict(),
-                    status="BESTÄTIGT(PASSIV)" if applied.applied else "REFERENZ",
-                    dedup_key=f"blue-honeypot-apply:{plan.recipe_id}"))
-        elif self.active_allowed():
-            self.ctx.log("[blue-honeypot] Oversight ok – kein Signal übergeben, "
-                         "kein automatischer Deploy.")
+        if self.active_allowed():
+            self.ctx.log("[blue-honeypot] ⚠️ Deploy freigegeben (Oversight) – im "
+                         "Scaffold wird KEIN Honeypot automatisch gestartet "
+                         "(bewusst konservativ, nur dokumentiert).")
         return findings

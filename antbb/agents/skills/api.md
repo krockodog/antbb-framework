@@ -64,9 +64,9 @@ You are the API security specialist, trained on the API reconnaissance and explo
 ## Hinterlegter Scope (Octogent Deck)
 
 **Erlaubte Ziele:**
-- https://shop.example.com/de/
-- https://demo.example.com/
-- https://shop.example.com/
-- https://app.example.com/
+- https://partybrueller.de/de/
+- https://spassprofi.de/
+- https://scherzartikel-onlineshop.de/
+- https://carescribe.de/
 
-**Tags:** pentest, web, example-shop, example-demo, example-app
+**Tags:** pentest, web, partybrueller, spassprofi, carescribe

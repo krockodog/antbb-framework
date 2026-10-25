@@ -1,0 +1,160 @@
+{% extends "base.html" %}{% set active='yellow' %}
+{% block title %}🟡 Yellow Queen · RE-Kolonie{% endblock %}
+{% block body_class %}yq-body{% endblock %}
+{% block body %}
+<section class="yq-hero" aria-label="Yellow Queen">
+  <div class="yq-hero-glow" aria-hidden="true"></div>
+  <div class="yq-hero-ants" aria-hidden="true">
+    <span class="yha yha1">🐜</span>
+    <span class="yha yha2">🐜</span>
+    <span class="yha yha3">🐜</span>
+  </div>
+  <div class="yq-hero-inner">
+    <div class="yq-crest" aria-hidden="true">🔍</div>
+    <div class="yq-hero-copy">
+      <p class="yq-kicker">Reverse-Engineering-Kolonie · eigenständige Ansicht</p>
+      <h2>Yellow Queen <span class="yq-sub">die Gelbe Königin</span></h2>
+      <p class="yq-lede">
+        Sie führt die <strong>RE-Ameisen</strong> — Triage, Entpacken, Static-Analyse, Dynamic-Lab.
+        Jeder Schritt erklärt sich selbst: <em>warum dieser Weg, was gefunden wurde, was als Nächstes kommt</em>.
+        Standard: statisch und lesend. Tiefe Schritte nur mit Human Oversight.
+      </p>
+      <p class="yq-motto">Kein Schritt ohne Begründung — kein Lab ohne Oversight.</p>
+    </div>
+    <div class="yq-hero-stats">
+      <div class="ystat"><b>{{ cases|length }}</b><span>Fälle</span></div>
+      <div class="ystat ystat-ok"><b>{{ doctor.present }}</b><span>Tools da</span></div>
+      <div class="ystat ystat-warn"><b>{{ doctor.total - doctor.present }}</b><span>Tools fehlen</span></div>
+      <div class="ystat"><b>{{ max_mb }} MB</b><span>max. Upload</span></div>
+      <div class="ystat"><b>6</b><span>RE-Schritte</span></div>
+    </div>
+  </div>
+</section>
+
+<nav class="yq-jump" aria-label="Yellow Queen Abschnitte">
+  <a href="#yq-pipeline">Pipeline</a>
+  <a href="#yq-upload">Analyse starten</a>
+  <a href="#yq-cases">Fälle</a>
+  <a href="#yq-doctor">Tool-Doctor</a>
+</nav>
+
+<section class="card yq-card" id="yq-pipeline">
+  <h3>⬡ RE-Pipeline <small>jeder Schritt begründet sich selbst</small></h3>
+  <ol class="yq-pipe">
+    <li class="yq-phase" style="--i:0">
+      <div class="yq-phase-box"><span class="yq-phase-no">1</span>
+        <span class="yq-phase-name">Triage</span>
+        <span class="yq-phase-note">Hex-Dump, Strings, PE-Sektionen, Hash, Packer-Hinweise</span>
+        <span class="yq-phase-mode def">immer</span></div>
+      <ul class="yq-phase-tools"><li>hexdump</li><li>strings</li><li>sha256</li></ul>
+    </li>
+    <li class="yq-phase" style="--i:1">
+      <div class="yq-phase-box"><span class="yq-phase-no">2</span>
+        <span class="yq-phase-name">Identifikation</span>
+        <span class="yq-phase-note">Packer / Compiler als unabhängiger Beleg</span>
+        <span class="yq-phase-mode def">immer</span></div>
+      <ul class="yq-phase-tools"><li>diec</li></ul>
+    </li>
+    <li class="yq-phase" style="--i:2">
+      <div class="yq-phase-box"><span class="yq-phase-no">3</span>
+        <span class="yq-phase-name">Entpacken</span>
+        <span class="yq-phase-note">Packer-Bypass, erst danach lohnt Static</span>
+        <span class="yq-phase-mode off">Lab · Oversight</span></div>
+      <ul class="yq-phase-tools"><li>unpack</li></ul>
+    </li>
+    <li class="yq-phase" style="--i:3">
+      <div class="yq-phase-box"><span class="yq-phase-no">4</span>
+        <span class="yq-phase-name">Static</span>
+        <span class="yq-phase-note">Funktionen &amp; Adressen per Ghidra ins Dossier</span>
+        <span class="yq-phase-mode def">immer</span></div>
+      <ul class="yq-phase-tools"><li>ghidra-mcp</li><li>ghidra headless</li></ul>
+    </li>
+    <li class="yq-phase" style="--i:4">
+      <div class="yq-phase-box"><span class="yq-phase-no">5</span>
+        <span class="yq-phase-name">Dynamic</span>
+        <span class="yq-phase-note">Frida-Hook im Labor — Syscalls/Imports nachverfolgen</span>
+        <span class="yq-phase-mode off">Lab · Oversight</span></div>
+      <ul class="yq-phase-tools"><li>frida</li><li>strace</li><li>gdb</li></ul>
+    </li>
+    <li class="yq-phase" style="--i:5">
+      <div class="yq-phase-box"><span class="yq-phase-no">6</span>
+        <span class="yq-phase-name">Dossier</span>
+        <span class="yq-phase-note">Funde, Next-3-Schritte, Ledger als Markdown</span>
+        <span class="yq-phase-mode def">immer</span></div>
+      <ul class="yq-phase-tools"><li>dossier.md</li><li>ledger.md</li></ul>
+    </li>
+  </ol>
+</section>
+
+<section class="card yq-card" id="yq-upload">
+  <h3>🐜🔍 Analyse starten <small>Static immer · Dynamic-Lab nur mit Oversight</small></h3>
+  {% if error %}<div class="yq-err">⛔ {{ error }}</div>{% endif %}
+  <form method="post" action="/yellow/upload" enctype="multipart/form-data" id="yq-upload-form" class="yq-form">
+    <label class="yq-field">Sample (EXE, DLL, APK, ELF, HEX …)
+      <input type="file" name="file" required accept=".exe,.dll,.sys,.apk,.so,.elf,.bin,.hex,.srec,.com,.mz,*/*">
+    </label>
+    <label class="yq-check">
+      <input type="checkbox" name="authorized" value="on" required>
+      <span><b>Autorisierung (Pflicht):</b> Dieses Sample gehört mir bzw. ist freigegeben
+            (eigen / Lab / Research). Kein Crack, kein DRM-/Lizenz-Bypass.</span>
+    </label>
+    <details style="flex-basis:100%">
+      <summary class="hint">Oversight / Dynamic-Lab</summary>
+      <label class="yq-check"><input type="checkbox" name="dynamic" value="on">
+        <span>Dynamic-Lab starten (strace / Frida / gdb)</span></label>
+      <label class="yq-check yq-ack"><input type="checkbox" name="oversight" value="on">
+        <span><b>Oversight bestätigt</b> — ich beaufsichtige den Lab-Lauf. Ohne Häkchen bleibt Dynamic blockiert.</span></label>
+    </details>
+    <p class="hint" style="flex-basis:100%">Max. {{ max_mb }} MB · Yellow klassifiziert, wählt die Toolchain und erklärt jeden Schritt:
+       Ergebnisse und Next-3 siehst du danach im Fall.</p>
+    <button type="submit" class="yq-go">🐜🔍 Analyse starten</button>
+  </form>
+  <p class="yq-gate">🔒 {{ gate_text }}</p>
+</section>
+
+<section class="card yq-card" id="yq-cases">
+  <h3>🗂 Fälle <small>letzte 50 · volle Historie über <a href="/api/cases">/api/cases</a></small></h3>
+  <div class="yq-wrap">
+    {% if cases %}
+    <table class="yq-table">
+      <thead><tr><th>Fall</th><th>Datei</th><th>Format</th><th>Route</th><th>Status</th><th>Zeit</th></tr></thead>
+      <tbody>
+      {% for c in cases %}
+        <tr>
+          <td><a href="/yellow/case/{{ c.id }}">{{ c.id }}</a></td>
+          <td>{{ c.filename }}</td>
+          <td><code>{{ c.kind }}</code></td>
+          <td class="hint">{{ c.route }}</td>
+          <td><span class="yq-badge {{ 'ok' if c.status == 'done' else ('err' if c.status == 'error' else 'live') }}">{{ c.status }}</span></td>
+          <td class="hint">{{ c.created_at }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="hint">Noch keine Fälle — oben ein Sample wählen und Analyse starten.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card yq-card" id="yq-doctor">
+  <h3>🧰 Tool-Doctor <small>{{ doctor.present }}/{{ doctor.total }} Werkzeuge einsatzbereit</small></h3>
+  <div class="yq-wrap">
+    <table class="yq-table">
+      <thead><tr><th>Tool</th><th>Status</th><th>Wofür</th><th>Pfad</th></tr></thead>
+      <tbody>
+      {% for t in doctor.tools %}
+        <tr>
+          <td><b>{{ t.id }}</b></td>
+          <td><span class="yq-badge {{ 'ok' if t.present else 'partial' }}">{{ 'da' if t.present else 'fehlt' }}</span></td>
+          <td>{{ t.why_de }}</td>
+          <td class="hint"><code>{{ t.path or '–' }}</code></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">Werkzeug-Status als JSON: <a href="/api/doctor">/api/doctor</a> ·
+     Live-Status: <a href="/yellow/brain">/yellow/brain</a> · Wiki aller drei Königinnen: <a href="/brain">🧠 Schwarm-Wiki</a></p>
+</section>
+{% endblock %}

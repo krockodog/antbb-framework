@@ -70,10 +70,10 @@ You are the report engineer, trained on the bug-bounty and red-team reporting me
 ## Hinterlegter Scope (Octogent Deck)
 
 **Erlaubte Ziele:**
-- https://shop.example.com/de/
-- https://demo.example.com/
-- https://shop.example.com/
-- https://engagement.example.com/
-- https://app.example.com/
+- https://partybrueller.de/de/
+- https://spassprofi.de/
+- https://scherzartikel-onlineshop.de/
+- https://dc-infosec.de/
+- https://carescribe.de/
 
-**Tags:** pentest, report, example-shop, example-demo, example-engagement, example-app
+**Tags:** pentest, report, partybrueller, spassprofi, dc-infosec, carescribe

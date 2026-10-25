@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% set active='home' %}
+{% block title %}Start{% endblock %}
+{% block body %}
+<h1>Sample analysieren</h1>
+<p class="lead">Wirf ein Sample rein (EXE, DLL, APK, ELF, HEX …). Yellow Queen bestimmt das Format, wählt die passende Toolchain und erklärt dir <b>jeden Schritt</b> auf Deutsch: warum, was gefunden wurde, und was als Nächstes kommt.</p>
+{% if error %}<div class="err">⛔ {{ error }}</div>{% endif %}
+<form class="card" method="post" action="/yellow/upload" enctype="multipart/form-data">
+  <input type="file" name="file" required>
+  <p class="mut">Max. {{ max_mb }} MB · Das Sample wird <b>nie ausgeführt</b>.</p>
+  <label class="chk"><input type="checkbox" name="authorized" value="on" required>
+    <span><b>Autorisierung (Pflicht):</b> Ich bestätige, dass dieses Sample mir gehört bzw. freigegeben ist (eigen / Lab / Research). Kein Crack, kein DRM-/Lizenz-Bypass.</span></label>
+  <details class="mut"><summary>Oversight-Flags (Dynamic / Frida)</summary>
+    <label class="chk"><input type="checkbox" name="dynamic" value="on" id="dyn"><span>Dynamic-Lab starten (Yellow führt aus: strace/Frida/gdb)</span></label>
+    <label class="chk"><input type="checkbox" name="oversight" value="on" id="ovs"><span>Oversight bestätigt – ich beaufsichtige den Lab-Lauf. Ohne dieses Häkchen bleibt Dynamic <b>blockiert</b>. Mit Häkchen startet Yellow den Lab-Pfad selbst (Playbook dynamic-lab / frida-lab).</span></label>
+  </details>
+  <p><button class="btn" type="submit">👑 Analyse starten</button></p>
+</form>
+<div class="gate">🔒 {{ gate_text }}</div>
+<div class="grid">
+  <div class="card"><b>1 · Classify</b><br><span class="mut">sha256, Magic, Packer/.NET-Hinweise</span></div>
+  <div class="card"><b>2 · Route</b><br><span class="mut">PE · .NET · APK · ELF · HEX · DOS</span></div>
+  <div class="card"><b>3 · Soldaten</b><br><span class="mut">file, strings, rizin, jadx, apktool, binwalk, diec</span></div>
+  <div class="card"><b>4 · Merge</b><br><span class="mut">Dossier + Ledger + Neural Brain</span></div>
+</div>
+{% endblock %}

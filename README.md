@@ -1,546 +1,283 @@
-# All and One - RED-BLUE-Yellow-Ant-Team
+# All and One — RED · BLUE · Yellow · Ant-Team
 
-![Red Queen](https://img.shields.io/badge/Rot-Pentest%20%26%20Bug%20Bounty-crimson?style=for-the-badge)
-![Blue Queen](https://img.shields.io/badge/Blau-Schutz%20%26%20Hardening-008080?style=for-the-badge)
-![Yellow Queen](https://img.shields.io/badge/Gelb-Reverse%20Engineering-f0ad4e?style=for-the-badge)
-![Neural Brain](https://img.shields.io/badge/Neural%20Brain-Superhirn-8a2be2?style=for-the-badge)
+**Orchestrierte Ameisenfarmen** — eine Plattform, drei Königinnen: Bug Bounty & Pentest (Red), Schutz & Hardening (Blue), Reverse Engineering (Yellow). Ein Framework, ein Prozess, eine Adresse.
 
-![Python](https://img.shields.io/badge/Python-3.11--3.13-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-Web%20%2B%20JSON--API-009688?logo=fastapi&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-lokal-FCC624?logo=linux&logoColor=black)
-![Local first](https://img.shields.io/badge/Betrieb-lokal%20(127.0.0.1)-informational)
-![Nur autorisiert](https://img.shields.io/badge/Einsatz-nur%20autorisiert%20(%C2%A7%20202a--c%20StGB%20%2F%20CFAA)-critical)
+> Unbefugtes Ausspähen, Abfangen oder Vorbereiten von Angriffen auf Daten ist strafbar (§ 202a–c StGB; im US-Kontext der CFAA). Dieser Hinweis ersetzt kein Oversight. Aktive Arbeit läuft nur mit gesetztem Häkchen und einem konkreten Ziel auf der Allowlist. Dieser Schwarm führt keine Angriffe aus.
 
-Drei Königinnen unter einem Dach, mit gemeinsamem Neural Brain. Ich habe die
-offensive, die defensive und die Reverse-Engineering-Kolonie in **eine** lokale
-Plattform zusammengeführt — ein Prozess, eine Oberfläche, ein Superhirn.
+---
 
-![Oberfläche](docs/screenshots/01-startseite.png)
+## Inhalt
 
-## Drei Königinnen
+1. [Das Konzept](#das-konzept)
+2. [Screenshots](#screenshots)
+3. [Alle Menüpunkte im Detail](#alle-menüpunkte-im-detail)
+4. [Architektur](#architektur)
+5. [Installation](#installation)
+6. [Betrieb](#betrieb)
+7. [Leitplanken & Sicherheitsmodell](#leitplanken--sicherheitsmodell)
+8. [Roadmap](#roadmap)
 
-| Königin | Rolle | Oberfläche | Was sie macht |
-| --- | --- | --- | --- |
-| 🔴 **Rote Königin** | Red-Teaming | `/` | Bug Bounty & Pentest, nur im Scope. Recon, Scan, Auth, Fuzz, Verify, Report. |
-| 🔵 **Blaue Königin** | Blue Safety-Teaming | `/blue` | Schutz & Hardening: Softwarescan, Hardening-Audit, Remediation-Verify, Detection, Honeypots, Jobs. |
-| 🟡 **Gelbe Königin** | Yellow Reverse-Teaming | `/yellow`, `/yellow/upload` | Reverse Engineering mit Erklärpfad: Tools-Doctor, Probenaufnahme, Strings/Krypto, ELF/Mach-O/PE/APK/.NET, Ghidra, Dossier. Read-only, tiefe Schritte nur mit Oversight. |
+---
 
-Gemeinsames **Neural Brain** als Superhirn unter `/brain` (eingefärbt auch unter
-`/yellow/brain`): führt die Kolonien zu einem nachvollziehbaren Bild zusammen —
-Ameisenteams, Spuren, durchgehende Logs. Jeder Schritt bleibt lesbar.
+## Das Konzept
 
-## Lokal bauen & starten
+Drei Königinnen — ein Schwarm. Jede Königin führt ihre eigene Kolonie mit eigenen Soldaten, Playbooks und Farbe; geteilt werden **Scope (default-deny)**, **Human Oversight** und der **kanonische Beweis** (Proof-Gate: „verifiziert" gilt erst mit Nachweis — alles andere bleibt Verdacht).
 
-Voraussetzungen: Linux, `python3` (3.11–3.13) mit `venv`/`pip`, optional `node`
-(nur für UI-Rebuild). RE-Tools (radare2, binutils, binwalk, apktool, jadx …)
-sind optional und werden vom Doctor geprüft.
+| Königin | Farbe | Rolle | Kern |
+|---|---|---|---|
+| 🔴 **Rote Königin** | Rot | Red-Teaming | Bug Bounty & Pentest im engen Scope, 5-Phasen-Pipeline, Findings mit Proof-Gate und Fix-Brücke zur Blauen Königin |
+| 🛡 **Blaue Königin** | Blau | Blue Safety-Teaming | Schutz & Hardening, 6-Phasen-Pipeline (Assess→Verify), Greenbone-Anbindung, Remediation mit Vorher/Nachher-Evidence |
+| 🟡 **Gelbe Königin** | Gold | Yellow Reverse-Teaming | Reverse Engineering von Samples (EXE/DLL/APK/ELF/HEX), 6-stufige RE-Pipeline, jeder Schritt begründet sich selbst |
+| 🧠 **Neuronales Gehirn** | alle | Schwarm-Wiki & Visualisierung | Drei Königinnen über drei farbigen Armeen, klickbare Knoten, Live-Logs, Zeitraffer, Schwarm-Wiki (wer macht was, wie, wo, warum) |
+
+Die Kette im Betrieb: **Red** beweist den Angriffspfad → **Yellow** verifiziert offline (z. B. geknacktes WLAN-Passwort, maskiert) → **Blue** fixt mit Re-Test und sauberem Log & Report.
+
+---
+
+## Screenshots
+
+### Hub (`/`)
+Einstieg mit den drei Königinnen-Karten, Live-Status aus der echten Colony und Rechtshinweis.
+
+![Hub](docs/screenshots/shot-hub.jpg)
+
+### Rote Königin (`/red`)
+Offensiv-Kolonie: Hero mit Echt-Statistiken, Phasen-Pipeline, Kolonie starten (Scan-Tiefe wählbar), Red-Team-Menü nach Scope-Auswahl, Soldaten & Playbooks, Ziele & Scope-Manager, Findings mit „In Blau reparieren"-Fix-Brücke, Läufe, Fernzugriff (Tailscale/Cloudflare).
+
+![Red Queen](docs/screenshots/shot-red.jpg)
+
+### Blaue Königin (`/blue`)
+Verteidigungs-Kolonie: Phasen-Pipeline (Assess → Watch → Harden → Defend → Remediate → Verify), Kolonie starten (read-only Default), Soldaten & Playbooks, Greenbone/OpenVAS (Import + Scoped Scan), wiederholbare Jobs, Posture-Ledger, Attack-Log, Posture/SIEM, Remediation, Läufe.
+
+![Blue Queen](docs/screenshots/shot-blue.jpg)
+
+### Gelbe Königin (`/yellow`)
+RE-Kolonie: RE-Pipeline (Triage → Identifikation → Entpacken → Static → Dynamic → Dossier), Sample-Upload mit Autorisierungs- und Oversight-Gate, Fälle, Tool-Doctor.
+
+![Yellow Queen](docs/screenshots/shot-yellow.jpg)
+
+### Neuronales Gehirn (`/brain`)
+Drei gleich große Königinnen — jede vor ihrer farblich passenden Armee (Bewegungs-Sektoren in `ants.js`). Knoten-Panel minimiert, Zeitraffer unten links, „📖 Schwarm-Wiki"-Overlay erklärt alle drei Kolonien (WER/WAS/WIE/WO/WARUM).
+
+![Neuronales Gehirn](docs/screenshots/shot-brain.jpg)
+
+### Historie (`/history`)
+Run-Historie aller Königinnen — inklusive Zeitraffer (Lauf auswählen, abspielen, 1×–8×, Scrubber).
+
+![Historie](docs/screenshots/shot-history.jpg)
+
+### Funk-Labor (`/wlan`)
+WLAN-Scope, Coverage & Scan, Heatmap, Offensiv/Airgorah (Engagement-Gate) — plus Bluetooth/BLE- und IoT-Lab-Karten (passiv frei, aktiv nur mit Oversight, Kette Red→Yellow→Blue).
+
+![WLAN · BT · IoT](docs/screenshots/shot-wlan.jpg)
+
+---
+
+## Alle Menüpunkte im Detail
+
+Die Menüleiste ist auf **allen** Seiten identisch:
+
+| Menüpunkt | Route | Beschreibung |
+|---|---|---|
+| ← Hub | `/` | Zurück zur Startseite |
+| Scope-Manager | `/` | Hub: Königinnen-Übersicht, Live-Status, Einstieg |
+| 🔴 Red Queen | `/red` | Offensiv-Kolonie (unten im Detail) |
+| 🛡 Blue Queen | `/blue` | Verteidigungs-Kolonie (unten im Detail) |
+| 🟡 Yellow Queen | `/yellow` | RE-Kolonie (unten im Detail) |
+| 📡 WLAN · BT · IoT | `/wlan` | Funk-Labor: WLAN, Bluetooth/BLE, IoT (unten im Detail) |
+| 🧠 Neuronales Gehirn | `/brain` | Schwarm-Visualisierung, Knoten, Logs, Zeitraffer, Wiki |
+| 🔒 Eigene Assets | `/assets` | Asset-Register der eigenen Systeme |
+| 🗂️ Historie | `/history` | Persistente Run-Historie aller Kolonien + Zeitraffer |
+
+### `/` — Hub
+- **Drei Königinnen-Karten** mit Live-Status aus der echten Colony (Soldaten, Scope-Status).
+- Buttons: *Neural Brain öffnen* (`/brain`), *Gelbe Fälle* (`/yellow`).
+- Rechtshinweis im Footer (§ 202a-c StGB / CFAA).
+
+### `/red` — Rote Königin (Red-Teaming)
+- **Hero + Statistiken**: Soldaten, Playbooks, Aufgaben, Findings, Ziele, Scope-Einträge — alles echte Werte aus der Registry.
+- **⬡ Phasen-Pipeline**: Recon → Vulnerability Assessment → Exploitation → Post-Exploitation → Reporting (aus der Capability-Registry; defensiv/offensiv gekennzeichnet).
+- **🐜🎯 Kolonie starten**: Ziel (Scope) wählen, Scan-Tiefe *Leicht/Intensiv*, optional aktive/offensive Schritte mit Oversight-Häkchen. Live-Feed per Polling.
+- **🎛 Red-Team-Menü** (erscheint nach Ziel-Auswahl): Recon & OSINT · Schwachstellen-Scan · Aktive Verifikation 🔒 · PoC aus Evidence 🔒 · LLM-Security · Reporting. 🔒-Punkte sind ohne Oversight-Häkchen gesperrt; jeder Klick legt einen echten Lauf an.
+- **Soldaten & Playbooks**: Karten aller 18 Rot-Soldaten mit Playbooks, Tools und abhakbaren Aufgaben (Haken = Override, gespeichert über die API), SKILL.md-Dialog pro Soldat, Volltext-Filter.
+- **🧭 Ziele & Scope-Manager**: Ziele anlegen (Name, Beschreibung, mode_policy), Scope-Einträge, Oversight-Status, Modus, Archivieren (Soft-Delete in `/trash`).
+- **🕷 Findings**: aggregiert über alle Ziele, nach Schwere sortiert; **„🛡 In Blau reparieren"** erzeugt einen echten Remediate-Job in `/blue` (Fix-Brücke).
+- **🗂 Läufe**: persistente Historie (ohne Blue-Läufe).
+- **🔐 Fernzugriff**: Aus (nur lokal) / Tailscale / Cloudflare-Tunnel — Modus wählen, Tunnel mit Oversight starten/stoppen.
+
+### `/blue` — Blaue Königin (Blue Safety-Teaming)
+- **Hero + Statistiken**: Soldaten, Playbooks, Aufgaben, Jobs, offene Lücken, nachweislich geschlossen.
+- **⬡ Phasen-Pipeline**: Assess → Watch → Harden → Defend → Remediate → Verify.
+- **🐜🛡 Kolonie starten**: read-only Default, scope-gebunden; aktive Fixes/Honeypots nur mit Oversight-Häkchen.
+- **Soldaten & Playbooks**: 24 Blue-Soldaten mit Checklisten, 🔒-Markierung für Oversight-Pflicht.
+- **🌿 Greenbone / OpenVAS**: Report-Import (XML/CSV/JSON, rein lesend) und Scoped Scan (ein In-Scope-Host, Oversight-Pflicht).
+- **⏱ Jobs**: wiederholbare Checks (Software-Scan, Hardening, Remediation-Verify, …) mit Intervall und manuellem Auslösen.
+- **🧾 Posture-Ledger**: Vorher/Nachher über Läufe — „nachweislich geschlossen" nur mit Re-Check.
+- **🕷 Attack-Log**: append-only Protokoll (Detection, Honeypot-Umleitung, Gegenmaßnahme).
+- **📡 Posture / SIEM**: Splunk-HEC-Status (optional) + Leitplanken.
+- **🛠 Remediation**: Findings mit prüfbarem Fix und Oversight-Gate.
+- **🗂 Blue-Läufe**: nur colony=blue.
+
+### `/yellow` — Gelbe Königin (Yellow Reverse-Teaming)
+- **Hero + Statistiken**: Fälle, Tools da/fehlend (Tool-Doctor), max. Upload, RE-Schritte.
+- **⬡ RE-Pipeline**: Triage (Hex/Strings/Sektionen) → Identifikation (diec) → Entpacken (Lab 🔒) → Static (Ghidra) → Dynamic (Frida-Lab 🔒) → Dossier.
+- **🐜🔍 Analyse starten**: Sample-Upload (EXE, DLL, SYS, APK, SO, ELF, BIN, HEX, …) mit **Autorisierungs-Pflicht**-Häkchen; Dynamic-Lab nur mit Oversight. Danach: Fall-Seite mit Next-3-Schritten, Funden, Begründung je Schritt.
+- **🗂 Fälle**: letzte 50 Fälle (Format, Route, Status, Zeit), volle Historie über `/api/cases`.
+- **🧰 Tool-Doctor**: Werkzeug-Status (Ghidra, diec, Frida, …) mit Pfad und Zweck.
+
+### `/brain` — Neuronales Gehirn
+- **Drei Königinnen** (gleich groß, korrekte Farben, Labels) vor ihren farbigen Armeen — Armeen wandern in ihren Sektoren (blau 20–42 %, rot 42–58 %, gelb 58–80 %).
+- **Knoten-Panel** (rechts, minimiert aufklappbar): Knoten mit Status, Detail-Dialog, Logs-Tab, Löschen nur mit Menschen-Bestätigung.
+- **Zeitraffer** (unten links): Lauf auswählen, abspielen, Geschwindigkeit, Scrubber.
+- **📖 Schwarm-Wiki**: Overlay mit allen drei Königinnen nach dem Schema WER / WAS / WIE / WO / WARUM + geteilte Leitplanken.
+- **Ameisen-Overlay**: laufende Soldaten mit Namensschildern, keine Spiegelschrift.
+
+### `/wlan` — Funk-Labor (WLAN · BT · IoT)
+- **WLAN-Scope** (Allowlist), **Coverage & Scan** (passiv + Königin-Voll-Scan), **Heatmap**, **Offensiv/Airgorah** (Engagement + Oversight + `ANTBB_WIFI=1`).
+- **🦷 Bluetooth / BLE** (passiv): Inventar, GATT-Lesekarte, Verbindungs-Tracking; BT-Verifikation 🔒 nur an eigenen Geräten.
+- **🔌 IoT-Lab** (eigene Geräte): Inventar (FritzBox/mDNS/SSDP), MQTT-Audit, Zigbee/Z-Wave-Karte, Default-Cred-Check; Kette Red → Yellow → Blue.
+
+### Weitere Routen
+| Route | Inhalt |
+|---|---|
+| `/target/{id}` | Ziel-Detail: Scope-Einträge, Oversight, Mode, Findings, Reports (mit Addenda & Revisionen), Scan-Status |
+| `/target/add` | Ziel-Anlage-Formular (GET) / Anlegen (POST) |
+| `/assets` | Eigene Assets (Web-Assets, TLS-/Header-Checks) |
+| `/history` | Run-Historie aller Kolonien + Zeitraffer |
+| `/trash` | Papierkorb (archivierte Ziele, wiederherstellbar) |
+| `/yellow/case/{id}` | Fall-Dossier: Hops, Next-3, Funde mit Adresse, Bypass/Dynamic-Status, Evidence-Links |
+| `/yellow/laeufe` | Gelbe Dossiers |
+| `/red/brain`, `/blue/brain`, `/yellow/brain` | Aliasse auf das geteilte neuronale Gehirn |
+
+---
+
+## Architektur
+
+Ein Prozess, ein Port (`:1001`), drei eingebettete Apps:
+
+```
+antbb.service (uvicorn, api.main:app)
+├── /                Hub          → Next.js-Static-Export (all-and-one/out)
+├── /red /blue       Kolonie      → antbb.web (FastAPI, Colony-Backup)
+├── /yellow …        Yellow Queen → yellow_queen.web (FastAPI, RE-Orchestrierung)
+├── /brain           Gehirn      → Colony-Brain (Three.js-Partikelfeld + nodes-panel + runs.js + queens.js)
+├── /wlan /assets /history …     → Colony-Routen
+└── /api/…           Queens-APIs, Targets, Runs, Feed, Capabilities, Blue-Jobs, …
+```
+
+- **Eine Adresse, same-origin**: alle Seiten und APIs hinter `http://<host>:1001` — kein CORS, kein Sidecar-Zwang.
+- **Echte Daten nur**: keine Mocks im Endprodukt; jede Zahl kommt aus Registry, Store oder Tool-Ausgabe.
+- **Statik**: `/static` merged aus Colony- und Yellow-Static; der Hub liefert aus `all-and-one/out`.
+
+---
+
+## Installation
+
+Voraussetzungen: **Linux** (getestet auf Debian/Ubuntu), **Python ≥ 3.11**, **Node.js ≥ 20** (nur für den Hub-Build), git. WLAN-Features brauchen eine WLAN-Karte mit Monitor-Modus; Greenbone/optional.
+
+### 1. Klonen & Umgebung
 
 ```bash
 git clone https://github.com/krockodog/antbb-framework.git
 cd antbb-framework
-./install.sh --doctor              # Preflight: Python + Toolchain je Königin prüfen
-./install.sh                       # AI-Setup je Königin, dann venv + deps + Start
-# oder nicht-interaktiv:  ./install.sh --noninteractive
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
-Weitere Flags: `--install-tools` (fehlende System-Tools via apt nachziehen),
-`--dry-run` (alles vorbereiten, Server nicht starten), `--host`, `--port`.
-Danach läuft die Oberfläche lokal, Standard `http://127.0.0.1:8000/`
-(Port via `ANTBB_PORT` / `--port`). Neural Brain zuerst: `…/brain`.
+### 2. Konfiguration
 
-## KI pro Königin — frei zuweisbar
+```bash
+cp antbb.env.example antbb.env   # Werte eintragen; niemals committen (gitignore sicher)
+```
 
-Das AI-Setup im Installer ordnet **jeder Königin einen eigenen Anbieter** zu —
-Mehrfachauswahl aus **9 Providern**: OpenAI, Anthropic, Gemini, MiniMax,
-Moonshot/Kimi, Mistral, DeepSeek, xAI und lokalem Ollama. Beispiel: Rot→Claude,
-Blau→Ollama, Gelb→MiniMax. Die Zuordnung landet in `antbb.env` (chmod 600);
-**Keys kommen nur zur Laufzeit aus der Umgebung und liegen nie im Repo**. Fehlt
-ein Key, wird der Provider sauber übersprungen.
+Wichtige Variablen (alle optional, sane Defaults): `ANTBB_HOST`/`ANTBB_PORT` (Surface), `COLONY_DB`, `COLONY_DATA`, `YELLOW_QUEEN_ROOT`, `ANTBB_WIFI=1` (aktiviert das WLAN-Offensiv-Modul), `GVM_USERNAME`/`GVM_PASSWORD` (Greenbone), `ANTBB_SPLUNK_HEC_URL/TOKEN` (SIEM), `MINIMAX_API_KEY` (nur zur Laufzeit).
 
-## Skills & Playbooks verwalten
+### 3. Hub bauen (Next.js Static Export)
 
-Gebrandete Builtins liegen pro Königin unter `antbb/agents/skills/` und
-`antbb/playbooks/` (Gelb zusätzlich als Referenzbibliothek unter
-`antbb/agents/skills/reference/yellow/`). Eigene Skills/Playbooks lassen sich pro
-Königin **hinzufügen, erstellen und löschen** — einfach Dateien in
-`antbb/agents/skills/custom/{red,blue,yellow}/` bzw.
-`antbb/playbooks/custom/{red,blue,yellow}/` pflegen.
+```bash
+cd all-and-one
+npm ci
+npm run build          # erzeugt out/
+rm -f out/*.txt          # RSC-Payload-Dateien nicht ausliefern
+cd ..
+```
 
-## Recht
+`all-and-one/out` ist der Webroot für `/`.
 
-> ⚠️ **Nur für autorisierte Security-Arbeit.** Pentests, Bug-Bounty und Reverse
-> Engineering OHNE Erlaubnis sind strafbar (§ 202a–c StGB in DE, Computer Fraud
-> and Abuse Act / CFAA in US). Jede aktive Aktion erfordert autorisierten Scope
-> **und** eine manuelle Freigabe (Human-Oversight). Default: rein lesend/lokal.
+### 4. Starten
+
+```bash
+./run.sh                      # oder:
+.venv/bin/python -m uvicorn api.main:app --host 0.0.0.0 --port 1001
+```
+
+Als Dienst (systemd, Auszug):
+
+```ini
+[Unit]
+Description=All and One - RED-BLUE-Yellow-Ant-Team
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/antbb
+Environment=ALLONE_HOST=0.0.0.0
+Environment=ALLONE_PORT=1001
+Environment=ALLONE_WEB_ROOT=/opt/antbb/all-and-one/out
+Environment=PYTHONPATH=/opt/antbb
+ExecStart=/opt/antbb/.venv/bin/python -m uvicorn api.main:app --host 0.0.0.0 --port 1001
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 5. Verifizieren
+
+```bash
+curl -s http://127.0.0.1:1001/api/health
+# {"ok": true, "service": "all-and-one", "queen_ids": ["red","blue","yellow"]}
+```
+
+Danach im Browser: `http://<host>:1001` — Hub → Königin wählen → Ziel anlegen → Scope pflegen → Oversight → Kolonie starten.
+
+> **Hinweis zum Installer:** `install.sh` / `install-and-start.sh` im Repo führen diese Schritte idempotent durch (Vereinigung, Skills/Playbooks-Seeds, Tool-Install je Queen, AI-Setup, Doctor/Preflight, Modi `--noninteractive`, `--doctor`, `--full`).
 
 ---
 
-Ein **rein lokales** Framework zum Üben von Bug-Bounty-/Pentest-Workflows.
-Es tritt **keiner** externen Plattform (HackerOne, Bugcrowd, …) bei und führt
-**keine echten aktiven Angriffe** aus: alle Scanner-Agenten arbeiten mit
-**simulierter, ungefährlicher Logik**. Der Kern ist die Software-Architektur
-(Orchestrierung, Scope-Gate, Human-Oversight, Reports), nicht reales Angreifen.
+## Betrieb
 
-> ⚠️ **Pflichthinweis:** Pentests/Bug-Bounty OHNE schriftliche oder öffentliche
-> Autorisierung sind STRAFBAR (§ 202a-c StGB in DE, CFAA in US). Jede Aktion
-> erfordert einen autorisierten Scope **und** eine manuelle Freigabe
-> (Human-Oversight-Häkchen).
+- **Läufe starten**: Ziel im Scope-Manager anlegen → Scope-Einträge setzen → Oversight bestätigen → Kolonie starten (Lesend per Default; aktiv/offensiv nur mit Häkchen).
+- **Scan-Tiefe**: *Leicht* (recon·scan·report) oder *Intensiv* (alle Phasen) — wählbar, landet im Start-Request und im Log.
+- **Fix-Brücke**: Red-Finding → „In Blau reparieren" → echter Remediate-Job in `/blue`.
+- **Backups**: Vor Patches legt die Plattform `*.bak-<zeitstempel>` an; DB-Backup vor „Alles löschen" im Gehirn.
+- **Logs**: `journalctl -u antbb -f`.
 
-## Architektur
+---
 
-- **Gemeinsame Kern-Logik** im Package `antbb/` – CLI und Web nutzen dieselbe
-  Service-Fassade (`antbb/service.py`). Keine Logik-Duplizierung.
-- **Persistenz:** SQLite (`antbb/store.py`), DB unter `data/antbb.db`
-  (überschreibbar via `ANTBB_DB`).
-- **Scope-Gate** (`antbb/scope.py`): default-deny Allowlist; Out-of-Scope hat
-  Vorrang. Jede aktive Aktion prüft jedes Asset.
-- **Human-Oversight** (`antbb/oversight.py`): hartes Gate. Ohne Häkchen pro
-  Target kein Scan und kein Report-Export – in CLI **und** Web.
-- **Ameisen-Schwarm** (`antbb/agents/`, `antbb/queen.py`):
-  - **Königin** (`Queen`): verteilt Aufgaben in Phasen (recon → scan →
-    analyze → report), dispatcht Agenten-Gruppen **parallel (asyncio)**,
-    sammelt Findings zentral, **dedupliziert** und **priorisiert**.
-  - **Arbeiter-Ameisen** (gemeinsame Basisklasse `AntAgent`):
-    `ReconAnt`, `ScanningAnt`, `ApiAnt`, `InfraAnt`, `FuzzAnt`,
-    `AnalysisAnt`, `PocAnt`, `ReportingAnt`.
-- **Blue Queen / Verteidigungs-Kolonie** (`antbb/blue_queen.py`,
-  `antbb/agents/blue/`): Pendant zur offensiven Königin – plant und
-  dispatcht Blue-Team-Soldaten in den Phasen **Assess → Harden → Defend →
-  Remediate → Verify**. Standard rein lesend/non-destruktiv; aktive Fixes
-  und Honeypot-Starts nur oversight-gated. GUI unter `/blue`.
-- **Reports** (`antbb/reports.py`): 8-Schritt-Evidence-Kette + CVSS,
-  Speicherung als JSON im Store, Export nach Markdown/JSON.
+## Leitplanken & Sicherheitsmodell
 
-## Verzeichnisstruktur
+1. **Default-deny Scope** — leer heißt: kein Ziel, kein Lauf.
+2. **Human Oversight** — aktive Schritte (Deauth, PoC, Fixes, Scans gegen Ziele, Tunnel) brauchen ein gesetztes Häkchen; der Rechtshinweis ersetzt es nicht.
+3. **Proof-Gate** — „verifiziert" gilt erst mit Nachweis; Findings ohne Evidence bleiben Verdacht.
+4. **Honest-empty** — was nicht geht, wird ehrlich als Ergebnis gemeldet (kein Fake-Status).
+5. **Keine Secrets/PII** in Findings oder Reports; geknackte Passwörter werden maskiert, nie persistiert.
+6. **Recht** — § 202a-c StGB / CFAA-Hinweis auf jeder Seite; nur autorisierte Ziele, nur eigene Geräte, nur eigene Netze.
 
-```
-antbb-framework/
-├── antbb/                     # Produktivcode (Package)
-│   ├── __init__.py  __main__.py  cli.py
-│   ├── service.py             # gemeinsame Fassade (CLI + Web)
-│   ├── store.py               # SQLite-Persistenz
-│   ├── scope.py               # Allowlist-Prüfung (default-deny)
-│   ├── oversight.py           # Pflicht-Häkchen-Gate
-│   ├── active_oversight.py    # Freigabe-Gate für aktive/offensive Aktionen
-│   ├── queen.py               # Ameisenkönigin / Orchestrator
-│   ├── router.py  llm.py  oauth.py  prompts.py   # Multi-Provider-LLM + Auth
-│   ├── reports.py  findingreport.py  brandedreport.py  rating.py
-│   ├── attackpath.py  poc_builder.py  replay.py  proofgate.py
-│   ├── brain_ops.py  registry.py  sdk.py  plugins/   # Neural-Brain + Erweiterbarkeit
-│   ├── remote_access.py  egress_firewall.py  netutil.py
-│   ├── wlan_survey.py  wlan_offensive.py  wlan_airgorah.py  wordlists.py
-│   ├── codeaudit.py  config.py  telemetry.py  disclaimer.py
-│   ├── agents/                # Basisklasse + 20 Spezial-Soldaten
-│   │   ├── base.py recon.py scanning.py api.py infra.py fuzz.py
-│   │   ├── analysis.py poc.py reporting.py auth.py osint.py cloud.py
-│   │   ├── mobile.py codeaudit.py llmsec.py threatintel.py verify.py
-│   │   ├── ssrf.py takeover.py wifi.py  skills/
-│   │   └── …
-│   ├── tools/                 # Kali-Tool-Adapter-Schicht
-│   └── web/
-│       ├── app.py             # FastAPI: HTML + JSON-API
-│       ├── templates/         # base/index/target/brain/wlan/trash.html
-│       └── static/            # Style, Neural-Brain-Assets
-├── tests/                     # nur Smoke-/Selbsttests (NICHT Produktivcode)
-├── docs/screenshots/          # Galerie (nur Repo, nicht in der ZIP)
-├── config/                    # default.yaml (Provider-URLs, Router-Schwellen)
-├── install-and-start.sh       # robuster 1-Befehl-Installer (= install.sh)
-├── run.sh  run_web.py  requirements.txt
-├── MANIFEST.md  INSTALL.md  antbb.env.example
-└── data/                      # SQLite-DB + Exporte (gitignored)
-```
+---
 
-## Installation
+## Roadmap
 
-```bash
-cd ameisen-bugbounty
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+Bewusst **nicht** als Mock eingebaut — diese Bausteine brauchen echte Hardware bzw. Zugänge:
 
-## CLI starten
+- **Geräte-Agenten**: Flipper Zero, Ghost ESP, ESP32-Marauder, BleShark Nano, AI-ESP32 als checkbare Workflow-Schritte mit automatischer Evidence (Geräte-Registry + Treiber-Schicht).
+- **Yellow-Crack-Pipeline**: aircrack-ng / hashcat / john mit lokalen Wortlisten, komplett offline, maskierte Ergebnisse, Schwellenlogik (trivial/schwach → Blue-Ticket).
+- **Blue-Konnektoren**: FritzBox (TR-064/LUA) für WPS aus / Passwort-Rotation / Gastnetz-Segmentierung; Freigabe-Matrix (auto / 1-Klick / 4-Augen) mit Dry-Run-Diff, Apply, Verify, Rollback.
+- **Gedächtnis-Speicher**: `/history` als kollektives Gedächtnis (Tricks, Gegenmittel, Lehren, verlinkt auf Evidence).
+- **Debrief-Dashboard**: Katz-und-Maus-Scoreboard (Angriffe vs. Abwehr je Klasse), Residual-Risk-Trend, Export PDF/PPTX für Kunden-Aufklärung.
 
-Modul-Aufruf (`python -m antbb`). Beispiel-Workflow:
+---
 
-```bash
-source .venv/bin/activate
+## Lizenz & Hinweis
 
-# Target + Scope
-python -m antbb target add example.com -d "Demo"
-python -m antbb scope add example.com domain '*.example.com'
-python -m antbb scope add example.com url 'http://api.example.com/*'
-python -m antbb scope add example.com domain 'secret.example.com' --out   # Out-of-Scope
-python -m antbb scope list example.com
-python -m antbb scope check example.com http://api.example.com/users      # ERLAUBT
-python -m antbb scope check example.com http://secret.example.com/        # BLOCKIERT
-
-# Human-Oversight (Pflicht)
-python -m antbb scan example.com            # -> BLOCKIERT (kein Häkchen)
-python -m antbb oversight set example.com on --by OPERATOR
-python -m antbb oversight status example.com
-python -m antbb scan example.com            # -> läuft (Schwarm)
-
-# Findings & Reports
-python -m antbb findings example.com
-python -m antbb report create example.com "IDOR in Orders-API" --cvss 7.5 \
-    --vector "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"
-python -m antbb report list example.com
-python -m antbb report show 1
-python -m antbb report export 1 --format md     # Gate: braucht Häkchen
-python -m antbb report export 1 --format json
-```
-
-Eigene DB: `python -m antbb --db /pfad/zur.db ...` oder `ANTBB_DB=...`.
-
-## Webserver starten
-
-```bash
-source .venv/bin/activate
-python run_web.py
-# -> http://127.0.0.1:8000
-```
-
-- **HTML-Oberfläche:** `/` (Scope-Manager), `/target/{id}`
-  (Oversight, Scope, Swarm-Control, Findings-Feed, Report-Builder).
-- **JSON-API:** `/api/health`, `/api/targets`, `/api/targets/{id}/scopes`,
-  `/api/targets/{id}/scope-check?asset=...`, `/api/targets/{id}/oversight`,
-  `/api/targets/{id}/scan`, `/api/feed`, `/api/targets/{id}/findings`,
-  `/api/targets/{id}/reports`.
-
-Der Scan-Button ist deaktiviert, solange das Oversight-Häkchen fehlt; die
-API antwortet dann mit **HTTP 403**.
-
-
-## Fernzugriff / Remote-Access (Tailscale + Cloudflare Free)
-
-Chooser in GUI und CLI: **Aus / Tailscale / Cloudflare-Tunnel**. Default = Aus
-(nur lokal). Die Präferenz wird in SQLite persistiert; Start/Stop ist immer
-**oversight-gegatet** (Haken in der GUI bzw. `--oversight` in der CLI).
-
-| Transport | Was antbb tut | Secrets (nur ENV, nie im Repo) |
-|-----------|---------------|--------------------------------|
-| **Aus** | nichts exponiert | – |
-| **Tailscale** | Status lesen, `up`/`down`, MagicDNS-Hostname, optional Funnel | `TS_AUTHKEY` (optional) |
-| **Cloudflare Tunnel** | `cloudflared` Start/Stop/Status (quick oder named) | `CLOUDFLARE_TUNNEL_TOKEN` |
-| **Zero Trust Access** | Setup-Schritte + API-Status (Free, E-Mail-OTP) | `CF_API_TOKEN`, `CF_ACCOUNT_ID` |
-| **DNS** | CNAME-Listing/Upsert für Tunnel-Hostname | `CF_API_TOKEN`, `CF_ZONE_ID` |
-| **WARP** | Status rein lesend + Setup-Schritte | – |
-
-**Nicht enthalten (bewusst):** Cloudflare Pages/Workers – kein echter Nutzen für
-die lokale GUI. Honest-empty: fehlt ein Binary oder Token, wird das klar
-gemeldet (keine erfundenen IPs/Hostnamen/Status).
-
-```bash
-# Status (erweitert: Funnel/Access/DNS/WARP)
-python -m antbb remote status --full
-
-# Präferenz speichern (exponiert nichts)
-python -m antbb remote set tailscale
-
-# Tailscale aktivieren / Funnel (braucht --oversight)
-python -m antbb remote up --oversight
-python -m antbb remote funnel --oversight
-
-# Cloudflare-Tunnel (quick oder named)
-python -m antbb remote tunnel start --oversight
-python -m antbb remote tunnel start --oversight --named   # braucht CLOUDFLARE_TUNNEL_TOKEN
-python -m antbb remote tunnel stop
-
-# Access- / WARP-Setup-Schritte
-python -m antbb remote access-steps --hostname gui.example.com
-python -m antbb remote warp-steps
-```
-
-## Sicherheits-/Design-Garantien
-
-1. **Default-deny Scope:** ohne In-Scope-Eintrag wird jedes Asset blockiert.
-2. **Oversight-Gate hart:** `OversightError` blockiert Scan + Export.
-3. **Nur Simulation:** Agenten erzeugen deterministische Platzhalter-Findings,
-   es werden keine echten Netzwerk-Requests gegen Ziele ausgeführt.
-4. **Zentrale Dedup/Priorisierung** durch die Königin.
-
-## LLM-Connector (optional)
-
-Das Framework kann Königin und Agenten **optional** von einem LLM unterstützen
-lassen. Modul: `antbb/llm.py` (+ austauschbare Adapter in `antbb/llm_providers.py`).
-
-- **LLMs sind nur austauschbare Denk-/Text-Bausteine.** Sie fassen Findings
-  zusammen, priorisieren oder formulieren Report-Narrative – mehr nicht.
-- **Keys werden AUSSCHLIESSLICH aus Umgebungsvariablen gelesen** und niemals
-  geloggt, geechot, in die DB oder in Reports geschrieben. Es ist **kein** Key
-  und **kein** Account im Repo hinterlegt.
-- **Optionaler Schritt mit Fallback:** Ohne konfigurierten Provider läuft alles
-  wie bisher (deterministischer Fallback). Das Human-Oversight-Gate bleibt in
-  jedem Fall unangetastet.
-
-## Multi-Provider-LLM-Router
-
-> **ZENTRALE REGEL:** Kein einzelnes LLM aktiviert von sich aus einen Schwarm.
-> Das Schwarm-Verhalten (Königin + Spezial-Agenten, Phasen, Dispatch) kommt
-> **ausschließlich aus dem antbb-Framework**. Die LLMs sind nur austauschbare
-> Denk-/Text-Bausteine, die der Router pro Aufgabe aufruft.
-
-Der **Multi-Provider-LLM-Router** (`antbb/router.py`) ist eine austauschbare
-Schicht, die pro Aufgabe **ein** LLM auswählt und aufruft:
-
-- Kleine/schnelle Arbeiter-Schritte → günstiges/schnelles Modell.
-- Entscheidungs-/komplexe Aufgaben (tiefe Analyse, Report-Narrativ) → stärkeres
-  Modell.
-- Bei kritischen oder mehrdeutigen Entscheidungen fragt der Router den Nutzer
-  (`UserQuery`), statt still selbst zu wählen.
-
-antbb **unterstützt mehrere austauschbare LLM-Provider** (Cloud-APIs per Key
-oder lokale Modelle über eine einheitliche `chat()`-Adapter-Schnittstelle).
-**Welche Provider konkret genutzt werden, konfiguriert jede Installation selbst
-über Umgebungsvariablen** – nichts davon ist im Repo hinterlegt. Nur Provider,
-für die zur Laufzeit ein Key gesetzt ist (bzw. bei einem lokalen Dienst dieser
-erreichbar ist), werden als „verfügbar" gelistet; fehlt der Key/Dienst, wird der
-Provider sauber übersprungen (kein Crash).
-
-**Authentifizierung:** Der Router unterstützt **API-Key-Authentifizierung** und –
-wo der jeweilige Provider es offiziell anbietet – zusätzlich **OAuth** (OAuth 2.0
-Authorization Code mit PKCE für browserbasierte Anmeldung sowie den
-Device-Authorization-Grant/Device-Code-Flow für Anmeldung ohne lokalen Browser).
-Pro Provider ist die Methode wählbar (`auth_method: api_key | oauth`); Provider
-ohne dokumentierten OAuth-Flow bleiben key-only. Keys, OAuth-Client-Secrets und
-Tokens kommen **ausschließlich zur Laufzeit** (Umgebungsvariablen bzw. lokaler,
-verschlüsselter Token-Store) – **nichts davon ist im Repo hinterlegt**, und
-fehlende Credentials führen zu sauberem Überspringen statt zum Absturz.
-
-Provider-Status in der Oberfläche (zeigt **nie** Key-/Token-Werte):
-
-- **CLI:** `python -m antbb llm status`
-- **Web:** `GET /api/llm/status` (JSON) und HTML-Ansicht unter **`/providers`**.
-
-## Umgesetzt / Roadmap
-
-Umgesetzt:
-
-- ✅ Echter WebSocket-Live-Feed (`/ws/feed`) mit automatischem Fallback auf das
-  `/api/feed`-Polling.
-- ✅ Interaktiver CVSS-v3.1-Rechner (`antbb/cvss.py`, `GET /api/cvss`).
-- ✅ Optionale Authentifizierung/Multi-User für den Webserver (`ANTBB_AUTH=1`,
-  Rollen admin/viewer; Standard: Einzelnutzer-Betrieb ohne Login).
-- ✅ Opt-in-Modul für *echte* ungefährliche Checks (TLS/HTTP-Security-Header)
-  nur gegen ausdrücklich bestätigte **eigene** Assets (default-deny,
-  oversight-gated).
-- ✅ Persistente Run-Historie + Export-Index in der UI (`/history`).
-- ✅ Startseiten-Laufschrift **„Neueste Schwachstellen"** (`GET /api/dyk`):
-  echte, aktuelle CVEs (NVD) und öffentliche Mastodon-Infosec-Posts
-  (Instanz/Hashtags/Konten in `config/default.yaml` konfigurierbar, kein Login)
-  als durchlaufende Laufschrift + ausklappbare Späher-Liste. Cache mit TTL;
-  bei Netzausfall sauberer Fallback auf statische Infosec-Fakten (nie dauerhaft
-  „Lädt …"). Optik im Ameisen-/Schwarz-Theme inkl. Scout-Ameisen entlang der
-  Laufschrift; im Kolonie-Tunnel laufen animierte Ameisen zum Ziel.
-- ✅ Neuronales Gehirn: jeder echte Pentest-/Bugbounty-Lauf aus der
-  Run-Historie erscheint als leuchtender Ameisen-Knoten mit Hover-Tooltip
-  und verblassender Pheromonspur (`/static/brain/runs.js`, Daten aus
-  `GET /api/runs`). Im Kolonie-Tunnel hinterlassen die Späher ebenfalls
-  Pheromonspuren.
-
-
-- ✅ Zeitraffer im Neuronalen Gehirn: einen echten Lauf (Pentest, Bugbounty
-  oder WLAN) aus der Run-Historie auswählen und chronologisch abspielen
-  (`GET /api/runs/{id}/timeline`) – Play/Pause, Geschwindigkeit, Pheromonspur.
-  Nur reale Events/Findings; nichts erfunden.
-
-
-- ✅ Neuronales Gehirn: jeder echte Pentest-/Bugbounty-Lauf aus der
-  Run-Historie (`/api/runs`) erscheint als leuchtende Ameise mit
-  Pheromonspur und Tooltip (Ziel, Zeitpunkt, Modus, Funde); neue Läufe
-  kommen automatisch hinzu. Auch die Tunnel-Ameisen der Kolonie-Karte
-  hinterlassen nun eine verblassende Pheromonspur.
-
-
-- ✅ WLAN-Coverage-Heatmap (Tab „Heatmap" in der WLAN-Ansicht): rein **passive**
-  Signalstärke-Messung (RSSI) je sichtbarem AP aus dem vorhandenen Scan, verortet
-  per Klick auf einen optionalen Grundriss-Upload oder ein leeres Raster (kein GPS).
-  Messpunkte landen persistent in SQLite (`wlan_heatmap_samples`), der Grundriss in
-  `wlan_floorplans`. Darstellung als Canvas-Heatmap mit einfacher IDW-Interpolation
-  (gut = grün → schlecht = rot), AP/SSID umschaltbar oder bestes Signal aggregiert,
-  Legende; verspielt im Ameisen-Look mit Pheromonspur und Ameisen-Markern, strikt im
-  Schwarz-Theme. Endpoints: `POST /api/wlan/heatmap/sample`, `GET /api/wlan/heatmap`,
-  `DELETE /api/wlan/heatmap`, Grundriss `POST|GET|DELETE /api/wlan/heatmap/floorplan`.
-  Nur eigene/erlaubte Umgebung, keine Angriffe; ohne Scan (Rechte/Adapter) ein
-  **ehrlicher Hinweis statt Fake-Daten**. Smoke-Test: `smoke_test_wlan_heatmap.py`.
-
-- ✅ **Blue Queen** (Verteidigungs-Kolonie): Orchestrator + 5 Blue-Soldaten,
-  Job-Scheduler, Splunk-Adapter (optional), Remediation-Verify
-  („nachweislich geschlossen"), GUI unter `/blue`.
-
-Offen / Ideen:
-
-- Weitere LLM-Adapter und Feinschliff der Router-Heuristiken.
-
-## On-Device GUI (ohne CLI-Copy-Paste)
-
-Die Web-GUI steuert die Königin **vollständig lokal** über `AntBBService`
-(Scope, Oversight, Mode-Policy, Scan, Report). Es gibt **keine** Fernsteuerung
-von Termux durch einen externen Assistenten und **keine** Ausführung beliebiger
-Shell-Kommandos – nur fest verdrahtete Python-Operationen.
-
-### Ein-Tipp-Start
-
-```bash
-./run.sh
-# öffnet http://127.0.0.1:8000/
-```
-
-Oder: `python run_web.py`
-
-### Mode-Policy
-
-Pro Target: `defensive` | `auto` | `offensive`.
-Offensiv (`--active` / `--fuzz` bzw. GUI-Checkboxen) greift nur bei
-**Scope + Oversight**. Bei `defensive` werden Offensiv-Flags verworfen.
-
-### Pixel / Termux und Python 3.14
-
-FastAPI/pydantic bauen unter **Python 3.14** in Termux oft nicht.
-Saubere Lösungen:
-
-1. Termux-Python **3.12** nutzen (falls verfügbar), dann `pip install -r requirements.txt` und `./run.sh`
-2. Oder **CLI-only** ohne Web: `python -m antbb …` (pydantic-frei)
-
-Die Autonomie ist on-device: App startet lokal, GUI + Königin erledigen den Rest.
-
-## Secrets & Environment (Distribution)
-
-Siehe **`INSTALL.md`** und **`antbb.env.example`**.
-
-Kurz: Provider-API-Keys und der `CLOUDFLARE_TUNNEL_TOKEN`
-werden **ausschließlich zur Laufzeit** als Umgebungsvariablen gesetzt und
-**niemals** in ZIP/Repo/APK/Logs eingebettet. Es wird **keine** leere Key-Variable angelegt.
-
-
-## System-Bootstrap durch den Installer
-
-`install-and-start.sh` (= `install.sh`) richtet auf einem frischen System so
-viel wie möglich automatisch ein:
-
-- **Basis (immer, best effort):** `python3`, `python3-venv`, `python3-pip`,
-  `build-essential`, `git`, `curl` – via erkanntem Paketmanager (apt, optional
-  dnf/pacman). Non-interaktiv (`DEBIAN_FRONTEND=noninteractive apt-get -y`).
-- **`ANTBB_FULL=1`:** zusätzlich die vom Code **real erwarteten** externen Tools
-  und Wortlisten (keine erfundenen):
-  - Netz/Web: `nmap`, `iw`, `network-manager` (nmcli), `ffuf`, `gobuster`,
-    `nikto`, `wpscan`
-  - WLAN-Offensiv (gate-pflichtig): `aircrack-ng`-Suite (airmon-ng/airodump-ng/
-    aireplay-ng), `hcxdumptool`, `hashcat`, `mdk4`
-  - Wortlisten: `seclists` und `wordlists` (rockyou) an die in
-    `antbb/wordlists.py` erwarteten Pfade (`/usr/share/seclists`,
-    `/usr/share/wordlists/rockyou.txt`).
-- **`ANTBB_SKIP_SYSTEM=1`:** keine System-Installation, nur Python/venv/Web.
-
-**Rechte:** als root direkt, sonst via `sudo`. Fehlen root **und** sudo, bricht
-der Installer **nicht still** ab, sondern listet die fehlenden Pakete + den
-exakten Install-Befehl auf und startet trotzdem den Python-/Web-Teil
-(tool-abhängige Funktionen bleiben dann „ehrlich leer", bis die Pakete da sind).
-Idempotent: vorhandene Tools werden übersprungen; einzelne Paketfehler brechen
-den Lauf nicht ab; am Ende erscheint eine Zusammenfassung
-„installiert / übersprungen / fehlgeschlagen".
-
-> **Python-Version:** empfohlen 3.11–3.13 (FastAPI/pydantic bauen damit
-> zuverlässig). Ubuntu 24.04 liefert 3.12 als Standard. Unter 3.14/3.15 kann
-> pydantic/FastAPI fehlen – der Installer warnt dann klar.
-
-### Handshake-/Capture-Dateien (bewusst KEINE mitgeliefert)
-
-Diese Distribution enthält **keine** WLAN-Handshakes/Traffic-Captures – weder
-echte noch fremde Samples (keine PII, nichts aus Produktivsystemen). Für
-autorisierte, offline Crack-Übungen bringt der Nutzer **eigene**, selbst
-erzeugte oder offiziell/frei lizenzierte Test-Captures mit und legt sie lokal
-ab. Es wird nichts dergleichen erfunden oder automatisch heruntergeladen.
-
-## Telemetrie (optional, anonym, standardmäßig AUS, abschaltbar)
-
-antbb kann **optional** anonyme Nutzungs-Signale senden – **standardmäßig ist
-das AUS**. Es wird **nichts** gesendet, solange `ANTBB_TELEMETRY_URL` leer ist.
-Nichts davon ist getarnt; die Logik steht offen in `antbb/telemetry.py`.
-
-- **Was** (exakter Payload, JSON): `{"event": "<install|heartbeat>",
-  "version": "<antbb-Version>", "ts": <unix-sekunden>}`. **Keine** PII, **keine**
-  API-Keys, **keine** Hostnamen/Usernamen/IPs im Body.
-- **Wann:** `install` einmalig beim Lauf von `install-and-start.sh`;
-  `heartbeat` periodisch vom laufenden Web-Server (Intervall via
-  `ANTBB_TELEMETRY_INTERVAL`, Default 6 h) – nur „aktiv", keine Nutzungsdetails.
-- **Wohin:** an die vom **Betreiber selbst** gesetzte `ANTBB_TELEMETRY_URL`
-  (oben im Script als offene Variable). Die rohe Absender-IP sieht technisch
-  nur dieser Endpunkt (wie bei jedem HTTP-Request) – hier offengelegt.
-- **Aus-/Anschalten:** leere `ANTBB_TELEMETRY_URL` = komplett aus (Default).
-  Zusätzlich `ANTBB_TELEMETRY=0` als harter Aus-Schalter. Beim ersten Start und
-  im Installer erscheint ein klarer Konsolen-Hinweis zum Status (AN/AUS).
-- **Fehlertolerant:** kurzes Timeout (3 s), Fehler werden still geschluckt;
-  Telemetrie blockiert Start/Betrieb nie.
-
-## Lizenz
-
-Für dieses Repository ist derzeit **keine Open-Source-Lizenz hinterlegt**. Ohne
-explizite Lizenz gelten die gesetzlichen Standardrechte, d. h. alle Rechte liegen
-beim Autor (`krockodog`). Wer den Code über das reine Ansehen hinaus nutzen,
-anpassen oder weitergeben möchte, klärt das bitte vorab mit dem Autor. Eine
-passende `LICENSE`-Datei (z. B. MIT) kann jederzeit ergänzt werden.
-
-## 🐜 Vision
-
-antbb beginnt mit **einem** Volk — der offensiven Königin und ihren Spähern, Spezialisten und Soldaten, die autorisierte Ziele aufklären, Schwächen aufspüren und beweisen, niemals zerstören. Doch ein einzelnes Volk ist erst der Anfang.
-
-**Das Blue-Team-Volk.** Neben die angreifende Königin tritt eine **verteidigende Königin** mit ihrem eigenen Ameisenvolk: Härtungs-Ameisen, die Funde direkt in Fixes übersetzen, Wächter-Ameisen, die Erreichbarkeit und Veränderungen überwachen, und Sanitäter-Ameisen, die aus jedem Angriff eine konkrete Gegenmaßnahme bauen. Was das rote Volk findet, verschließt das blaue Volk — im selben Bau, mit demselben Gedächtnis.
-
-### Blue Queen – was schon steht
-
-| Modul | Status | Beschreibung |
-|---|---|---|
-| `blue-swscan` | **echt** | Software-Inventar (dpkg/rpm/pip) + optionaler OSV-CVE-Abgleich |
-| `blue-hardening` | **echt (read-only)** | CIS-artige Checks (SSH, Firewall, Dateirechte, sysctl) + Fix-Vorschläge |
-| `blue-remediation` | **echt (read-only)** | Finding→Fix-Pipeline; Re-Check belegt „nachweislich geschlossen" |
-| `blue-defense` | Scaffold + Regeln | Detection-Regeln (Sigma-artig); optional Splunk-HEC |
-| `blue-honeypot` | Scaffold + Doku | Sichere Decoy-Rezepte; Start nur oversight-gated |
-| Job-Scheduler | **echt** | Wiederholbare Jobs (`swscan`/`hardening`/`remediate`/`colony`) in DB |
-| Splunk-Adapter | **optional** | HEC via ENV (`ANTBB_SPLUNK_HEC_URL`/`_TOKEN`); ohne Config übersprungen |
-
-„Nachweislich geschlossen" = rein lesender Re-Check mit Vorher/Nachher-Evidence
-über das bestehende Proof-Gate (analog zur offensiven `VERIFIZIERT`-Logik).
-
-
-**Das Reverse-Engineering-Volk.** Ein drittes Volk gräbt tiefer: Zerleger-Ameisen, die Binärdateien, Firmware und Protokolle auseinandernehmen, Spuren-Ameisen, die Logik rekonstruieren, und Übersetzer-Ameisen, die aus rohem Code verständliche Erkenntnis machen. Sie verstehen, *wie* Dinge gebaut sind — damit die anderen Völker wissen, wo sie ansetzen.
-
-**Die Verschmelzung.** Jedes Volk hat heute seinen eigenen Bau. Die Vision ist, dass die Völker nicht nebeneinander leben, sondern **zu einer einzigen Plattform verschmelzen**: ein gemeinsames Gedächtnis, in dem jede Ameise vom Wissen aller anderen lernt. Der Angreifer weiß, was der Verteidiger gehärtet hat; der Verteidiger weiß, was der Zerleger entdeckt hat; der Zerleger weiß, wonach der Angreifer sucht. Ein Schwarm, viele Kasten, ein Bau.
-
-Verspielt im Auftritt — lebendige Ameisen, die über den Bildschirm wuseln — aber mit echter, gebündelter Kraft darunter. Das Ziel: nicht viele kleine Werkzeuge, sondern **ein großes, zusammengewachsenes Framework**, in dem autorisierte Sicherheitsarbeit, Verteidigung und Verständnis als ein einziger, koordinierter Organismus funktionieren. Immer nachvollziehbar, immer unter menschlicher Aufsicht, immer nur im erlaubten Rahmen.
-
-## Roadmap / noch nicht enthalten
-
-- **Blue Queen – Feinschliff:** Grundgerüst ist gebaut (siehe Vision). Offen:
-  automatisches Fix-Apply (weiterhin oversight-gated), erweiterte Detection-
-  Integrationen, Honeypot-Deploy jenseits der Doku, CVE-Lab-Fall als Demo.
-- **Reverse-Engineering-Kolonie:** noch nicht gebaut.
-
-## Screenshots (nur Repo)
-
-> Diese Galerie liegt nur im privaten Repo unter `docs/screenshots/`.
-> Die geteilte ZIP enthält diesen Abschnitt bewusst NICHT (keine kaputten Links).
-
-![Startseite](docs/screenshots/01-startseite.png)
-*Startseite der antbb-Web-GUI – Königin-Steuerung, Ziel-/Scope-Übersicht.*
-
-![WLAN-Scope](docs/screenshots/02-wlan-scope.png)
-*WLAN-Scope: autorisierte SSIDs/APs als default-deny Allowlist.*
-
-![Coverage & Scan](docs/screenshots/03-coverage-scan.png)
-*Coverage & Scan: passives Site-Survey, Kanal-/Funkloch-Analyse.*
-
-![Offensiv / Airgorah](docs/screenshots/04-offensiv-airgorah.png)
-*Offensiv/Airgorah-Tab: gate-pflichtige WLAN-Aktionen (Monitor/Handshake/Crack).*
-
-![Neuronales Gehirn der Königin](docs/screenshots/05-neural-brain.png)
-*Orchestrator-Ansicht „Neuronales Gehirn der Königin": sichtbares Ameisenvolk – die Königin mittig, die 18 Soldaten krabbeln als Ameisen-Sprites darum herum und leuchten bei Aktivität/Funden auf.*
-
-### Installer-Konsole (Transkripte)
-
-Die CLI-Schritte liegen als echte Konsolen-Transkripte bei:
-
-- [`docs/screenshots/cli_provider_prompt.txt`](docs/screenshots/cli_provider_prompt.txt) – Installer: interaktive KI-Anbieter-Abfrage (API-Key oder OAuth, überspringbar).
-- [`docs/screenshots/cli_telemetry_notice.txt`](docs/screenshots/cli_telemetry_notice.txt) – Klarer Konsolen-Hinweis: Telemetrie standardmäßig AUS, abschaltbar.
-- [`docs/screenshots/beispiel_test_transkript.txt`](docs/screenshots/beispiel_test_transkript.txt) – vollständiges Transkript eines lokalen Beispiel-Scans (Scope → Oversight → Scan → Findings → Report).
+Siehe [LICENSE](LICENSE). Dieses Framework ist für **autorisierte Sicherheitstests, eigene Labore und Aufklärungsarbeit** gebaut. Missbrauch gegen fremde Systeme ist strafbar und technisch durch das Scope-Gate ausgeschlossen — Tricks kennen heißt schützen können.

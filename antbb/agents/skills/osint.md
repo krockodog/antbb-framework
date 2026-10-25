@@ -60,10 +60,10 @@ You are the open-source intelligence (OSINT) expert. Your job is to map the exte
 ## Hinterlegter Scope (Octogent Deck)
 
 **Erlaubte Ziele:**
-- https://shop.example.com/de/
-- https://demo.example.com/
-- https://shop.example.com/
-- https://engagement.example.com/
-- https://app.example.com/
+- https://partybrueller.de/de/
+- https://spassprofi.de/
+- https://scherzartikel-onlineshop.de/
+- https://dc-infosec.de/
+- https://carescribe.de/
 
-**Tags:** pentest, osint, example-shop, example-demo, example-engagement, example-app
+**Tags:** pentest, osint, partybrueller, spassprofi, dc-infosec, carescribe

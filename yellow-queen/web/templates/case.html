@@ -1,0 +1,125 @@
+{% extends "base.html" %}{% set active='yellow' %}
+{% block title %}Fall {{ case.id }}{% endblock %}
+{% block body %}
+<h1>Fall <code>{{ case.id }}</code></h1>
+<div class="card kv"><div>Datei</div><div>{{ case.filename }}</div><div>SHA-256</div><div><code>{{ case.sha256 }}</code></div>
+<div>Format / Route</div><div>{{ case.kind }} → {{ case.route }}</div><div>Status</div><div><span class="badge {{ 'ok' if case.status=='done' else 'live' }}">{{ case.status }}</span></div>
+<div>Dynamic</div><div>{{ case.dynamic }}</div><div>Zuletzt gelaufen</div><div class="mut">{{ snap.last_ran_at or case.updated_at }}</div></div>
+<p>
+  <a class="pill" href="/yellow/brain?case={{ case.id }}">📡 Yellow Live-Status</a>
+  <a class="pill" href="http://192.168.2.7:1001/brain">🧠 Gehirn :1001</a>
+  <a class="pill" href="/yellow/case/{{ case.id }}/dossier.md">Dossier (md)</a>
+  <a class="pill" href="/yellow/case/{{ case.id }}/ledger.md">Ledger (md)</a>
+</p>
+
+{# ===== Next-3 ===== #}
+<section class="card eye next3-panel" id="next3">
+  <div class="panel-head">
+    <h2 style="margin:0">▶️ Next-3 · wohin geht’s?</h2>
+    <span class="badge live" id="n3prog">
+      {% set done_n = snap.next3_steps | selectattr('status','equalto','done') | list | length %}
+      {{ done_n }}/{{ snap.next3_steps|length or 3 }} erledigt
+    </span>
+  </div>
+  <p class="mut" style="margin:.4em 0 1em">Aktiver Schritt = <b class="gold">Jetzt</b>. Abgehakte Schritte sind fertig. Klick öffnet die Schritt-Begründung (Warum / Fund / Nächstes).</p>
+  <div class="n3-track">
+  {% for s in snap.next3_steps %}
+    <details class="n3-step {{ s.status }}" {% if s.jetzt %}open{% endif %}>
+      <summary>
+        <span class="n3-num">{{ s.progress }}</span>
+        {% if s.status == 'done' %}<span class="n3-check">✓</span>{% elif s.jetzt %}<span class="n3-jetzt">Jetzt</span>{% else %}<span class="n3-wait">…</span>{% endif %}
+        <span class="n3-label">{{ s.label }}</span>
+        <span class="badge {{ s.status }}">{{ s.status }}</span>
+      </summary>
+      <div class="erk">
+        <div><b>Warum?</b> {{ s.warum or '–' }}</div>
+        <div><b>Was bedeutet der Fund?</b> {{ s.fund or '–' }}</div>
+        <div><b>Als Nächstes:</b>
+          <ol>{% for n in s.next %}<li>{{ n }}</li>{% else %}<li class="mut">–</li>{% endfor %}</ol>
+        </div>
+        {% if s.tool %}<div class="mut">Tool/Skill: <code>{{ s.tool }}</code></div>{% endif %}
+      </div>
+    </details>
+  {% else %}
+    <p class="mut">Noch keine Next-3 – Lauf startet gleich.</p>
+  {% endfor %}
+  </div>
+</section>
+
+{# ===== Bypass ===== #}
+{% set bp = snap.bypass or {} %}
+<section class="card eye bypass-panel bypass-{{ bp.status or 'pending' }}">
+  <div class="panel-head">
+    <h2 style="margin:0">🔓 Bypass-Pfad</h2>
+    <span class="badge {{ bp.status or 'pending' }}">{{ bp.status or 'pending' }}</span>
+  </div>
+  <p><b>{{ bp.label or 'Bypass' }}</b> · Playbook <code>{{ bp.playbook or '–' }}</code>
+    {% if bp.requires_oversight %} · <span class="badge partial">Oversight nötig</span>{% endif %}
+  </p>
+  <div class="erk">
+    <div><b>Warum?</b> {{ bp.warum or '–' }}</div>
+    <div><b>Status/Fund:</b> {{ bp.fund or '–' }}</div>
+    <div><b>Als Nächstes:</b><ol>{% for n in bp.next or [] %}<li>{{ n }}</li>{% endfor %}</ol></div>
+  </div>
+</section>
+
+
+{# ===== Dynamic Lab ===== #}
+{% set dyn = snap.dynamic_step or {} %}
+<section class="card eye dynamic-panel bypass-{{ dyn.status or 'pending' }}">
+  <div class="panel-head">
+    <h2 style="margin:0">⚡ Dynamic-Lab</h2>
+    <span class="badge {{ dyn.status or 'pending' }}">{{ dyn.status or 'pending' }}</span>
+  </div>
+  <p><b>{{ dyn.label or 'Dynamic' }}</b> · Playbook <code>{{ dyn.playbook or '–' }}</code>
+    {% if dyn.requires_oversight %} · <span class="badge partial">Oversight Pflicht</span>{% endif %}
+    {% if dyn.tools_used %} · Tools: {% for x in dyn.tools_used %}<code>{{ x }}</code> {% endfor %}{% endif %}
+  </p>
+  <div class="erk">
+    <div><b>Warum?</b> {{ dyn.warum or '–' }}</div>
+    <div><b>Was ist gelaufen / Status?</b> {{ dyn.fund or '–' }}</div>
+    <div><b>Als Nächstes:</b><ol>{% for n in dyn.next or [] %}<li>{{ n }}</li>{% endfor %}</ol></div>
+  </div>
+</section>
+
+{# ===== Ergebnisse ===== #}
+<section class="card eye findings-panel">
+  <div class="panel-head">
+    <h2 style="margin:0">🎯 Ergebnisse · Funde mit Adresse</h2>
+    <span class="mut">zuletzt: {{ snap.last_ran_at or '–' }}</span>
+  </div>
+  <p class="mut">Ghidra / DIE / r2 / Strings – klick auf Evidence oder Dossier.</p>
+  {% if snap.findings %}
+  <table class="findings">
+    <tr><th>Tool</th><th>Adresse</th><th>Titel</th><th>Snippet</th><th>Links</th></tr>
+    {% for f in snap.findings %}
+    <tr>
+      <td><code>{{ f.tool }}</code><div class="mut">{{ f.soldier }}</div></td>
+      <td><code class="addr">{{ f.address }}</code></td>
+      <td>{{ f.title }}</td>
+      <td class="snip">{{ f.snippet }}</td>
+      <td>
+        {% if f.evidence_url %}<a class="pill" href="{{ f.evidence_url }}">Evidence</a>{% endif %}
+        <a class="pill" href="{{ f.dossier_url }}">Dossier</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="mut">Noch keine strukturierten Funde – nach Classify/Soldaten erscheinen sie hier.</p>
+  {% endif %}
+</section>
+
+<h2>Hops</h2>
+<div class="hops">{% for h in case.hops %}<div class="hop {{ h.status }}"><h3>{{ h.idx }}. {{ h.op }} <span class="badge {{ h.status }}">{{ h.status }}</span></h3><div>{{ h.summary_de }}</div>
+<div class="erk"><b>Warum?</b> {{ h.warum }}<br><b>Was bedeutet der Fund?</b> {{ h.fund }}<br><b>Als Nächstes:</b><ol>{% for n in h.next %}<li>{{ n }}</li>{% endfor %}</ol></div></div>{% endfor %}</div>
+<h2>Evidenz</h2><p>{% for e in evidence %}<a class="pill" href="/yellow/case/{{ case.id }}/evidence/{{ e }}">{{ e }}</a>{% else %}<span class="mut">keine</span>{% endfor %}</p>
+
+<h2>🔬 Analyse-Orchestrator</h2>
+<div id="orch-panel" data-case="{{ case.id }}">
+  <p class="mut">lädt…</p>
+</div>
+<script src="/static/orchestrate.js?v=202610240705"></script>
+
+<h2>Dossier</h2><pre>{{ dossier }}</pre>
+{% endblock %}

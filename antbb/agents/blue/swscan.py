@@ -20,7 +20,7 @@ class SoftwareScanAnt(BlueAgent):
         Playbook("sw-inventory", "defensive", False,
                  ["dpkg-query", "rpm", "pip-list"],
                  "Installierte Software rein lesend inventarisieren "
-                 "(Paketname+Version, keine Secrets)."),
+                 "(Paketname+Version, keine Klartext-Zugangsdaten)."),
         Playbook("sw-cve-match-osv", "defensive", False,
                  ["osv-querybatch", "osv-enrich"],
                  "Inventar gegen die öffentliche OSV-Datenbank abgleichen; "

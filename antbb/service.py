@@ -5,8 +5,11 @@ CLI und Web rufen NUR diese Fassade auf → keine Logik-Duplizierung.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import shutil
+import subprocess
 from typing import Callable, Optional
 
 from . import llm as llm_mod
@@ -272,11 +275,92 @@ class AntBBService:
 
     def wlan_scan(self, iface: Optional[str] = None,
                   emit: Optional[Callable[[dict], None]] = None) -> dict:
-        """Passiver Umgebungs-Scan (iw/nmcli). Ohne Tool/Interface: ehrlich leer."""
+        """Passiver Umgebungs-Scan (iw/nmcli). Ohne Tool/Interface: ehrlich leer.
+
+        Hält das Ergebnis zusätzlich als 'last_scan' persistent, damit die
+        Grundriss-Schätzung nach einem Scan automatisch rendern kann."""
         from . import wlan_survey as ws
         log = (lambda m: emit({"ts": __import__("time").time(), "msg": m})) if emit else None
-        return ws.scan_environment(iface=iface, log=log, force=True)
+        result = ws.scan_environment(iface=iface, log=log, force=True)
+        aps = (result or {}).get("aps") or []
+        observations = [
+            {"bssid": a.get("bssid", ""), "rssi": a.get("rssi"),
+             "ssid": a.get("ssid") or ""}
+            for a in aps
+            if a.get("bssid") and a.get("rssi") is not None
+        ]
+        if observations:
+            self.store.set_wlan_state("last_scan", json.dumps({
+                "observations": observations,
+                "ts": __import__("time").time(),
+            }))
+        return result
 
+    def wlan_scope_allowlist_bssids(self) -> set:
+        """BSSIDs aller aktiven, Oversight-bestätigten Engagements (default-deny)."""
+        import time as _t
+        now = _t.time()
+        out = set()
+        for row in self.store.list_wlan_engagements(include_revoked=False):
+            eng = dict(row)
+            if eng.get("revoked") or not eng.get("oversight"):
+                continue
+            if not (eng["start_ts"] <= now <= eng["end_ts"]):
+                continue
+            try:
+                bssids = json.loads(eng.get("bssids") or "[]")
+            except Exception:
+                bssids = []
+            out.update(b.lower() for b in bssids if b)
+        return out
+
+    def wlan_enumerate_clients(self, iface: str = "wlan1", seconds: int = 20,
+                               channel: Optional[int] = None,
+                               oversight_ok: bool = False) -> dict:
+        """EIN-KLICK Client-Enumeration (passiv, Monitor-Mode) – Oversight-Pflicht.
+
+        Läuft direkt (als Root) oder über den sudoers-Wrapper
+        /opt/allone/wlan_clients_run. Ohne beides: ehrliche Fehlermeldung."""
+        from . import wlan_clients as wc
+        allow = self.wlan_scope_allowlist_bssids()
+        geteuid = getattr(os, "geteuid", None)
+        if geteuid is not None and geteuid() == 0:
+            return wc.enumerate_clients(iface, seconds, channel,
+                                        allowlist_bssids=allow,
+                                        oversight_ok=oversight_ok)
+        wrapper = "/opt/allone/wlan_clients_run"
+        if os.path.isfile(wrapper) and shutil.which("sudo"):
+            cmd = ["sudo", "-n", wrapper, "--iface", iface,
+                   "--seconds", str(int(seconds)), "--oversight", "1"]
+            if channel:
+                cmd += ["--channel", str(int(channel))]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True,
+                                      timeout=max(90, int(seconds) + 60))
+            except subprocess.TimeoutExpired:
+                return {"ok": False,
+                        "error": "WLAN-Client-Scan hat das Zeitlimit überschritten."}
+            if proc.returncode == 0 and proc.stdout.strip():
+                try:
+                    return json.loads(proc.stdout)
+                except ValueError:
+                    return {"ok": False,
+                            "error": "WLAN-Wrapper-Ausgabe ungültig (kein JSON)."}
+            return {"ok": False,
+                    "error": f"WLAN-Wrapper fehlgeschlagen (rc={proc.returncode}): "
+                             f"{(proc.stderr or '').strip()[:300]}"}
+        return {"ok": False,
+                "error": "Root/sudo erforderlich für Monitor-Mode "
+                         "(airmon-ng/iw). sudoers-Wrapper einrichten: "
+                         "NOPASSWD für /opt/allone/wlan_clients_run (siehe EINBAU.md)."}
+
+    def wlan_discover_devices(self, oversight_ok: bool = False) -> dict:
+        """EIN-KLICK Geraete-Scan (nmap, read-only) im lokalen Subnetz.
+
+        Erkennt Router/Fritzbox, Repeater/Mesh, IoT; Firmware-Hinweise aus
+        Versionsbannern. Oversight-Pflicht, nur private lokale Subnetze."""
+        from . import wlan_devices as wdev
+        return wdev.discover_devices(oversight_ok=oversight_ok)
     def wlan_add_point(self, point_label: str, samples: dict,
                        target_id: Optional[int] = None,
                        own_bssids: Optional[list] = None) -> int:
@@ -416,7 +500,6 @@ class AntBBService:
             "legend": {"gut": ">= -55 dBm", "ok": "-56..-67 dBm",
                        "schwach": "-68..-75 dBm", "funkloch": "< -75 dBm"},
         }
-
 
     def _wlan_points_from_store(self, target_id: Optional[int] = None):
         """Rekonstruiert Mess-Punkte + eigene BSSIDs aus den gespeicherten Samples."""
@@ -813,55 +896,6 @@ class AntBBService:
         from . import remote_access as ra
         return ra.setup_steps(mode)
 
-    def remote_full_status(self) -> dict:
-        """Erweiterter Status (Funnel/Access/DNS/WARP/API) – rein lesend, honest-empty."""
-        from . import remote_access as ra
-        return ra.remote_full_status(self.get_remote_mode())
-
-    def remote_capability_summary(self) -> dict:
-        """installed/skipped/failed-Zusammenfassung der Remote-Access-Lage."""
-        from . import remote_access as ra
-        return ra.remote_capability_summary()
-
-    def enable_tailscale(self, oversight: bool = False) -> dict:
-        """Aktiviert Tailscale (oversight-gegatet). Setzt Präferenz bei Erfolg."""
-        from . import remote_access as ra
-        res = ra.enable_tailscale(oversight=oversight)
-        if res.get("ok") and res.get("running"):
-            self.set_remote_mode("tailscale")
-        return res
-
-    def disable_tailscale(self, oversight: bool = False) -> dict:
-        """Trennt Tailscale (oversight-gegatet)."""
-        from . import remote_access as ra
-        return ra.disable_tailscale(oversight=oversight)
-
-    def tailscale_funnel(self, enable: bool, oversight: bool = False) -> dict:
-        """Schaltet Tailscale Funnel an/aus (oversight-gegatet)."""
-        from . import remote_access as ra
-        return ra.tailscale_funnel(enable=enable, oversight=oversight)
-
-    def start_cloudflare_tunnel(self, oversight: bool = False, named: bool = False) -> dict:
-        """Startet Cloudflare-Tunnel (oversight-gegatet). Setzt Präferenz bei Erfolg."""
-        from . import remote_access as ra
-        res = ra.start_cloudflare_tunnel(oversight=oversight, named=named)
-        if res.get("ok"):
-            self.set_remote_mode("cloudflare")
-        return res
-
-    def stop_cloudflare_tunnel(self) -> dict:
-        """Stoppt den von antbb verwalteten Cloudflare-Tunnel."""
-        from . import remote_access as ra
-        return ra.stop_cloudflare_tunnel()
-
-    def cloudflare_access_setup_steps(self, hostname: str = "") -> list:
-        from . import remote_access as ra
-        return ra.cloudflare_access_setup_steps(hostname or "<dein-tunnel-hostname>")
-
-    def warp_setup_steps(self) -> list:
-        from . import remote_access as ra
-        return ra.warp_setup_steps()
-
     def llm_status(self):
         """Status aller konfigurierten LLM-Provider – ohne Key-Werte."""
         return {
@@ -932,74 +966,6 @@ class AntBBService:
         from .jobs import JobScheduler
         return JobScheduler(self.store, logger=self.logger).tick()
 
-    # ---------------- Yellow Queen (Reverse-Engineering-Kolonie) ----------------
-    def yellow_capabilities(self) -> dict:
-        """Yellow-Soldaten aus der Registry (colony=yellow)."""
-        reg = self.capabilities(rebuild=True)
-        yellows = [s for s in reg.get("soldiers", []) if s.get("colony") == "yellow"]
-        import os as _os
-        pb_dir = _os.path.join(_os.path.dirname(__file__), "playbooks", "yellow")
-        try:
-            pb_files = len([f for f in _os.listdir(pb_dir)
-                            if f.endswith(".md") or f.endswith(".json")])
-        except Exception:
-            pb_files = 0
-        pb_n = sum(len(s.get("playbooks") or []) for s in yellows)
-        task_n = sum(((s.get("skill") or {}).get("task_count") or 0) for s in yellows)
-        return {
-            "yellow_phases": reg.get("yellow_phases", []),
-            "soldier_count": len(yellows),
-            "playbook_count": pb_n,
-            "task_count": task_n,
-            "playbook_file_count": pb_files,
-            "soldiers": yellows,
-            "soldier_ids": [s.get("name") for s in yellows],
-        }
-
-    def yellow_uploads_dir(self) -> str:
-        import os as _os
-        d = _os.environ.get("ANTBB_YELLOW_UPLOADS") or _os.path.join(
-            _os.path.dirname(__file__), "..", "data", "uploads")
-        d = _os.path.abspath(d)
-        _os.makedirs(d, exist_ok=True)
-        return d
-
-    def save_upload(self, filename: str, data: bytes) -> dict:
-        """Speichert eine hochgeladene RE-Probe read-only unter data/uploads."""
-        import os as _os, hashlib, re as _re
-        safe = _re.sub(r"[^A-Za-z0-9._-]", "_", (filename or "sample"))[:128] or "sample"
-        sha = hashlib.sha256(data).hexdigest()
-        dest = _os.path.join(self.yellow_uploads_dir(), f"{sha[:16]}_{safe}")
-        with open(dest, "wb") as fh:
-            fh.write(data)
-        return {"path": dest, "name": safe, "sha256": sha, "size": len(data)}
-
-    def list_uploads(self) -> list:
-        import os as _os
-        d = self.yellow_uploads_dir()
-        out = []
-        for fn in sorted(_os.listdir(d)):
-            fp = _os.path.join(d, fn)
-            if _os.path.isfile(fp):
-                out.append({"name": fn, "path": fp, "size": _os.path.getsize(fp)})
-        return out
-
-    def run_yellow(self, sample_path: Optional[str] = None,
-                   target_id: Optional[int] = None,
-                   phases: Optional[tuple] = None, deep: bool = False,
-                   oversight_ack: Optional[bool] = None,
-                   params: Optional[dict] = None,
-                   emit: Optional[Callable[[dict], None]] = None):
-        """Startet die Reverse-Engineering-Kolonie (Yellow Queen). Default: read-only."""
-        from .yellow_queen import YellowQueen, PHASES as YP
-        p = dict(params or {})
-        if sample_path:
-            p["sample"] = sample_path
-        queen = YellowQueen(self.store, logger=self.logger, emit=emit, use_llm=False)
-        return queen.run_colony_sync(
-            target_id=target_id, phases=phases or YP,
-            deep=deep, oversight_ack=oversight_ack, params=p)
-
     def softwarescan(self, online: bool = True, ecosystems=None) -> dict:
         """Direkter Software-/Versions-Scan (ohne Kolonie-Lauf)."""
         from . import softwarescan as sw
@@ -1015,6 +981,94 @@ class AntBBService:
                          "fixed": m.fixed, "aliases": m.aliases}
                         for m in rep.matches],
         }
+
+    # ---------------- Greenbone / OpenVAS (Blue Queen) ----------------
+    def greenbone_status(self) -> dict:
+        """Ehrlicher GVM-Status (kein Secret). Import bleibt immer möglich."""
+        from . import greenbone as gb
+        st = gb.status()
+        d = gb.drop_dir()
+        try:
+            st["drop_files"] = sorted(f.name for f in d.iterdir()
+                                      if f.is_file() and f.suffix.lower() in gb.IMPORT_SUFFIXES)[-20:]
+        except OSError:
+            st["drop_files"] = []
+        st["drop_dir"] = "data/greenbone/"
+        return st
+
+    def greenbone_import(self, path: str = "", data: Optional[bytes] = None,
+                         filename: str = "", target_id: Optional[int] = None,
+                         min_severity: str = "high") -> dict:
+        """Defensiv: Report importieren (Upload-Bytes ODER Pfad unter data/greenbone/).
+
+        Mit `target_id` werden nur In-Scope-Hosts übernommen und als Findings
+        persistiert; ohne Target ist es eine reine Datei-Analyse."""
+        from . import greenbone as gb
+        from . import scope as scope_mod
+        import uuid as _uuid
+        if data is not None:
+            path = str(gb.save_upload(filename, data))
+        flt = None
+        if target_id is not None:
+            if not self.store.get_target(target_id):
+                raise ValueError(f"Target {target_id} existiert nicht.")
+            flt = lambda host: bool(scope_mod.check_asset(self.store, target_id, host))
+        res = gb.import_report(path, min_hint_severity=min_severity, scope_filter=flt)
+        if not res.get("ok"):
+            return {"ok": False, "empty": bool(res.get("empty")), "error": res.get("error", ""),
+                    "findings": [], "hints": []}
+        findings = res["findings"]
+        hint_f = gb.hint_findings(res["hints"])
+        persisted = 0
+        run_id = "blue-gb-" + _uuid.uuid4().hex[:8]
+        if target_id is not None:
+            for f in [gb.summary_finding(res["report"], res["report_file"]), *findings, *hint_f]:
+                try:
+                    if self.store.add_finding(
+                            target_id=target_id, run_id=run_id, agent=f.agent, title=f.title,
+                            category=f.category, severity=f.severity, asset=f.asset,
+                            description=f.description, evidence=f.evidence,
+                            dedup_key=f.key(), status=f.status):
+                        persisted += 1
+                except Exception:
+                    pass
+        return {
+            "ok": True, "empty": False, "report_file": res["report_file"],
+            "summary": res["summary"], "out_of_scope_skipped": res["out_of_scope_skipped"],
+            "persisted": persisted, "run_id": run_id if target_id is not None else "",
+            "findings": [{"title": f.title, "severity": f.severity, "status": f.status,
+                          "asset": f.asset, "category": f.category,
+                          "cves": (f.evidence or {}).get("cves", []),
+                          "cvss": (f.evidence or {}).get("cvss"),
+                          "qod": (f.evidence or {}).get("qod")} for f in findings[:300]],
+            "hints": res["hints"],
+        }
+
+    def greenbone_scan(self, target_id: int, host: str, oversight_ack: Optional[bool],
+                       scan_config: str = "", wait_seconds: int = 0) -> dict:
+        """AKTIV: Scan gegen ein In-Scope-Einzelziel (Oversight + Scope Pflicht)."""
+        from . import greenbone as gb
+        from . import scope as scope_mod
+        if not self.store.get_target(target_id):
+            raise ValueError(f"Target {target_id} existiert nicht.")
+        res = gb.start_scan(
+            host, scope_check=lambda h: bool(scope_mod.check_asset(self.store, target_id, h)),
+            acknowledged=(oversight_ack is True),
+            scan_config=scan_config or gb.DEFAULT_SCAN_CONFIG,
+            log=lambda m: self.logger.info(m))
+        if res.get("ok") and int(wait_seconds or 0) > 0:
+            res["status"] = gb.wait_for_scan(res["task_id"], int(wait_seconds))
+        return res
+
+    def greenbone_scan_status(self, task_id: str, import_report: bool = False,
+                              target_id: Optional[int] = None) -> dict:
+        """Lesend: Task-Status; bei fertigem Scan optional Report abholen + importieren."""
+        from . import greenbone as gb
+        st = gb.scan_status(task_id)
+        if st.get("ok") and import_report and st.get("done") and st.get("report_id"):
+            path = gb.fetch_report(st["report_id"])
+            st["import"] = self.greenbone_import(path=str(path), target_id=target_id)
+        return st
 
     def attack_log_list(self, limit: int = 50, run_id: str = "",
                         event_type: str = ""):

@@ -9,6 +9,8 @@ Unterstützte Job-Arten (`kind`):
   * hardening  – Hardening-Audit (read-only)
   * remediate  – Remediation-Verify über vorhandene Findings
   * colony     – voller Blue-Queen-Lauf (alle Phasen, read-only)
+  * patching · firewall · identity · tls · logs · backup · greenbone – je ein Spezial-Soldat
+    (greenbone: importiert den neuesten Report aus data/greenbone/, startet NIE einen Scan)
 """
 from __future__ import annotations
 
@@ -21,13 +23,20 @@ from .agents.blue import BLUE_PHASES
 from .blue_queen import BlueQueen
 from .store import Store
 
-VALID_KINDS = frozenset({"swscan", "hardening", "remediate", "colony", "patching", "firewall", "identity", "tls", "logs", "backup", "watcher", "attacklog"})
+VALID_KINDS = frozenset({"swscan", "hardening", "remediate", "colony", "patching", "firewall", "identity", "tls", "logs", "backup", "watcher", "attacklog", "greenbone"})
 
 _KIND_PHASES = {
     "swscan": ("assess",),
     "hardening": ("assess", "harden"),
     "remediate": ("remediate", "verify"),
     "colony": BLUE_PHASES,
+    "patching": ("assess", "harden"),
+    "firewall": ("assess", "defend"),
+    "identity": ("assess", "harden", "defend"),
+    "tls": ("assess", "harden"),
+    "logs": ("defend", "verify"),
+    "backup": ("verify",),
+    "greenbone": ("assess", "remediate"),
 }
 
 #: Optionale Agenten-Filter je Job-Art (None = alle Soldaten der Phase).
@@ -36,6 +45,13 @@ _KIND_AGENTS = {
     "hardening": ("blue-hardening",),
     "remediate": ("blue-remediation",),
     "colony": None,
+    "patching": ("blue-patchmgmt",),
+    "firewall": ("blue-fwaudit",),
+    "identity": ("blue-idhygiene",),
+    "tls": ("blue-tlsposture",),
+    "logs": ("blue-logintegrity",),
+    "backup": ("blue-backupverify",),
+    "greenbone": ("blue-greenbone",),
 }
 
 

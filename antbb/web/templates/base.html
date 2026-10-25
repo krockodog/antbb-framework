@@ -32,8 +32,9 @@
 </head>
 <body class="{% block body_class %}{% endblock %}" data-colony="{{ _colony_pick }}">
   <header>
-    <h1>🐜 antbb – Ameisen-Schwarm Bug-Bounty <span class="badge">lokal · simuliert</span></h1>
-    <nav><a href="/">Scope-Manager</a> · <a href="/blue">🛡 Blue Queen</a> · <a href="/yellow">🟡 Yellow Queen</a> · <a href="/wlan">📡 WLAN</a> · <a href="/brain">🧠 Neuronales Gehirn</a> · <a href="/assets">🔒 Eigene Assets</a> · <a href="/history">🗂️ Historie</a></nav>
+    <h1>🐜 antbb · All and One <span class="badge">lokal · simuliert</span></h1>
+    {% set aq = active_queen|default('') %}
+    <nav><a class="hub-back" href="/" title="Zurück zum Hub">← Hub</a> · <a href="/">Scope-Manager</a> · {% if aq != 'red' %}<a href="/red">🔴 Red Queen</a> · {% endif %}{% if aq != 'blue' %}<a href="/blue">🛡 Blue Queen</a> · {% endif %}{% if aq != 'yellow' %}<a href="/yellow">🟡 Yellow Queen</a> · {% endif %}<a href="/wlan">📡 WLAN</a>{% if not blue_view %} · <a href="/brain">🧠 Neuronales Gehirn</a>{% endif %} · <a href="/assets">🔒 Eigene Assets</a> · <a href="/history">🗂️ Historie</a></nav>
   </header>
   <main>
     {% block content %}{% endblock %}

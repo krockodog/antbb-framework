@@ -542,7 +542,7 @@ def detect_iface() -> Optional[str]:
 
 
 
-# Bekannte lab-host-/Labor-Adapter (Metadaten für die GUI). Nur Anzeige;
+# Bekannte ProLiant-/Labor-Adapter (Metadaten für die GUI). Nur Anzeige;
 # Discovery läuft weiterhin live über iw/nmcli/sysfs.
 KNOWN_ADAPTERS = {
     "wlan0": {

@@ -16,7 +16,6 @@ from typing import Optional
 
 from .agents import WORKER_AGENTS
 from .agents.blue import BLUE_AGENTS, BLUE_PHASES
-from .agents.yellow import YELLOW_AGENTS, YELLOW_PHASES
 
 _SECRET_MARKERS = ("api_key", "apikey", "token", "secret", "password", "minimax")
 
@@ -71,9 +70,11 @@ OCTOGENT_PHASES = [
 # Hinterlegter Scope aus den Octogent-Vorlagen – NUR Vorschlag/Historie, NICHT
 # automatisch erlaubt. Die echte Allowlist bleibt explizit + default-deny.
 SCOPE_SUGGESTIONS = {
-    "note": ("Vorschlag/Historie – NICHT automatisch erlaubt. Die echte Allowlist bleibt explizit + default-deny."),
-    "targets": ["demo.example.com", "shop.example.com", "app.example.com"],
-    "separate_engagement": ["engagement.example.com"],
+    "note": ("Vorschlag/Historie aus den Octogent-Vorlagen – NICHT automatisch "
+             "erlaubt. Die echte Allowlist bleibt explizit + default-deny."),
+    "targets": ["partybrueller.de", "spassprofi.de", "scherzartikel-onlineshop.de",
+                "carescribe.de"],
+    "separate_engagement": ["dc-infosec.de"],
 }
 
 
@@ -214,21 +215,87 @@ TASK_CATALOG: dict[str, list[str]] = {
                             "Auto-Purge nach Report"],
     # --- blue queen ---
     "sw-inventory": ["Paketmanager rein lesend abfragen (dpkg/rpm/pip)",
-                     "Paketname+Version erfassen", "keine Secrets"],
+                     "Paketname+Version erfassen", "Coverage je Manager zählen",
+                     "keine Klartext-Zugangsdaten in Evidence"],
     "sw-cve-match-osv": ["Inventar gegen OSV abgleichen", "CVE-IDs nur aus OSV übernehmen",
-                         "nie erfundene Schwachstellen"],
-    "hardening-audit": ["SSH-Config prüfen", "Firewall-Status prüfen",
-                        "world-writable Dateien in /etc finden", "sysctl-Härtung prüfen"],
-    "hardening-apply": ["Fix-Vorschlag NUR mit Oversight anwenden (default-deny)",
+                         "Severity aus OSV übernehmen (nie erfinden)",
+                         "veraltete Versionen als Report führen"],
+    "hardening-audit": ["SSH-Config prüfen (PermitRootLogin/PasswordAuth)",
+                        "Firewall-Status prüfen (nftables/ufw/iptables)",
+                        "world-writable Dateien in /etc finden",
+                        "sysctl-Härtung prüfen (rp_filter/syn-cookies)",
+                        "Fix-Empfehlung je Abweichung dokumentieren"],
+    "hardening-apply": ["Oversight-Freigabe prüfen (default-deny)",
+                        "Fix-Vorschlag NUR mit Freigabe anwenden",
                         "nie automatisch ohne Freigabe"],
-    "detection-ruleset": ["Detection-Regeln bereitstellen", "Quellen zuordnen"],
-    "splunk-forward": ["Events an HEC spiegeln wenn konfiguriert",
+    "detection-ruleset": ["Brute-Force-Detection bereitstellen",
+                          "Neue-Listening-Ports-Regel bereitstellen",
+                          "Auffälligen Outbound-Traffic beschreiben",
+                          "Priv-Esc/sudo-Anomalie beschreiben",
+                          "Persistenz (cron/timer) beschreiben",
+                          "Quellen je Regel zuordnen"],
+    "splunk-forward": ["HEC-Config prüfen (ENV)",
+                       "Events an HEC spiegeln wenn konfiguriert",
                        "ohne Config sauber überspringen"],
-    "remediation-plan": ["Finding→Fix-Schritt ableiten", "konkreten Behebungsschritt vorschlagen"],
-    "remediation-verify": ["rein lesender Re-Check", "Vorher/Nachher-Evidence",
-                           "nachweislich geschlossen belegen"],
-    "honeypot-recipes": ["sichere Decoy-Rezepte dokumentieren"],
-    "honeypot-deploy": ["Decoy NUR mit Oversight starten (default-deny, Scaffold)"],
+    "remediation-plan": ["remedierbare Findings filtern",
+                         "Finding→Fix-Schritt ableiten",
+                         "konkreten Behebungsschritt vorschlagen",
+                         "Fix-Befehl als Vorschlag (nicht ausführen)"],
+    "remediation-verify": ["rein lesender Re-Check je Finding",
+                           "Vorher/Nachher-Evidence erfassen",
+                           "nachweislich geschlossen belegen (Proof-Gate)",
+                           "offene Lücken ehrlich offen lassen"],
+    "honeypot-recipes": ["SSH-Decoy-Rezept dokumentieren",
+                         "HTTP-Canary-Rezept dokumentieren",
+                         "Decoy-Datei-Rezept dokumentieren",
+                         "Safety-Hinweise je Rezept festhalten"],
+    "honeypot-deploy": ["Oversight-Freigabe prüfen (default-deny)",
+                        "Decoy NUR mit Oversight starten",
+                        "im Scaffold nichts automatisch starten"],
+    "patch-inventory": ["Paketmanager rein lesend auf Upgrades prüfen",
+                          "Anzahl ausstehender Updates schätzen",
+                          "Security vs. normale Updates trennen",
+                          "keine Installation ohne Oversight"],
+    "patch-plan": ["Severity priorisieren",
+                          "Wartungsfenster vorschlagen",
+                          "Reboot-Bedarf markieren",
+                          "Plan nur als Vorschlag ausgeben"],
+    "firewall-status": ["nft/ufw/iptables Verfügbarkeit prüfen",
+                          "Regelsnapshot rein lesend erfassen",
+                          "Backend + Umfang dokumentieren"],
+    "firewall-gaps": ["Default-ALLOW erkennen",
+                          "fehlendes Default-Drop melden",
+                          "konkrete Härtungsempfehlung geben"],
+    "tls-cert-inventory": ["TLS-Handshake am Scope-Ziel",
+                          "notAfter/Ablauf berechnen",
+                          "keine Zertifikatsinhalte außer Metadaten loggen"],
+    "tls-protocol-review": ["beobachtete TLS-Version notieren",
+                          "TLS1.2+-Empfehlung geben",
+                          "schwache Ciphers als Hinweis (kein Brute)"],
+    "backup-presence": ["typische Backup-Pfade prüfen",
+                          "Backup-Timer via systemctl suchen",
+                          "ehrlich melden wenn nichts gefunden"],
+    "restore-readiness": ["Restore-Checkliste erstellen",
+                          "Offsite/Key-Escrow erwähnen",
+                          "keinen destruktiven Restore ausführen"],
+    "ssh-key-audit": ["authorized_keys zählen (ohne Key-Inhalt)",
+                          "Pfad/Permissions-Hinweise",
+                          "root vs. user trennen"],
+    "sudoers-hygiene": ["sudoers rein lesend scannen",
+                          "NOPASSWD-Treffer pfadweise melden",
+                          "keine sudoers-Inhalte loggen"],
+    "log-pipeline-status": ["journalctl Disk-Usage",
+                          "rsyslog/journald active?",
+                          "Log-Verzeichnisse auflisten"],
+    "log-forward-hygiene": ["SIEM-Forwarding empfehlen",
+                          "Retention + NTP nennen",
+                          "ohne Config nichts erzwingen"],
+    "ticket-backlog": ["remedierbare Themes als Tickets listen",
+                          "IDs stabil halten",
+                          "keine erfundenen CVEs"],
+    "ticket-close-criteria": ["Vorher/Nachher-Evidence fordern",
+                          "Proof-Gate Close-Policy",
+                          "offen lassen wenn Evidence fehlt"],
     # --- blue extras (watcher / attacklog / web / net / supply / ir) ---
     "watcher-detect": ["Events entgegennehmen", "Signal-Katalog anwenden",
                        "Treffer mit Evidence erfassen", "Ohne Events: honest-empty"],
@@ -309,18 +376,25 @@ def _tasks_for(pb: dict) -> list[dict]:
     name = pb.get("name", "")
     items = list(pb.get("tasks") or []) or TASK_CATALOG.get(name)
     if not items:
+        try:
+            from .blue_labels import BLUE_TASK_EXTRA, TOOL_LABELS
+            items = BLUE_TASK_EXTRA.get(name)
+        except Exception:  # pragma: no cover
+            items, TOOL_LABELS = None, {}
+    if not items:
         # Fallback: aus Tools/Beschreibung ableiten (ehrlich, generisch).
-        items = [f"{t} ausführen" for t in pb.get("tools", [])] or [pb.get("description", name)]
+        try:
+            from .blue_labels import TOOL_LABELS as _TL
+        except Exception:  # pragma: no cover
+            _TL = {}
+        items = [_TL.get(t, f"{t} ausführen") for t in pb.get("tools", [])] or [pb.get("description", name)]
     return [{"task": t, "status": "offen",
              "oversight": bool(pb.get("oversight_required"))} for t in items]
 
 
-def build_registry(agents=None, include_blue: bool = True,
-                   include_yellow: bool = True) -> dict:
+def build_registry(agents=None, include_blue: bool = True) -> dict:
     if agents is None:
-        agents = (list(WORKER_AGENTS)
-                  + (list(BLUE_AGENTS) if include_blue else [])
-                  + (list(YELLOW_AGENTS) if include_yellow else []))
+        agents = list(WORKER_AGENTS) + (list(BLUE_AGENTS) if include_blue else [])
     soldiers = []
     pb_count = 0
     tool_count = 0
@@ -388,8 +462,6 @@ def build_registry(agents=None, include_blue: bool = True,
         "octogent_phases": OCTOGENT_PHASES,
         "blue_phases": list(BLUE_PHASES),
         "blue_soldier_count": sum(1 for s in soldiers if s.get("colony") == "blue"),
-        "yellow_phases": list(YELLOW_PHASES),
-        "yellow_soldier_count": sum(1 for s in soldiers if s.get("colony") == "yellow"),
         "scope_suggestions": SCOPE_SUGGESTIONS,
         "prompt_categories": list(__import__("antbb.prompts", fromlist=["PROMPT_TEMPLATES"]).PROMPT_TEMPLATES),
     }

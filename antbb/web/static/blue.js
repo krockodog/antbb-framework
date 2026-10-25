@@ -24,13 +24,15 @@
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       const fd = new FormData(form);
+      const depth = (fd.get("depth") || "light").toString();
       const body = {
         target_id: fd.get("target_id") ? parseInt(fd.get("target_id"), 10) : null,
         apply_fixes: !!fd.get("apply_fixes"),
         oversight_ack: !!fd.get("oversight_ack"),
         online: true,
+        depth: depth,
       };
-      if (log) log.textContent = "🛡 Blue Queen orchestriert die Verteidigungs-Ameisen…\n";
+      if (log) log.textContent = "🛡 Blue Queen orchestriert (Tiefe=" + depth + ")…\n";
       const go = form.querySelector(".blue-go");
       if (go) { go.disabled = true; go.textContent = "läuft…"; }
       fetch("/api/blue/run", {
@@ -165,3 +167,26 @@
   })();
 
 })();
+
+  // Queen depth suggestion + override
+  (function(){
+    var form=document.getElementById("blue-run-form"); if(!form) return;
+    var reason=document.getElementById("blue-depth-reason");
+    var light=document.getElementById("blue-depth-light");
+    var intense=document.getElementById("blue-depth-intense");
+    var src=document.getElementById("blue-depth-source");
+    var sel=document.getElementById("blue-target");
+    function applyQueen(){
+      if(!window.AntbbDepth) return;
+      var label = sel && sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : "";
+      var s = window.AntbbDepth.suggest(label, label);
+      if(s.depth==="intense"){ if(intense) intense.checked=true; } else { if(light) light.checked=true; }
+      if(src) src.value="queen";
+      if(reason) reason.textContent = "Königin: " + s.reason + " (manuell überschreibbar)";
+    }
+    if(sel) sel.addEventListener("change", applyQueen);
+    form.querySelectorAll('input[name="depth"]').forEach(function(r){
+      r.addEventListener("change", function(){ if(src) src.value="manual"; if(reason) reason.textContent="Manuell gewählt: " + (r.value==="intense"?"Intensiv":"Leicht"); });
+    });
+    applyQueen();
+  })();

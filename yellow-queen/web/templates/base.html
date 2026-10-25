@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Yellow Queen{% endblock %} · RE-Orchestratorin · antbb</title>
+  <link rel="stylesheet" href="/static/yellow.css">
+  <link rel="stylesheet" href="/static/yellow_cards.css?v=2026102501">
+  <style>
+    /* Hintergrund wie auf den Kolonie-Seiten (zufälliges Nest-Motiv serverseitig) */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background-size: cover;
+      background-position: center;
+      background-image:
+        linear-gradient(180deg, rgba(5,7,12,.40), rgba(5,7,12,.58)),
+        url("/static/colony/ref3_symmetric.jpg");
+      background-image:
+        linear-gradient(180deg, rgba(5,7,12,.40), rgba(5,7,12,.58)),
+        image-set(
+          url("/static/colony/ref3_symmetric.webp") type("image/webp"),
+          url("/static/colony/ref3_symmetric.jpg")  type("image/jpeg"));
+    }
+  </style>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header>
+    <h1>🐜 antbb · All and One <span class="badge">Yellow Queen</span></h1>
+    <nav>
+      <a class="hub-back" href="/" title="Zurück zum Hub">← Hub</a> ·
+      <a href="/">Scope-Manager</a> ·
+      <a href="/red">🔴 Red Queen</a> ·
+      <a href="/blue">🛡 Blue Queen</a> ·
+      <a href="/yellow" class="on">🟡 Yellow Queen</a> ·
+      <a href="/wlan">📡 WLAN · BT · IoT</a> ·
+      <a href="/brain">🧠 Neuronales Gehirn</a> ·
+      <a href="/assets">🔒 Eigene Assets</a> ·
+      <a href="/history">🗂️ Historie</a>
+    </nav>
+  </header>
+  <main>{% block body %}{% endblock %}</main>
+  <footer>
+    queen_id: {{ queen_id }} · v{{ version }} · Nur autorisierte Samples · Keine Ausführung durch Yellow Queen ·
+    Kanonisches Brain: <a href="/brain">/brain</a>
+    <details style="margin-top:.4rem">
+      <summary>⚠️ Pflichthinweis / Disclaimer</summary>
+      <pre class="disclaimer" style="white-space:pre-wrap">{{ gate_text }}</pre>
+    </details>
+  </footer>
+</body>
+</html>

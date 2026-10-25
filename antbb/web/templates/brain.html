@@ -3,11 +3,61 @@
 {% block body_class %}brain-body{% endblock %}
 {% block content %}
 <section class="brain-view">
-  <div class="brain-title">🧠 Neuronales Gehirn der Königin</div>
+  <div class="brain-title">🧠 Neuronales Gehirn · Offensive Kolonie</div>
   <div id="brain-canvas" class="brain-canvas"></div>
 </section>
 
 <!-- Node-/Log-Overlay über dem GPU-Partikelfeld (verändert die Engine nicht). -->
+<a class="hub-back" href="/" style="position:fixed;top:4.2rem;left:1rem;z-index:50;padding:.35rem .7rem;border-radius:999px;border:1px solid rgba(212,175,106,.45);background:rgba(8,10,16,.75);color:#e8ecf5;text-decoration:none;font:600 .78rem system-ui">← Hub</a>
+<button id="wiki-open" aria-label="Schwarm-Wiki öffnen"
+  style="position:fixed;top:4.2rem;left:5.6rem;z-index:50;padding:.35rem .8rem;border-radius:999px;border:1px solid rgba(56,224,255,.4);background:rgba(8,10,16,.75);color:#cfefff;text-decoration:none;font:600 .78rem system-ui;cursor:pointer">
+  📖 Schwarm-Wiki</button>
+
+<!-- Schwarm-Wiki: wer macht was, wie, wo, warum — alle drei Königinnen. -->
+<div id="wiki-overlay" class="wiki-overlay" role="dialog" aria-modal="true" aria-label="Schwarm-Wiki" hidden>
+  <div class="wiki-box">
+    <button id="wiki-close" class="bp-mini wiki-close" aria-label="schließen">✕</button>
+    <p class="wiki-kicker">Ein Schwarm · drei Königinnen</p>
+    <h2 class="wiki-title">📖 Schwarm-Wiki</h2>
+    <p class="wiki-lede">Wer erklärt was, wie, wo — und warum. Jede Königin führt ihre eigene Kolonie
+       mit eigenen Soldaten, Playbooks und Leitplanken; geteilt werden Scope (default-deny),
+       Human Oversight und der kanonische Beweis.</p>
+    <div class="wiki-grid">
+      <article class="wiki-card wiki-red">
+        <h3>🔴 Rote Königin <small>Red-Teaming</small></h3>
+        <dl>
+          <dt>WER</dt><dd>18 offensive Soldaten — Recon, Web, API, Auth, OSINT, WLAN, Cloud, Exploit, Report.</dd>
+          <dt>WAS</dt><dd>Bug Bounty und Pentest im autorisierten Scope; jeder Befund durchläuft ein Proof-Gate.</dd>
+          <dt>WIE</dt><dd>5-Phasen-Pipeline: Recon → Vulnerability Assessment → Exploitation → Post-Exploitation → Reporting. Rein lesend per Default, aktiv nur mit Oversight.</dd>
+          <dt>WO</dt><dd><a href="/red">/red</a> — Start, Scope-Manager, Soldaten, Findings und die Fix-Brücke zur blauen Kolonie.</dd>
+          <dt>WARUM</dt><dd>Angriffe verstehen, bevor sie geschehen. Verdacht bleibt Verdacht — „verifiziert“ gilt erst mit Nachweis.</dd>
+        </dl>
+      </article>
+      <article class="wiki-card wiki-blue">
+        <h3>🛡 Blaue Königin <small>Blue Safety-Teaming</small></h3>
+        <dl>
+          <dt>WER</dt><dd>24 defensive Soldaten — vom Backup-Gardisten bis zum Honeypot-Hüter.</dd>
+          <dt>WAS</dt><dd>Schutz und Härtung: Patch-Stand, TLS-Lage, Greenbone-Import, Remediation mit Vorher/Nachher-Evidence.</dd>
+          <dt>WIE</dt><dd>6-Phasen-Pipeline: Assess → Watch → Harden → Defend → Remediate → Verify. Read-only Default, aktive Fixes und Honeypots nur mit Oversight.</dd>
+          <dt>WO</dt><dd><a href="/blue">/blue</a> — Phasen, Kolonie-Start, Jobs, Ledger, Attack-Log, Posture/SIEM.</dd>
+          <dt>WARUM</dt><dd>„Nachweislich geschlossen“ gilt erst mit Beleg — und eine Lücke, die zurückkommt, wird ehrlich wieder als offen geführt.</dd>
+        </dl>
+      </article>
+      <article class="wiki-card wiki-yellow">
+        <h3>🟡 Gelbe Königin <small>Yellow Reverse-Teaming</small></h3>
+        <dl>
+          <dt>WER</dt><dd>Die RE-Orchestratin mit Tool-Doctor — Ghidra, diec, Unpacker, Frida-Lab.</dd>
+          <dt>WAS</dt><dd>Reverse Engineering von Samples: EXE, DLL, APK, ELF, HEX — klassifiziert, mit Toolchain und Dossier.</dd>
+          <dt>WIE</dt><dd>RE-Pipeline: Triage → Identifikation → Entpacken → Static → Dynamic → Dossier. Jeder Schritt begründet sich selbst; Lab-Schritte nur mit Oversight.</dd>
+          <dt>WO</dt><dd><a href="/yellow">/yellow</a> — Upload, Fälle, Tool-Doctor; jedes Fall-Dossier unter <code>/yellow/case/…</code>.</dd>
+          <dt>WARUM</dt><dd>Kein Schritt ohne Begründung — Vertrauen entsteht durch Erklärung, nicht durch Black Box.</dd>
+        </dl>
+      </article>
+    </div>
+    <p class="wiki-foot">Geteilte Leitplanken: default-deny Scope · Human Oversight für aktive Schritte ·
+       Proof-Gate · keine Secrets/PII in Findings · § 202a-c StGB / CFAA beachten.</p>
+  </div>
+</div>
 <aside id="brain-panel" class="brain-panel" aria-label="Gehirn-Knoten">
   <div class="bp-head">
     <strong>🕸️ Knoten</strong>
@@ -30,7 +80,7 @@
     </div>
   </div>
 
-  <div id="bp-view-logs" class="bp-view" style="display:none">
+  <div id="bp-view-logs" class="bp-view">
     <div class="bp-logfilter">
       <input id="bp-log-target" type="number" placeholder="Target-ID (optional)" min="1">
       <input id="bp-log-run" type="text" placeholder="Run-ID (optional)">
@@ -124,7 +174,99 @@
   .bp-detail-box table { width:100%; border-collapse:collapse; font-size:.78rem; }
   .bp-detail-box td { padding:.2rem .3rem; border-bottom:1px solid #1d2740; }
   .bp-kv { color:#8a92a6; }
+
+  /* Soldaten-Detail (Playbooks / SKILL.md) — Premium-Panel */
+  .bp-detail.sol-wide .bp-detail-box { max-width: 780px; }
+  .sol-detail { display:flex; flex-direction:column; gap:.55rem; }
+  .sol-hero { display:flex; gap:.7rem; align-items:flex-start; }
+  .sol-ant { font-size:1.8rem; filter:drop-shadow(0 0 10px rgba(176,77,255,.45)); }
+  .sol-hero h3 { margin:0 0 .15rem; color:#cfefff; }
+  .sol-sub { display:flex; gap:.4rem; align-items:center; color:#8a92a6; font-size:.75rem; }
+  .sol-sub code { color:#9fd0ff; background:#101726; padding:.05rem .35rem; border-radius:4px; }
+  .sol-role { color:#9fb0cc; margin:.25rem 0 0; font-size:.8rem; }
+  .sol-stats { display:flex; flex-wrap:wrap; gap:.35rem; }
+  .sol-stat { background:#101726; border:1px solid #1d2740; border-radius:8px;
+    padding:.15rem .5rem; color:#9fd0ff; font-size:.72rem; }
+  .sol-stat b { color:#cfefff; margin-right:.2rem; }
+  .sol-tabs { display:flex; gap:.3rem; border-bottom:1px solid #1d2740; padding-bottom:.3rem; }
+  .sol-tabs button { background:#101726; color:#8a92a6; border:1px solid #1d2740;
+    border-radius:5px; padding:.2rem .55rem; margin:0; font-size:.76rem; cursor:pointer; }
+  .sol-tabs button.active { background:#17233c; color:#9fd0ff; border-color:#38507e;
+    box-shadow:0 0 12px rgba(56,224,255,.12); }
+  .sol-pb { background:rgba(16,23,38,.7); border:1px solid #1d2740; border-radius:8px;
+    padding:.45rem .6rem; margin:.35rem 0; }
+  .sol-pb.off { border-color:rgba(255,61,240,.28); }
+  .sol-pb.def { border-color:rgba(56,224,255,.22); }
+  .sol-pb-head { display:flex; justify-content:space-between; gap:.5rem; align-items:center; }
+  .pb-mode { font-size:.68rem; color:#8fd; border:1px solid rgba(56,224,255,.3);
+    border-radius:999px; padding:.05rem .45rem; }
+  .pb-mode.offensive { color:#f8a; border-color:rgba(255,61,240,.4); }
+  .sol-pb-desc { color:#9fb0cc; font-size:.76rem; margin:.25rem 0; }
+  .sol-tools { display:flex; flex-wrap:wrap; gap:.25rem; margin:.2rem 0; }
+  .sol-tools .chip, .sol-detail .chip { background:#0d1524; border:1px solid #243049;
+    color:#9fd0ff; border-radius:999px; padding:.05rem .45rem; font-size:.68rem; }
+  .sol-tasks { margin:.2rem 0 .1rem 1.1rem; color:#cfe7ff; font-size:.76rem; }
+  .sol-tasks li { margin:.1rem 0; }
+  .skill-md { font-size:.78rem; color:#c9d1d9; line-height:1.45; }
+  .skill-md h1,.skill-md h2,.skill-md h3 { color:#cfefff; margin:.5rem 0 .25rem; }
+  .skill-meta { display:flex; gap:.4rem; font-size:.72rem; color:#8a92a6; margin:.15rem 0; }
+  .skill-meta span { color:#79c0ff; min-width:5rem; }
+  .skill-pre { background:#0a101c; border:1px solid #1d2740; border-radius:6px;
+    padding:.5rem .65rem; overflow:auto; font-size:.72rem; color:#c9d1d9; }
+  .sol-actions { margin-top:.4rem; border-top:1px solid #1d2740; padding-top:.45rem; }
+
   @media (prefers-reduced-motion: reduce){ .bp-badge.läuft,.bp-badge.hängt{animation:none} }
+
+  /* ---- Schwarm-Wiki ---- */
+  .wiki-overlay {
+    position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+    background: rgba(2, 4, 8, .72); backdrop-filter: blur(4px);
+  }
+  .wiki-overlay[hidden] { display: none; }
+  .wiki-box {
+    position: relative; max-width: 1080px; width: 94vw; max-height: 86vh; overflow-y: auto;
+    background: rgba(9, 12, 20, .97); border: 1px solid rgba(120, 160, 220, .25); border-radius: 16px;
+    padding: 1.4rem 1.6rem 1.2rem; color: #d5deee;
+    box-shadow: 0 0 60px rgba(56, 224, 255, .12), 0 20px 60px rgba(0,0,0,.5);
+    font-size: .85rem; line-height: 1.5;
+  }
+  .wiki-close { position: absolute; top: .8rem; right: .9rem; }
+  .wiki-kicker {
+    margin: 0 0 .2rem; font-size: .68rem; letter-spacing: .22em; text-transform: uppercase;
+    color: #8a92a6;
+  }
+  .wiki-title { margin: 0 0 .4rem; font-size: 1.45rem; color: #e8f0ff; letter-spacing: .02em; }
+  .wiki-lede { margin: 0 0 1.1rem; max-width: 62rem; color: #9fb0cc; }
+  .wiki-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;
+  }
+  .wiki-card {
+    border-radius: 14px; padding: .95rem 1.05rem .85rem;
+    background: linear-gradient(170deg, rgba(16,20,30,.9), rgba(8,10,16,.95));
+    border: 1px solid rgba(120,160,220,.2);
+  }
+  .wiki-card h3 { margin: 0 0 .55rem; font-size: 1.02rem; color: #eef3ff; }
+  .wiki-card h3 small { display: block; font-size: .72rem; font-weight: 500; color: #8a92a6; margin-top: .12rem; }
+  .wiki-red  { border-color: rgba(255, 90, 106, .35);  box-shadow: inset 0 0 30px rgba(255, 90, 106, .05); }
+  .wiki-red h3  { color: #ffb3bc; }
+  .wiki-blue { border-color: rgba(56, 224, 255, .32);  box-shadow: inset 0 0 30px rgba(56, 224, 255, .05); }
+  .wiki-blue h3 { color: #9fe9ff; }
+  .wiki-yellow { border-color: rgba(255, 209, 102, .35); box-shadow: inset 0 0 30px rgba(255, 209, 102, .05); }
+  .wiki-yellow h3 { color: #ffe1a1; }
+  .wiki-card dl { margin: 0; display: grid; gap: .42rem; }
+  .wiki-card dt {
+    font-size: .62rem; font-weight: 800; letter-spacing: .14em; color: #8a92a6;
+  }
+  .wiki-red dt { color: #ff8a96; } .wiki-blue dt { color: #7ef0ff; } .wiki-yellow dt { color: #ffd166; }
+  .wiki-card dd { margin: -.28rem 0 0; font-size: .8rem; color: #c9d4e6; }
+  .wiki-card a { color: #9fdfff; }
+  .wiki-red a { color: #ffb3bc; } .wiki-yellow a { color: #ffe1a1; }
+  .wiki-card code { background: #101726; color: #9fd0ff; padding: 0 .3rem; border-radius: 4px; font-size: .78em; }
+  .wiki-foot {
+    margin: 1.1rem 0 0; padding-top: .7rem; border-top: 1px solid #1d2740;
+    font-size: .74rem; color: #8a92a6;
+  }
+  @media (max-width: 720px) { .wiki-box { padding: 1rem 1rem .9rem; } }
 </style>
 
 <script type="importmap">
@@ -140,9 +282,31 @@
   const el = document.getElementById("brain-canvas");
   mountBrain(el);
 </script>
-<script src="/static/brain/nodes-panel.js"></script>
-<!-- 🐜 Pentest-/Bugbounty-Runs als leuchtende Ameisen-Knoten (echte Run-Historie) -->
-<script src="/static/brain/runs.js"></script>
-<!-- 🐜 Ameisenvolk-Overlay (Königin + 18 Soldaten als sichtbare Sprites) -->
-<script src="/static/brain/ants.js"></script>
+<script src="/static/brain/nodes-panel.js?v=20261023s"></script>
+<script>
+/* Schwarm-Wiki ein-/ausblenden */
+(function () {
+  const overlay = document.getElementById("wiki-overlay");
+  const openBtn = document.getElementById("wiki-open");
+  const closeBtn = document.getElementById("wiki-close");
+  if (!overlay || !openBtn) return;
+  const show = () => { overlay.hidden = false; };
+  const hide = () => { overlay.hidden = true; };
+  openBtn.addEventListener("click", show);
+  if (closeBtn) closeBtn.addEventListener("click", hide);
+  overlay.addEventListener("click", e => { if (e.target === overlay) hide(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") hide(); });
+})();
+</script>
+<!-- 🐜 Offensive Kolonie: Pentest-/Bugbounty-/WLAN-Runs (echte Historie). Blue Queen → /blue -->
+<script src="/static/brain/runs.js?v=20261023s"></script>
+<!-- 🐜 Ameisenvolk-Overlay (offensive Königin + Soldaten; kein Blue Queen) -->
+<script src="/static/brain/ants.js?v=20261024-j7-20261024013043"></script>
+<script src="/static/brain/queens.js?v=1"></script>
 {% endblock %}
+
+<style id="ant-colony-noclip">
+  html.brain-body, body.brain-body { overflow-x: hidden; }
+  body.brain-body { overflow-y: auto; }
+  .ant-colony, .ant, .ant-body, .ant.queen { overflow: visible !important; }
+</style>

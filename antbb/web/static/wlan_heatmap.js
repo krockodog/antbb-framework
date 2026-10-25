@@ -15,6 +15,7 @@
   let CANVAS, CTX, DATA = { points: [], aps: [], samples: [] };
   let FLOORPLAN_IMG = null;          // Image oder null
   let PENDING = null;                // {samples, ap_meta, ort} wartet auf Klick-Position
+  let ESTIMATE = null;               // {aps_norm, walls, note} geschätzter Grundriss
   let booted = false;
   let antPhase = 0;
 
@@ -52,6 +53,21 @@
       } else { FLOORPLAN_IMG = null; render(); }
     } catch (e) { FLOORPLAN_IMG = null; }
   }
+
+  async function loadEstimate() {
+    // Geschätzter Grundriss: bei Reload/Tab-Öffnung aus dem gespeicherten Scan.
+    try {
+      const r = await fetch("/api/wlan/floorplan");
+      const j = await r.json();
+      ESTIMATE = (j && j.ok && j.aps_norm) ? j : null;
+    } catch (e) { ESTIMATE = null; }
+    render();
+  }
+
+  window.addEventListener("antbb:floorplan-data", (e) => {
+    ESTIMATE = (e.detail && e.detail.aps_norm) ? e.detail : null;
+    if (CTX) render();
+  });
 
   function fillApSelect() {
     const sel = qs("heat-ap");
@@ -155,11 +171,39 @@
     CTX.restore();
   }
 
+  function drawEstimate(w, h) {
+    if (!ESTIMATE) return;
+    // Geschätzter Grundriss im Heatmap-Stil: cyanfarbene Wände, gelbe AP-Marker.
+    CTX.save();
+    CTX.strokeStyle = "rgba(110,231,255,0.95)";
+    CTX.lineWidth = 4;
+    CTX.lineCap = "square";
+    (ESTIMATE.walls || []).forEach((seg) => {
+      CTX.beginPath();
+      CTX.moveTo(seg[0] * w, seg[1] * h);
+      CTX.lineTo(seg[2] * w, seg[3] * h);
+      CTX.stroke();
+    });
+    const aps = ESTIMATE.aps_norm || {};
+    Object.keys(aps).forEach((b) => {
+      const ax = aps[b][0] * w, ay = aps[b][1] * h;
+      CTX.fillStyle = "#ffd166";
+      CTX.beginPath(); CTX.arc(ax, ay, 7, 0, Math.PI * 2); CTX.fill();
+      CTX.fillStyle = "#05070c";
+      CTX.beginPath(); CTX.arc(ax, ay, 3, 0, Math.PI * 2); CTX.fill();
+      CTX.fillStyle = "#ffd166"; CTX.font = "11px system-ui";
+      CTX.fillText("AP " + String(b).slice(-5), ax + 10, ay + 4);
+    });
+    CTX.restore();
+  }
+
   function render() {
     if (!CTX) return;
     const w = CANVAS.width, h = CANVAS.height;
     if (FLOORPLAN_IMG) { CTX.fillStyle = "#05070c"; CTX.fillRect(0, 0, w, h); drawFloorplan(w, h); }
     else drawGrid(w, h);
+
+    drawEstimate(w, h);
 
     const pts = (DATA.points || []).map(p => {
       const rssi = selectedRssiAt(p);
@@ -231,6 +275,10 @@
     PENDING = { samples, ap_meta, ort: (qs("heat-ort").value || "").trim() };
     const chk = qs("heat-place"); if (chk) { chk.disabled = false; chk.checked = true; }
     setStatus(Object.keys(samples).length + " AP(s) gemessen – jetzt auf die Karte klicken, um die Position zu setzen.", "ok");
+    // Heatmap-Bugfix: Scan-Ergebnis ist serverseitig persistiert (last_scan) –
+    // Features (Grundriss-Schätzung) direkt nachScan aktualisieren + Heatmap neu zeichnen.
+    try { window.dispatchEvent(new CustomEvent("antbb:wlan-scan-done")); } catch (e) {}
+    render();
   }
 
   async function placeAt(nx, ny) {
@@ -309,11 +357,16 @@
 
   function boot() {
     if (booted) return; booted = true;
-    wire(); loadFloorplan(); loadData();
+    wire(); loadFloorplan(); loadData(); loadEstimate();
   }
 
   window.addEventListener("antbb:wlan-tab", (e) => {
-    if (e.detail && e.detail.tab === "heatmap") boot();
+    if (e.detail && e.detail.tab === "heatmap") {
+      boot();
+      // Heatmap-Bugfix: beim Tab-Wechsel garantiert frisch nachzeichnen (statt
+      // nur beim ersten Boot – sonst wirkt die Fläche nach einem Scan leer).
+      loadData();
+    }
   });
   // Falls Deep-Link direkt auf heatmap
   document.addEventListener("DOMContentLoaded", () => {

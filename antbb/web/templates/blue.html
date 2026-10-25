@@ -2,6 +2,7 @@
 {% block title %}🛡 Blue Queen · Verteidigungs-Kolonie · antbb{% endblock %}
 {% block body_class %}blue-body{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="/static/blue_cards.css">
 <section class="blue-hero" aria-label="Blue Queen">
   <div class="blue-hero-glow" aria-hidden="true"></div>
   <div class="blue-hero-ants" aria-hidden="true">
@@ -30,23 +31,42 @@
       <div class="bstat bstat-closed"><b id="bst-closed">{{ blue_stats.closed }}</b><span>nachweislich geschlossen</span></div>
     </div>
   </div>
+  {% if not blue_stats.tracked %}
+  <p class="hint blue-firstrun">Noch kein Lauf im Ledger – <a href="#blue-launch">Kolonie starten</a>:
+    „offene Lücken“ und „geschlossen“ füllen sich ausschließlich aus echten, read-only Belegen.</p>
+  {% endif %}
 </section>
 
 <nav class="blue-jump" aria-label="Blue Queen Abschnitte">
   <a href="#blue-phases">Phasen</a>
   <a href="#blue-launch">Kolonie starten</a>
   <a href="#soldier-section">Soldaten &amp; Playbooks</a>
+  <a href="#blue-greenbone">Greenbone</a>
   <a href="#blue-jobs">Jobs</a>
   <a href="#blue-ledger">Ledger</a>
   <a href="#blue-attacklog">Attack-Log</a>
   <a href="#blue-posture">Posture / SIEM</a>
   <a href="#blue-runs">Läufe</a>
-  <a href="/brain" class="blue-jump-off">🧠 Gehirn (nur Offensiv) →</a>
 </nav>
 
 <section class="card blue-card" id="blue-phases">
   <h3>⬡ Phasen-Pipeline <small>jeder Soldat kennt seinen Abschnitt</small></h3>
-  <div id="octogent-phases" class="blue-phases-host">lädt Phasen…</div>
+  <ol class="bq-pipe" id="bq-pipeline">
+  {% for ph in blue_phases %}
+    <li class="bq-phase" data-phase="{{ ph.key }}" style="--i: {{ loop.index0 }}">
+      <button type="button" class="bq-phase-btn" data-filter-phase="{{ ph.key }}"
+              title="Soldaten dieser Phase filtern">
+        <span class="bq-phase-no">{{ loop.index }}</span>
+        <span class="bq-phase-name">{{ ph.label }}</span>
+        <span class="bq-phase-note">{{ ph.note }}</span>
+        <span class="bq-phase-count">{{ ph.soldiers|length }} Soldaten</span>
+      </button>
+      <ul class="bq-phase-sol">
+        {% for s in ph.soldiers %}<li>{{ s.specialty or s.name }}</li>{% endfor %}
+      </ul>
+    </li>
+  {% endfor %}
+  </ol>
 </section>
 
 <section class="card blue-card blue-launch" id="blue-launch">
@@ -74,16 +94,112 @@
 </section>
 
 <section class="card blue-card" id="soldier-section">
-  <h3>🛡 Blue-Soldaten · Skills &amp; Playbooks
-    <small id="soldier-summary">lädt…</small>
+  <h3>🛡 Blue-Soldaten · Playbooks &amp; Checklisten
+    <small id="soldier-summary">{{ blue_stats.soldiers }} Soldaten · {{ blue_stats.playbooks }} Playbooks · {{ blue_stats.tasks }} Aufgaben</small>
   </h3>
-  <p class="hint">Jeder Soldat öffnet mit dem Tab <strong>Skills</strong> — dort stehen die
-     Playbooks inkl. Aufgaben-Checkliste, Mode und Oversight-Flag. SKILL.md und Mems
-     liegen unter Vault / Datei-Chips.</p>
-  <input type="search" id="soldier-filter" class="blue-filter"
-         placeholder="Blue-Soldaten / Skills / Playbooks / Aufgaben durchsuchen…"
-         autocomplete="off">
-  <div id="soldier-cards" class="blue-soldier-grid">lädt Soldaten…</div>
+  <p class="hint">Jede Karte zeigt ihre Playbooks mit der vollständigen Aufgaben-Checkliste —
+     ohne Tabs, ohne Klick. Haken speichern als Override. 🔒 = nur mit Human Oversight.</p>
+  <div class="bq-toolbar">
+    <input type="search" id="soldier-filter" class="blue-filter"
+           placeholder="Soldaten / Playbooks / Aufgaben durchsuchen…" autocomplete="off">
+    <div class="bq-chips" id="bq-phase-chips">
+      <button type="button" class="bq-chip active" data-filter-phase="">alle</button>
+      {% for ph in blue_phases %}<button type="button" class="bq-chip" data-filter-phase="{{ ph.key }}">{{ ph.label }}</button>{% endfor %}
+    </div>
+  </div>
+  {% set icons = {'swscan':'🔎','patchmgmt':'🩹','hardening':'🧱','fwaudit':'🔥','idhygiene':'🪪','tlsposture':'🔐','defense':'📡','logintegrity':'📜','honeypot':'🍯','backupverify':'💾','remediation':'🩺','vulnticket':'🎫','ticketclose':'✅','incident':'🚨','watcher':'👁','netdef':'🕸','webharden':'🧰','credhygiene':'🗝','logging':'🗒','supplychain':'📦','patchverify':'🧪','greenbone':'🌿'} %}
+  <div id="blue-soldier-cards" class="bq-grid">
+  {% for s in blue_soldiers %}
+    {% set key = s.name|replace('blue-','') %}
+    <article class="bq-card" data-name="{{ s.name }}" data-phases="{{ (s.blue_phases or [])|join(' ') }}">
+      <div class="bq-head">
+        <span class="bq-ico" aria-hidden="true">{{ icons.get(key, '🐜') }}</span>
+        <div class="bq-id">
+          <h4>{{ s.specialty or s.name }}</h4>
+          <code>{{ s.name }}</code>
+        </div>
+        <span class="bq-prog" data-prog title="erledigte Aufgaben">{{ s.progress.done }}/{{ s.progress.total }}</span>
+      </div>
+      <p class="bq-role">{{ s.role }}</p>
+      <div class="bq-phases">{% for ph in (s.blue_phases or []) %}<span class="bq-ph bq-ph-{{ ph }}">{{ ph }}</span>{% endfor %}</div>
+      <div class="bq-bar"><span data-bar style="width: {{ (100 * s.progress.done / s.progress.total)|round|int if s.progress.total else 0 }}%"></span></div>
+      <div class="bq-pbs">
+      {% for pb in s.playbooks %}
+        <section class="bq-pb{{ ' bq-pb-gated' if pb.oversight_required }}" data-pb="{{ pb.name }}">
+          {% set is_active = pb.oversight_required or pb.mode in ('offensive', 'active', 'aktiv') %}
+          <div class="bq-pb-head">
+            <h5>{{ pb.name }}</h5>
+            <span class="bq-mode {{ 'bq-mode-active' if is_active else 'bq-mode-def' }}"
+                  title="{{ 'aktiv: verändert Systeme – nur mit Human Oversight' if is_active else 'defensiv: rein lesend, immer erlaubt' }}">{{ 'aktiv' if is_active else 'defensiv' }}</span>
+            {% if pb.oversight_required %}<span class="bq-lock" title="nur mit Human Oversight">🔒 Oversight</span>{% endif %}
+            <span class="bq-pb-count">{{ pb.task_items|length }} Schritte</span>
+          </div>
+          {% if pb.description %}<p class="bq-pb-desc">{{ pb.description }}</p>{% endif %}
+          {% if pb.tools %}<p class="bq-pb-tools"><span>Checks</span>{% for t in pb.tools %}<code>{{ t }}</code>{% endfor %}</p>{% endif %}
+          <ul class="bq-tasks">
+          {% for ti in pb.task_items %}
+            <li><label><input type="checkbox" data-pb="{{ pb.name }}" data-task="{{ ti.task }}"{{ ' checked' if ti.checked }}> <span>{{ ti.task }}</span></label></li>
+          {% endfor %}
+          </ul>
+        </section>
+      {% else %}
+        <p class="hint">Dieser Soldat führt aktuell keine Playbooks.</p>
+      {% endfor %}
+      </div>
+      <div class="bq-foot">
+        <span>{{ s.playbooks|length }} Playbooks · {{ s.skill.task_count }} Aufgaben</span>
+        <button type="button" class="bq-skill-btn" data-skill="{{ s.name }}">📖 SKILL.md lesen</button>
+      </div>
+    </article>
+  {% else %}
+    <p class="hint">Keine Blue-Soldaten in der Registry gefunden.</p>
+  {% endfor %}
+  </div>
+  <p class="hint bq-empty" id="bq-empty" hidden>Kein Soldat passt zum Filter.</p>
+</section>
+
+<dialog id="bq-skill-dialog" class="bq-dialog">
+  <form method="dialog" class="bq-dialog-bar"><strong id="bq-skill-title">SKILL.md</strong>
+    <button class="bq-close" aria-label="schließen">✕</button></form>
+  <div id="bq-skill-body" class="bq-skill-body"></div>
+</dialog>
+
+<section class="card blue-card" id="blue-greenbone">
+  <h3>🌿 Greenbone / OpenVAS <small>Import → Härtung · Scan nur mit Oversight</small>
+    <span id="gb-badge" class="gb-badge {{ 'gb-ok' if gb_status.available else 'gb-off' }}">
+      {{ 'Greenbone vorhanden – prüfe…' if gb_status.available else 'Greenbone nicht verfügbar' }}</span></h3>
+  <p class="hint" id="gb-status-msg">{{ gb_status.message or gb_status.error }}</p>
+  <div class="gb-grid">
+    <form id="gb-import-form" class="blue-form gb-box" enctype="multipart/form-data">
+      <h4>📥 Report importieren <small>defensiv · kein Oversight nötig</small></h4>
+      <p class="hint">Greenbone-Export (<code>.xml</code>, <code>.csv</code>, <code>.json</code>) – wird nur gelesen,
+         es entsteht kein Netzwerkverkehr. Mit Ziel werden nur In-Scope-Hosts übernommen.</p>
+      <input type="file" name="file" accept=".xml,.csv,.json" required class="blue-field-input">
+      <label class="blue-field">Ziel (optional, Scope-Filter + Speicherung)
+        <select name="target_id"><option value="">ohne Ziel (nur Analyse)</option>
+          {% for t in targets %}<option value="{{ t.id }}">{{ t.name }} (#{{ t.id }})</option>{% endfor %}
+        </select></label>
+      <button type="submit" id="gb-import-go">Importieren</button>
+    </form>
+    <form id="gb-scan-form" class="blue-form gb-box">
+      <h4>🔒 Scoped Scan <small>aktiv · Oversight Pflicht</small></h4>
+      <p class="hint">Genau ein In-Scope-Host, nicht-destruktive Scan-Config, ein Scan gleichzeitig.
+         Ohne laufendes GVM + Zugangsdaten (<code>GVM_USERNAME</code>/<code>GVM_PASSWORD</code> in der Umgebung)
+         wird ehrlich nichts gestartet.</p>
+      <label class="blue-field">Ziel (Scope)
+        <select name="target_id" required><option value="">— wählen —</option>
+          {% for t in targets %}<option value="{{ t.id }}">{{ t.name }} (#{{ t.id }})</option>{% endfor %}
+        </select></label>
+      <input name="host" required placeholder="Host/IP, z. B. 192.0.2.1" class="blue-field-input"
+             pattern="[A-Za-z0-9.:\-]+" autocomplete="off">
+      <label class="blue-check blue-ack">
+        <input type="checkbox" name="oversight_ack" id="gb-ack" value="1">
+        ✅ Human Oversight: ich bestätige die Freigabe dieses aktiven Scans gegen das autorisierte Ziel
+      </label>
+      <button type="submit" id="gb-scan-go" disabled>Scan starten</button>
+    </form>
+  </div>
+  <div id="gb-result" class="gb-result" aria-live="polite" hidden></div>
 </section>
 
 <section class="card blue-card" id="blue-jobs">
@@ -105,6 +221,7 @@
       <option value="backup">Backup-Verify</option>
       <option value="watcher">Wächter-Check</option>
       <option value="attacklog">Attack-Log Review</option>
+      <option value="greenbone">Greenbone-Import (neuester Report)</option>
     </select>
     <input name="interval_sec" type="number" value="86400" title="Intervall in Sekunden"
            class="blue-field-input blue-interval">
@@ -215,11 +332,15 @@
     </div>
     <div class="blue-posture-tile">
       <div class="bpt-label">Trennung</div>
-      <p class="hint">Das <a href="/brain">Neuronale Gehirn</a> zeigt nur die
-         <strong>offensive</strong> Kolonie (Pentest / Bugbounty / WLAN).
-         Blue-Läufe und Blue-Soldaten leben ausschließlich hier unter <code>/blue</code>.</p>
+      <p class="hint">Blue-Läufe und Blue-Soldaten leben ausschließlich hier unter <code>/blue</code> – eigene Kolonie, eigene Läufe, eigenes Ledger.</p>
     </div>
   </div>
+</section>
+
+<section class="card blue-card" id="blue-remediation">
+  <h3>🛠 Blue-Remediation <small>Human Oversight · jedes Apply bestätigen</small></h3>
+  <p class="hint">Findings mit prüfbarem Fix werden hier angeboten. Backups mit <code>.bak-antbb-&lt;ts&gt;</code>, nach jedem Apply IST-Re-Check – geschlossen nur bei <code>closed:true</code>.</p>
+  <div id="blue-remediation-list" class="blue-remediation-list">lädt…</div>
 </section>
 
 <section class="card blue-card" id="blue-runs">
@@ -228,6 +349,8 @@
 </section>
 
 <script>window.ANTBB_COLONY = "blue";</script>
-<script src="/static/soldiers.js"></script>
+<script src="/static/blue_cards.js"></script>
 <script src="/static/blue.js"></script>
+<script src="/static/blue_greenbone.js"></script>
+<script src="/static/blue_remediation.js?v=202610240245"></script>
 {% endblock %}

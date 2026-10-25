@@ -1,158 +1,270 @@
 {% extends "base.html" %}
-{% block body_class %}home{% endblock %}
+{% block title %}🔴 Red Queen · Offensiv-Kolonie · antbb{% endblock %}
+{% block body_class %}red-body{% endblock %}
 {% block content %}
-<section class="intro-card">
-  <h2>🐜 Willkommen beim Ameisen-Schwarm</h2>
-  <p>
-    antbb ist deine <strong>lokale, autorisierte Pentest-Plattform</strong>: Eine <strong>Königin</strong>
-    (die Orchestratorin) steuert einen Schwarm aus 16 spezialisierten <strong>Ameisen-Soldaten</strong> –
-    je einer für Recon, Web, Netzwerk, Auth, OSINT, WLAN, Cloud, Exploit, Report und mehr.
-    Wie in einem echten Ameisenstaat erledigt jede Ameise ihre Aufgabe, und gemeinsam ergibt der
-    Schwarm ein vollständiges Bild der Sicherheitslage – immer nur für Ziele, für die du die
-    Erlaubnis hast.
-  </p>
-
-  <div class="intro-modes">
-    <div class="intro-mode def">
-      <strong>🛡️ Defensiv</strong>
-      Nur lesende Beobachtung. Der Schwarm sammelt und bewertet, ohne aktiv einzugreifen –
-      sicher für den Alltag.
+<link rel="stylesheet" href="/static/red_cards.css?v=2026102501">
+<section class="rq-hero" aria-label="Red Queen">
+  <div class="rq-hero-glow" aria-hidden="true"></div>
+  <div class="rq-hero-ants" aria-hidden="true">
+    <span class="rha rha1">🐜</span>
+    <span class="rha rha2">🐜</span>
+    <span class="rha rha3">🐜</span>
+  </div>
+  <div class="rq-hero-inner">
+    <div class="rq-crest" aria-hidden="true">🎯</div>
+    <div class="rq-hero-copy">
+      <p class="rq-kicker">Offensiv-Kolonie · eigenständige Ansicht</p>
+      <h2>Red Queen <span class="rq-sub">die Rote Königin</span></h2>
+      <p class="rq-lede">
+        Sie führt die <strong>offensiven Ameisen</strong> — Bug Bounty und Pentest im engen Scope.
+        Phasen: <em>Recon → Vulnerability Assessment → Exploitation → Post-Exploitation → Reporting</em>.
+        Standard: rein lesend. Aktive Schritte nur mit Scope-Allowlist und Human Oversight.
+      </p>
+      <p class="rq-motto">„Verifiziert“ gilt erst mit Proof-Gate — alles andere bleibt Verdacht.</p>
     </div>
-    <div class="intro-mode off">
-      <strong>⚔️ Offensiv</strong>
-      Aktive Verifikation von Schwachstellen – erst wenn <em>Scope-Allowlist</em>,
-      <em>Oversight-Häkchen</em> und der <em>Rechtshinweis (§ 202a–c StGB)</em> vorliegen.
+    <div class="rq-hero-stats">
+      <div class="rstat"><b id="rst-soldiers">…</b><span>Soldaten</span></div>
+      <div class="rstat"><b id="rst-playbooks">…</b><span>Playbooks</span></div>
+      <div class="rstat"><b id="rst-tasks">…</b><span>Aufgaben</span></div>
+      <div class="rstat"><b id="rst-findings">…</b><span>Findings</span></div>
+      <div class="rstat"><b>{{ targets|length }}</b><span>Ziele</span></div>
+      <div class="rstat"><b>{{ targets|sum(attribute="scope_count") }}</b><span>Scope-Einträge</span></div>
     </div>
   </div>
-
-  <p class="intro-guards">
-    <strong>Feste Leitplanken:</strong>
-    Scope ist <code>default-deny</code> – getestet wird nur, was ausdrücklich erlaubt ist, der Rest
-    wird blockiert und protokolliert. Nichts Destruktives (keine Brute-Force, keine Lasterzeugung).
-    Und ein <strong>Proof-Gate</strong>: Ein Befund gilt erst als <span class="ok">VERIFIZIERT</span>,
-    wenn er aktiv nachgewiesen wurde – alles andere bleibt „Verdacht" oder „zu bestätigen".
-  </p>
-
-  <div class="didyouknow" id="dyk-box">
-    <div class="dyk-ants-rail" aria-hidden="true">
-      <span class="dyk-walker dyk-w1"></span>
-      <span class="dyk-walker dyk-w2"></span>
-      <span class="dyk-walker dyk-w3"></span>
-    </div>
-    <span class="dyk-ant">🐜</span>
-    <span class="dyk-label" id="dyk-label">Neueste Schwachstellen</span>
-    <div class="dyk-ticker" id="dyk-ticker" aria-live="polite">
-      <div class="dyk-track" id="dyk-track"><span id="dyk-fact">Lädt …</span></div>
-    </div>
-  </div>
-  <details class="dyk-list-card card" id="dyk-list-card">
-    <summary>
-      <span id="dyk-list-title">🐜 Späher-Meldungen · Neueste Schwachstellen</span>
-      <span class="hint" id="dyk-list-meta"></span>
-    </summary>
-    <ul class="dyk-list" id="dyk-list">
-      <li class="hint">Lädt …</li>
-    </ul>
-  </details>
 </section>
 
-<section class="card mode-card" id="fernzugriff">
-  <h3>🔐 Fernzugriff</h3>
-  <p class="hint">Standardmäßig läuft antbb <strong>nur lokal</strong> ({{ remote.local_url }}).
-    Du entscheidest selbst, ob und wie die GUI aus der Ferne erreichbar sein soll.
-    Die Auswahl <strong>speichert nur deine Präferenz</strong> – Start/Stop braucht
-    jeweils deinen Oversight-Haken. Tokens nur zur Laufzeit aus ENV
-    (<code>TS_AUTHKEY</code>, <code>{{ remote.token_env_name }}</code>,
-    <code>CF_API_TOKEN</code>) – nie im Repo/DB/Log.</p>
+<nav class="rq-jump" aria-label="Red Queen Abschnitte">
+  <a href="#rq-phases">Phasen</a>
+  <a href="#rq-launch">Kolonie starten</a>
+  <a href="#rq-soldiers">Soldaten &amp; Playbooks</a>
+  <a href="#rq-targets">Ziele &amp; Scope</a>
+  <a href="#rq-findings">Findings</a>
+  <a href="#rq-runs">Läufe</a>
+  <a href="#rq-remote">Fernzugriff</a>
+</nav>
 
-  <form method="post" action="/remote/set">
-    <label style="display:block;margin:.3rem 0">
-      <input type="radio" name="mode" value="off" {% if remote.mode == "off" %}checked{% endif %}>
-      <strong>Aus (nur lokal)</strong> – sicherste Einstellung, nichts exponiert.
+<section class="card rq-card" id="rq-phases">
+  <h3>⬡ Phasen-Pipeline <small>jeder Soldat kennt seinen Abschnitt</small></h3>
+  <ol class="rq-pipe" id="rq-pipeline">
+    <li class="hint">Phasen werden aus der Registry gelesen…</li>
+  </ol>
+</section>
+
+<section class="card rq-card" id="rq-launch">
+  <h3>🐜🎯 Kolonie starten <small>lesend per Default · scope-gebunden · Scan-Tiefe wählbar</small></h3>
+  <form id="rq-run-form" class="rq-form">
+    <label class="rq-field">Ziel (Scope)
+      <select name="target_id" required>
+        <option value="">— wählen —</option>
+        {% for t in targets %}
+        <option value="{{ t.id }}">{{ t.name }} (#{{ t.id }}{% if t.scope_count %} · {{ t.scope_count }} Scope{% endif %})</option>
+        {% endfor %}
+      </select>
     </label>
-    <label style="display:block;margin:.3rem 0">
+    <label class="rq-field">Scan-Tiefe
+      <select name="depth">
+        <option value="light" selected>Leicht (recon · scan · report)</option>
+        <option value="intense">Intensiv (alle Phasen)</option>
+      </select>
+    </label>
+    <label class="rq-check">
+      <input type="checkbox" name="active" id="rq-active" value="1">
+      Aktive / offensive Schritte (Oversight)
+    </label>
+    <label class="rq-check rq-ack" id="rq-ack-wrap" style="display:none">
+      <input type="checkbox" name="oversight_ack" id="rq-ack" value="1">
+      ✅ Human Oversight: ich bestätige die Freigabe aktiver Schritte gegen das autorisierte Ziel
+    </label>
+    <button type="submit" class="rq-go">🐜🎯 Kolonie starten</button>
+  </form>
+  <pre id="rq-run-log" class="feed rq-feed" aria-live="polite"></pre>
+</section>
+
+<section class="card rq-card" id="rq-actions" hidden>
+  <h3>🎛 Red-Team-Menü <small>erscheint nach Ziel-Auswahl · jeder Klick legt einen echten Lauf an</small></h3>
+  <p class="hint" id="rq-actions-scope">Ziel wählen im Block „Kolonie starten" — das Menü folgt dem Scope (default-deny).</p>
+  <div class="rq-menu" id="rq-menu">
+    <div class="rq-mi" data-phases="recon">
+      <span class="rq-mi-ico">🔍</span>
+      <div><b>Recon &amp; OSINT</b><small>Angriffsfläche kartieren · Subdomains, Dienste, Technologie-Stack · immer lesend</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="Recon &amp; OSINT">▶ Start</button>
+    </div>
+    <div class="rq-mi" data-phases="scan">
+      <span class="rq-mi-ico">🌐</span>
+      <div><b>Schwachstellen-Scan</b><small>nuclei, Versions-Matching, Fehlkonfigurationen · immer lesend</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="Schwachstellen-Scan">▶ Start</button>
+    </div>
+    <div class="rq-mi rq-mi-gated" data-phases="verify">
+      <span class="rq-mi-ico">⚡</span>
+      <div><b>Aktive Verifikation</b><small>Fund → reproduzierbarer Nachweis (Proof-Gate) · 🔒 nur mit Oversight</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="Aktive Verifikation" disabled title="nur mit Human Oversight">🔒 Start</button>
+    </div>
+    <div class="rq-mi rq-mi-gated" data-phases="verify analyze">
+      <span class="rq-mi-ico">💥</span>
+      <div><b>PoC aus Evidence</b><small>Proof-of-Concept gegen eigene Ziele · 🔒 Oversight + Scope</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="PoC aus Evidence" disabled title="nur mit Human Oversight">🔒 Start</button>
+    </div>
+    <div class="rq-mi" data-phases="scan" data-note="llmsec">
+      <span class="rq-mi-ico">🤖</span>
+      <div><b>LLM-Security</b><small>Prompt-Injection-Lage, LLM-Endpunkte · lesend (aktive Teile 🔒)</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="LLM-Security">▶ Start</button>
+    </div>
+    <div class="rq-mi rq-mi-link" id="rq-report-row">
+      <span class="rq-mi-ico">📄</span>
+      <div><b>Reporting</b><small>Berichte, Addenda, Revisionen — auf der Ziel-Seite</small></div>
+      <a class="rq-skill-btn" id="rq-report-link" href="#" style="text-decoration:none">öffnen →</a>
+    </div>
+  </div>
+</section>
+
+<section class="card rq-card" id="rq-soldiers">
+  <h3>🎯 Red-Soldaten · Playbooks &amp; Checklisten
+    <small id="rq-soldier-summary">Soldaten, Playbooks und Aufgaben werden aus der Registry gelesen</small>
+  </h3>
+  <p class="hint">Jede Karte zeigt ihre Playbooks mit der vollständigen Aufgaben-Checkliste —
+     ohne Tabs, ohne Klick. Haken speichern als Override. 🔒 = nur mit Human Oversight.</p>
+  <div class="rq-toolbar">
+    <input type="search" id="rq-soldier-filter" class="rq-filter"
+           placeholder="Soldaten / Playbooks / Aufgaben durchsuchen…" autocomplete="off">
+  </div>
+  <div id="rq-soldier-cards" class="rq-grid">
+    <p class="hint">Soldaten werden gelesen…</p>
+  </div>
+  <p class="hint rq-empty" id="rq-empty" hidden>Kein Soldat passt zum Filter.</p>
+</section>
+
+<dialog id="rq-skill-dialog" class="rq-dialog">
+  <form method="dialog" class="rq-dialog-bar"><strong id="rq-skill-title">SKILL.md</strong>
+    <button class="rq-close" aria-label="schließen">✕</button></form>
+  <div id="rq-skill-body" class="rq-skill-body"></div>
+</dialog>
+
+<section class="card rq-card" id="rq-targets">
+  <h3>🧭 Ziele &amp; Scope-Manager
+    <small><a href="/trash" title="Archivierte Targets (Soft-Delete)">🗑 Papierkorb{% if archived_count %} ({{ archived_count }}){% endif %}</a></small>
+  </h3>
+  <p class="hint">Offensiv nur bei Scope + Oversight (mode_policy=auto/offensive). Archivieren verschiebt ein Ziel
+     in den Papierkorb (wiederherstellbar) — die Königin behält Findings, Registry und Erinnerungen.</p>
+  <div class="rq-wrap">
+    <table class="rq-table">
+      <thead><tr><th>ID</th><th>Name</th><th>Scope</th><th>Oversight</th><th>Modus</th><th></th></tr></thead>
+      <tbody>
+      {% for t in targets %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td>{{ t.name }}</td>
+          <td>{{ t.scope_count }}</td>
+          <td>{% if t.confirmed %}<span class="ok">✔ bestätigt</span>{% else %}<span class="blocked">✘ offen</span>{% endif %}</td>
+          <td>
+            <span class="badge">{{ t.mode.mode_policy }}</span>
+            {% if t.mode.effective_mode == "offensive" %}
+              <span class="ok">offensiv</span>
+            {% else %}
+              <span class="blocked">defensiv</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="/target/{{ t.id }}">öffnen →</a>
+            <form method="post" action="/target/{{ t.id }}/archive" style="display:inline"
+                  onsubmit="return confirm('Target „{{ t.name }}“ in den Papierkorb verschieben? Es wird nur ausgeblendet – alle Daten bleiben erhalten.');">
+              <button type="submit" class="rq-skill-btn" title="In den Papierkorb (Soft-Delete, wiederherstellbar)">🗑 Archivieren</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="hint">Noch keine Ziele — unten eines anlegen.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <h4>Neues Ziel</h4>
+  <form method="post" action="/target/add" class="rq-form">
+    <label class="rq-field">Name <input name="name" required placeholder="z.B. 127.0.0.1-lab" class="rq-field-input"></label>
+    <label class="rq-field">Beschreibung <input name="description" placeholder="optional" class="rq-field-input"></label>
+    <label class="rq-field">mode_policy
+      <select name="mode_policy">
+        <option value="auto" selected>auto (Offensiv nur bei Scope+Oversight)</option>
+        <option value="defensive">defensive (nur defensiv)</option>
+        <option value="offensive">offensive (Offensiv erlaubt bei Scope+Oversight)</option>
+      </select>
+    </label>
+    <button type="submit" class="rq-go">Anlegen</button>
+  </form>
+</section>
+
+<section class="card rq-card" id="rq-findings">
+  <h3>🕷 Findings <small>aggregiert über alle Ziele · nach Schwere sortiert</small></h3>
+  <p class="hint">Jeder Befund lässt sich als Fix-Aufgabe an die Blaue Königin übergeben —
+     die Fix-Brücke legt einen echten Remediate-Job in <code>/blue</code> an.</p>
+  <div class="rq-wrap">
+    <table class="rq-table">
+      <thead><tr><th>Severity</th><th>Befund</th><th>Ziel</th><th>Kategorie</th><th></th></tr></thead>
+      <tbody id="rq-findings-body">
+        <tr><td colspan="5" class="hint">Findings werden gelesen…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card rq-card" id="rq-runs">
+  <h3>🗂 Läufe <small>persistente Historie · ohne Blue-Queen-Läufe</small></h3>
+  <div id="rq-runs-list">lädt…</div>
+</section>
+
+<section class="card rq-card" id="rq-remote">
+  <h3>🔐 Fernzugriff <small>Du entscheidest, ob und wie die GUI aus der Ferne erreichbar ist</small></h3>
+  <p class="hint">Standardmäßig läuft antbb <strong>nur lokal</strong> ({{ remote.local_url }}).
+     Es wird nichts ins Internet exportiert; den jeweiligen Transport fährst du anhand der Schritte unten selbst hoch.</p>
+  <form method="post" action="/remote/set" class="rq-form">
+    <label class="rq-check">
+      <input type="radio" name="mode" value="off" {% if remote.mode == "off" %}checked{% endif %}>
+      Aus (nur lokal) — sicherste Einstellung, nichts exponiert.
+    </label>
+    <label class="rq-check">
       <input type="radio" name="mode" value="tailscale" {% if remote.mode == "tailscale" %}checked{% endif %}>
-      <strong>Tailscale</strong> – privates Mesh-VPN (Tailnet), nicht öffentlich.
+      Tailscale — privates Mesh-VPN (Tailnet), nicht öffentlich.
       {% if remote.tailscale.installed %}
         {% if remote.tailscale.running and remote.tailscale.ip %}
-          <span class="ok">● aktiv · {{ remote.tailscale.ip }}{% if remote.tailscale.hostname %} · {{ remote.tailscale.hostname }}{% endif %}</span>
+          <span class="ok">● aktiv · {{ remote.tailscale.ip }}</span>
         {% else %}
-          <span class="blocked">● installiert, nicht aktiv</span>
+          <span class="hint">○ installiert, läuft nicht</span>
         {% endif %}
       {% else %}
-        <span class="blocked">● nicht installiert</span>
+        <span class="hint">○ nicht installiert</span>
       {% endif %}
     </label>
-    <label style="display:block;margin:.3rem 0">
+    <label class="rq-check">
       <input type="radio" name="mode" value="cloudflare" {% if remote.mode == "cloudflare" %}checked{% endif %}>
-      <strong>Cloudflare-Tunnel</strong> – über das <em>öffentliche</em> Internet (nur mit Access nutzen).
+      Cloudflare-Tunnel — über das öffentliche Internet (nur mit eigener Auth).
       {% if remote.cloudflare.installed %}
         <span class="ok">● installiert{% if remote.cloudflare.version %} · {{ remote.cloudflare.version }}{% endif %}</span>
       {% else %}
-        <span class="blocked">● nicht installiert</span>
+        <span class="hint">○ nicht installiert</span>
       {% endif %}
     </label>
-    <button type="submit">Speichern</button>
-  </form>
-
-  <p class="hint" style="margin-top:.6rem">
-    <strong>Aktiver Modus:</strong>
-    {% if remote.mode == "off" %}<span class="badge">Aus (nur lokal)</span>
-    {% elif remote.mode == "tailscale" %}<span class="badge">Tailscale</span>
-    {% else %}<span class="badge">Cloudflare-Tunnel</span>{% endif %}
-    {% if remote.active_url %} · erreichbar unter <code>{{ remote.active_url }}</code>{% endif %}
-  </p>
-
-  {% if remote_summary %}
-  <p class="hint">Lage:
-    {% for x in remote_summary.installed %}<span class="ok">[+ {{ x }}]</span> {% endfor %}
-    {% for x in remote_summary.skipped %}<span class="blocked">[skip {{ x }}]</span> {% endfor %}
-    {% for x in remote_summary.failed %}<span class="blocked">[fail {{ x }}]</span> {% endfor %}
-  </p>
-  {% endif %}
-
-  <details style="margin-top:.4rem">
-    <summary>Setup-Schritte für „{{ remote.mode }}“ anzeigen</summary>
-    <ol class="hint">
-      {% for step in remote_steps %}<li>{{ step }}</li>{% endfor %}
-    </ol>
-  </details>
-
-  <div style="margin-top:.8rem;padding:.6rem;border:1px solid #333;border-radius:8px">
-    <strong>Tailscale steuern</strong>
-    <p class="hint" style="margin:.3rem 0">
-      Privates Tailnet. Optional Funnel = öffentlich (Oversight-Pflicht).
-      Auth-Key nur zur Laufzeit als <code>TS_AUTHKEY</code>.
-    </p>
-    <label style="display:block;margin:.3rem 0">
-      <input type="checkbox" id="ts-oversight"> Ich bestätige: Tailscale up/down/Funnel ausführen.
-    </label>
-    <button type="button" onclick="tsCtl('up')">Tailscale aktivieren</button>
-    <button type="button" onclick="tsCtl('down')">Trennen</button>
-    <button type="button" onclick="tsCtl('funnel_on')">Funnel an</button>
-    <button type="button" onclick="tsCtl('funnel_off')">Funnel aus</button>
-    <span id="ts-state" class="hint" style="margin-left:.5rem">
-      {% if remote.tailscale.running %}● aktiv{% if remote.tailscale.ip %} · {{ remote.tailscale.ip }}{% endif %}{% if remote.tailscale.hostname %} · {{ remote.tailscale.hostname }}{% endif %}
-      {% else %}● aus{% endif %}
-      {% if remote.tailscale.funnel and remote.tailscale.funnel.exposed %} · Funnel {{ remote.tailscale.funnel.url }}{% endif %}
+    <button type="submit" class="rq-go">Modus speichern</button>
+    <span class="hint">
+      {% if remote.mode == "off" %}<span class="badge">Aus (nur lokal)</span>
+      {% elif remote.mode == "tailscale" %}<span class="badge">Tailscale</span>
+      {% else %}<span class="badge">Cloudflare</span>{% endif %}
+      {% if remote.active_url %} · erreichbar unter <code>{{ remote.active_url }}</code>{% endif %}
     </span>
-    <div id="ts-msg" class="hint" style="margin-top:.4rem"></div>
-  </div>
-
-  <div style="margin-top:.8rem;padding:.6rem;border:1px solid #333;border-radius:8px">
-    <strong>Cloudflare-Tunnel aktiv steuern</strong>
-    <p class="hint" style="margin:.3rem 0">
-      ⚠ Ein Tunnel macht die GUI über das <em>öffentliche</em> Internet erreichbar.
-      Start erfordert deine ausdrückliche Bestätigung (Oversight).
-    </p>
-    <label style="display:block;margin:.3rem 0">
-      <input type="checkbox" id="cf-oversight"> Ich bestätige: GUI öffentlich per Cloudflare-Tunnel verfügbar machen.
+  </form>
+  <details class="hint">
+    <summary>Setup-Schritte für „{{ remote.mode }}“ anzeigen</summary>
+    <ol>{% for step in remote_steps %}<li>{{ step }}</li>{% endfor %}</ol>
+    <p>Der Tunnel benötigt ein Token zur Laufzeit aus der Umgebungsvariable
+       <code>{{ remote.token_env_name }}</code> — niemals ins Git committen.</p>
+  </details>
+  <div class="rq-form" style="margin-top:.6rem">
+    <label class="rq-check rq-ack">
+      <input type="checkbox" id="cf-oversight"> Oversight: Tunnelstart bewusst freigegeben
     </label>
-    <label style="display:block;margin:.3rem 0">
+    <label class="rq-check">
       <input type="checkbox" id="cf-named"> Benannter Tunnel (Token aus <code>{{ remote.token_env_name }}</code>) statt trycloudflare
     </label>
-    <button type="button" id="cf-start" onclick="cfTunnel('start')">Tunnel starten</button>
-    <button type="button" id="cf-stop" onclick="cfTunnel('stop')">Tunnel stoppen</button>
+    <button type="button" class="rq-skill-btn" onclick="cfTunnel('start')">Tunnel starten</button>
+    <button type="button" class="rq-skill-btn" onclick="cfTunnel('stop')">Tunnel stoppen</button>
     <span id="cf-state" class="hint" style="margin-left:.5rem">
       {% if remote.cloudflare.tunnel and remote.cloudflare.tunnel.running %}
         ● läuft{% if remote.cloudflare.tunnel.url %} · <code>{{ remote.cloudflare.tunnel.url }}</code>{% endif %}
@@ -160,29 +272,6 @@
     </span>
     <div id="cf-msg" class="hint" style="margin-top:.4rem"></div>
   </div>
-
-  <details style="margin-top:.6rem">
-    <summary>Cloudflare Free-Tier: Zero Trust Access (E-Mail-OTP), DNS, WARP</summary>
-    <p class="hint">
-      API:
-      {% if remote.cloudflare.api %}{{ remote.cloudflare.api.detail }}{% else %}–{% endif %}
-      · Access: {% if remote.cloudflare.access %}{{ remote.cloudflare.access.detail }}{% else %}–{% endif %}
-      · DNS: {% if remote.cloudflare.dns %}{{ remote.cloudflare.dns.detail }}{% else %}–{% endif %}
-      · WARP: {% if remote.warp %}{{ remote.warp.detail }}{% else %}–{% endif %}
-    </p>
-    <h4 class="hint">Access-Setup (Free, bis 50 Nutzer)</h4>
-    <ol class="hint">
-      {% for step in remote_access_steps %}<li>{{ step }}</li>{% endfor %}
-    </ol>
-    <h4 class="hint">WARP (optional)</h4>
-    <ol class="hint">
-      {% for step in remote_warp_steps %}<li>{{ step }}</li>{% endfor %}
-    </ol>
-    <p class="hint">DNS-CNAME für den Tunnel-Hostname: Dashboard oder
-      <code>CF_API_TOKEN</code> + <code>CF_ZONE_ID</code> (nie im Repo). Pages/Workers
-      werden hier bewusst nicht eingebaut – kein echter Nutzen für die lokale GUI.</p>
-  </details>
-
   <script>
   async function cfTunnel(action){
     const msg=document.getElementById('cf-msg');
@@ -205,223 +294,11 @@
       else { st.textContent='● aus'; }
     }catch(e){ msg.textContent='Fehler: '+e; }
   }
-  async function tsCtl(action){
-    const msg=document.getElementById('ts-msg');
-    const st=document.getElementById('ts-state');
-    if(!document.getElementById('ts-oversight').checked){
-      msg.textContent='Bitte zuerst die Oversight-Bestätigung ankreuzen.'; return;
-    }
-    try{
-      let url, body;
-      if(action==='up'){ url='/api/remote/tailscale/up'; body={confirm:true}; msg.textContent='Aktiviere Tailscale…'; }
-      else if(action==='down'){ url='/api/remote/tailscale/down'; body={confirm:true}; msg.textContent='Trenne Tailscale…'; }
-      else if(action==='funnel_on'){ url='/api/remote/tailscale/funnel'; body={confirm:true,enable:true}; msg.textContent='Aktiviere Funnel…'; }
-      else { url='/api/remote/tailscale/funnel'; body={confirm:true,enable:false}; msg.textContent='Deaktiviere Funnel…'; }
-      const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      const d=await res.json();
-      msg.textContent=(d.reason||'')+(d.url?(' → '+d.url):'')+(d.login_url?(' · Login: '+d.login_url):'');
-      const s=d.status && d.status.tailscale;
-      if(s){
-        let t=s.running?('● aktiv'+(s.ip?(' · '+s.ip):'')+(s.hostname?(' · '+s.hostname):'')):'● aus';
-        if(s.funnel && s.funnel.exposed) t+=' · Funnel '+s.funnel.url;
-        st.textContent=t;
-      }
-    }catch(e){ msg.textContent='Fehler: '+e; }
-  }
   </script>
 </section>
 
-<section>
-  <h2>Targets &amp; Scope-Manager
-    <a href="/trash" class="trash-link" title="Archivierte Targets (Soft-Delete)">🗑 Papierkorb{% if archived_count %} ({{ archived_count }}){% endif %}</a>
-  </h2>
-  <p class="hint">Alles läuft on-device über diese GUI – kein CLI-Copy-Paste nötig.
-    Offensiv nur bei Scope + Oversight (mode_policy=auto/offensive).
-    Archivieren verschiebt ein Target in den Papierkorb (wiederherstellbar) –
-    die Königin behält ihr gesamtes Wissen (Findings, Registry, Erinnerungen).</p>
-  <table>
-    <thead><tr><th>ID</th><th>Name</th><th>Scope</th><th>Oversight</th><th>Modus</th><th></th></tr></thead>
-    <tbody>
-    {% for t in targets %}
-      <tr>
-        <td>{{ t.id }}</td>
-        <td>{{ t.name }}</td>
-        <td>{{ t.scope_count }}</td>
-        <td>{% if t.confirmed %}<span class="ok">✔ bestätigt</span>{% else %}<span class="blocked">✘ offen</span>{% endif %}</td>
-        <td>
-          <span class="badge">{{ t.mode.mode_policy }}</span>
-          {% if t.mode.effective_mode == "offensive" %}
-            <span class="ok">offensiv</span>
-          {% else %}
-            <span class="blocked">defensiv</span>
-          {% endif %}
-        </td>
-        <td>
-          <a href="/target/{{ t.id }}">öffnen →</a>
-          <form method="post" action="/target/{{ t.id }}/archive" style="display:inline"
-                onsubmit="return confirm('Target „{{ t.name }}“ in den Papierkorb verschieben? Es wird nur ausgeblendet – alle Daten und das Wissen der Königin bleiben erhalten und sind wiederherstellbar.');">
-            <button type="submit" class="btn-archive" title="In den Papierkorb (Soft-Delete, wiederherstellbar)">🗑 Archivieren</button>
-          </form>
-        </td>
-      </tr>
-    {% else %}
-      <tr><td colspan="6">Noch keine Targets. Lege unten eines an.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</section>
-<section class="card">
-  <h3>Neues Target</h3>
-  <form method="post" action="/target/add">
-    <label>Name <input name="name" required placeholder="z.B. 127.0.0.1-lab"></label>
-    <label>Beschreibung <input name="description" placeholder="optional"></label>
-    <label>mode_policy
-      <select name="mode_policy">
-        <option value="auto" selected>auto (Offensiv nur bei Scope+Oversight)</option>
-        <option value="defensive">defensive (nur defensiv)</option>
-        <option value="offensive">offensive (Offensiv erlaubt bei Scope+Oversight)</option>
-      </select>
-    </label>
-    <button type="submit">Anlegen</button>
-  </form>
-</section>
-
 <script>
-// Startseiten-Laufschrift + sichtbare Liste: ECHTE neueste Schwachstellen
-// (NVD + oeffentliche Mastodon-Infosec-Konten) via /api/dyk.
-// Robust: Timeout, bei Fehler/Netzausfall Fallback auf statische Infosec-Fakten
-// – nie dauerhaft "Laedt ...". Optik folgt dem bestehenden antbb-Theme.
-(function () {
-  var fallbackFacts = [
-    "Platz 1 der <b>OWASP Top 10 (2021)</b> ist <b>Broken Access Control</b> \u2013 also fehlerhafte Zugriffskontrolle. Deshalb pr\u00fcfen unsere Soldaten besonders, wer worauf zugreifen darf.",
-    "Ein <b>WPA2-Handshake</b> ist der 4-Wege-Austausch, mit dem sich ein Ger\u00e4t beim WLAN anmeldet. Wird er mitgeschnitten, kann ein Passwort <b>offline</b> geraten werden \u2013 ganz ohne weiteren Funkkontakt. Darum sind starke, lange Passphrasen so wichtig.",
-    "<b>Default-deny</b> hei\u00dft: erlaubt ist nur, was ausdr\u00fccklich freigegeben wurde. Das verhindert, dass versehentlich fremde Systeme getestet werden \u2013 die sicherste Grundeinstellung f\u00fcr jeden Scope.",
-    "Laut Verizon DBIR ist der <b>Mensch</b> an der gro\u00dfen Mehrheit der Sicherheitsvorf\u00e4lle beteiligt \u2013 etwa \u00fcber Phishing oder schwache bzw. gestohlene Passw\u00f6rter. Technik allein reicht nicht.",
-    "<b>HTTPS/TLS</b> sch\u00fctzt den Transportweg (das Mitlesen unterwegs), aber nicht die Anwendung selbst. Eine Seite kann verschl\u00fcsselt und trotzdem verwundbar sein.",
-    "<b>SQL-Injection</b> geh\u00f6rt zur OWASP-Kategorie <b>Injection</b> und entsteht, wenn Eingaben ungepr\u00fcft in Datenbankabfragen landen. Schutz: parametrisierte Abfragen (Prepared Statements).",
-    "<b>Multi-Faktor-Authentifizierung (MFA)</b> stoppt den Gro\u00dfteil der Angriffe auf gestohlene Passw\u00f6rter, weil ein geklautes Passwort allein nicht mehr gen\u00fcgt.",
-    "Ein guter Pentest-Befund braucht einen <b>Nachweis</b>. Unser Proof-Gate f\u00fchrt etwas erst als \u201eVERIFIZIERT\u201c, wenn es aktiv belegt ist \u2013 das verhindert Fehlalarme und \u00fcbertriebene Risiko-Einstufungen."
-  ];
-
-  var track = document.getElementById("dyk-track");
-  var label = document.getElementById("dyk-label");
-  var listEl = document.getElementById("dyk-list");
-  var listTitle = document.getElementById("dyk-list-title");
-  var listMeta = document.getElementById("dyk-list-meta");
-  if (!track) return;
-
-  function esc(str) {
-    var d = document.createElement("div");
-    d.textContent = (str == null ? "" : String(str));
-    return d.innerHTML;
-  }
-  function sevBadge(sev) {
-    if (!sev) return "";
-    var s = String(sev).toUpperCase();
-    return ' <span class="dyk-sev dyk-sev-' + esc(s) + '">' + esc(s) + "</span>";
-  }
-  function fmtDate(iso) {
-    if (!iso) return "";
-    try {
-      var d = new Date(iso);
-      if (isNaN(d.getTime())) return "";
-      return d.toLocaleDateString("de-DE", { year: "numeric", month: "2-digit", day: "2-digit" });
-    } catch (e) { return ""; }
-  }
-
-  function itemHtml(it) {
-    if (it.kind === "cve") {
-      var cid = it.url
-        ? '<a href="' + esc(it.url) + '" target="_blank" rel="noopener"><b>' + esc(it.id) + "</b></a>"
-        : "<b>" + esc(it.id) + "</b>";
-      return "\ud83d\udd12 " + cid + sevBadge(it.severity) + " \u2013 " + esc(it.text);
-    }
-    var who = it.author ? "<b>" + esc(it.author) + "</b>: " : "";
-    var tag = it.id ? (" <code>" + esc(it.id) + "</code>") : "";
-    var txt = it.url
-      ? '<a href="' + esc(it.url) + '" target="_blank" rel="noopener">' + esc(it.text) + "</a>"
-      : esc(it.text);
-    return "\ud83d\udcac " + who + tag + sevBadge(it.severity) + " \u2013 " + txt;
-  }
-
-  function renderTicker(htmlItems) {
-    var sep = '<span class="dyk-sep">\u2022</span>';
-    var seq = htmlItems.join(sep);
-    track.innerHTML = '<span class="dyk-seq">' + seq + sep + seq + "</span>";
-    var dur = Math.max(90, htmlItems.length * 20);
-    track.style.animation = "dyk-scroll " + dur + "s linear infinite";
-  }
-
-  function renderList(items, isFallback) {
-    if (!listEl) return;
-    if (isFallback) {
-      if (listTitle) listTitle.textContent = "\ud83d\udc1c Wusstest du? \u00b7 Wissen der K\u00f6nigin";
-      if (listMeta) listMeta.textContent = "Quellen offline \u2013 Fallback";
-      listEl.innerHTML = items.map(function (f) {
-        return '<li class="dyk-li"><div class="dyk-li-text">' + f + "</div></li>";
-      }).join("");
-      return;
-    }
-    if (listTitle) listTitle.textContent = "\ud83d\udc1c Sp\u00e4her-Meldungen \u00b7 Neueste Schwachstellen";
-    if (listMeta) listMeta.textContent = items.length + " Eintr\u00e4ge";
-    listEl.innerHTML = items.map(function (it) {
-      var who = it.kind === "cve"
-        ? ("NVD \u00b7 " + esc(it.id || "CVE"))
-        : esc(it.author || it.source || "Mastodon");
-      var tag = it.id && it.kind !== "cve" ? (' <code>' + esc(it.id) + "</code>") : "";
-      var link = it.url
-        ? (' <a class="dyk-li-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">\u2192 Quelle</a>')
-        : "";
-      var when = fmtDate(it.date);
-      return '<li class="dyk-li">'
-        + '<div class="dyk-li-head">'
-        +   '<span class="dyk-li-author">' + who + "</span>"
-        +   tag + sevBadge(it.severity)
-        +   (when ? (' <span class="hint">' + esc(when) + "</span>") : "")
-        +   link
-        + "</div>"
-        + '<div class="dyk-li-text">' + esc(it.text) + "</div>"
-        + "</li>";
-    }).join("");
-  }
-
-  function useFallback() {
-    if (label) label.textContent = "Wusstest du?";
-    renderTicker(fallbackFacts.slice());
-    renderList(fallbackFacts, true);
-  }
-  function useFeed(items, sources) {
-    if (label) label.textContent = "Neueste Schwachstellen";
-    renderTicker(items.map(itemHtml));
-    renderList(items, false);
-    if (listMeta && sources && sources.length) {
-      listMeta.textContent = items.length + " Eintr\u00e4ge \u00b7 " + sources.join(" + ");
-    }
-  }
-
-  var done = false;
-  var timer = setTimeout(function () {
-    if (!done) { done = true; useFallback(); }
-  }, 7000);
-  var ctrl = ("AbortController" in window) ? new AbortController() : null;
-  if (ctrl) setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 7000);
-
-  fetch("/api/dyk", { signal: ctrl ? ctrl.signal : undefined })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (data) {
-      if (done) return;
-      done = true; clearTimeout(timer);
-      if (data && data.ok && data.items && data.items.length) {
-        useFeed(data.items, data.sources || []);
-      } else {
-        useFallback();
-      }
-    })
-    .catch(function () {
-      if (done) return;
-      done = true; clearTimeout(timer);
-      useFallback();
-    });
-})();
+window.RQ_TARGETS = {{ targets|tojson }};
 </script>
+<script src="/static/red_cards.js?v=2026102501"></script>
 {% endblock %}

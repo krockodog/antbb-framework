@@ -1,0 +1,144 @@
+{% extends "base.html" %}{% set active='brain' %}
+{% block title %}Yellow Live-Status{% endblock %}
+{% block body %}
+<h1>📡 Yellow Live-Status</h1>
+<p class="lead">Interim-Ansicht der Orchestrierung (Hops, Next-3, Funde, Bypass).
+  <b>Kanonisches Neurales Gehirn:</b> <a href="http://192.168.2.7:1001/brain">http://192.168.2.7:1001/brain</a>
+  — Yellow liefert dorthin Knoten via <code>/api/brain/snapshot</code>.</p>
+<div class="card" id="status">
+  <div class="kv"><div>Phase</div><div><span id="phase" class="badge">…</span></div>
+  <div>Fall</div><div id="title">…</div><div>Aktiver Soldat</div><div id="soldier">–</div><div>Playbook</div><div id="playbook">–</div>
+  <div>Dynamic/Oversight</div><div id="oversight">–</div><div>Zuletzt gelaufen</div><div id="updated" class="mut">–</div></div>
+  <p id="links"></p>
+</div>
+
+<section class="card eye next3-panel">
+  <div class="panel-head"><h2 style="margin:0">▶️ Next-3 · wohin geht’s?</h2><span class="badge live" id="n3prog">–</span></div>
+  <div class="n3-track" id="next3"></div>
+</section>
+
+<section class="card eye bypass-panel" id="bypassCard">
+  <div class="panel-head"><h2 style="margin:0">🔓 Bypass-Pfad</h2><span class="badge" id="bpStatus">–</span></div>
+  <p id="bpTitle"></p>
+  <div class="erk" id="bpErk"></div>
+</section>
+
+<section class="card eye dynamic-panel" id="dynCard">
+  <div class="panel-head"><h2 style="margin:0">⚡ Dynamic-Lab</h2><span class="badge" id="dynStatus">–</span></div>
+  <p id="dynTitle"></p>
+  <div class="erk" id="dynErk"></div>
+</section>
+
+<section class="card eye findings-panel">
+  <div class="panel-head"><h2 style="margin:0">🎯 Ergebnisse · Funde mit Adresse</h2><span class="mut" id="findRan">–</span></div>
+  <div id="findings"></div>
+</section>
+
+<h2>Hops</h2><div class="hops" id="hops"></div>
+<h2>Blocker / Hinweise</h2><div class="card"><ul id="blockers"></ul></div>
+<script id="initial" type="application/json">{{ snapshot | tojson }}</script>
+<script>
+const CASE = {{ (case or '') | tojson }};
+function el(tag, cls, text){const e=document.createElement(tag); if(cls)e.className=cls; if(text!==undefined)e.textContent=text; return e;}
+function olist(items){const o=el('ol'); (items||[]).forEach(i=>o.appendChild(el('li',null,i))); return o;}
+function erk(box,warum,fund,next){box.replaceChildren();
+  const a=el('div');a.append(el('b',null,'Warum dieses Tool? '),document.createTextNode(warum||'–'));
+  const b=el('div');b.append(el('b',null,'Was bedeutet der Fund? '),document.createTextNode(fund||'–'));
+  const c=el('div');c.append(el('b',null,'Was tun wir als Nächstes?'),olist(next));box.append(a,b,c);}
+function renderNext3(s){
+  const N=document.getElementById('next3'); N.replaceChildren();
+  const steps = s.next3_steps || [];
+  const done = steps.filter(x=>x.status==='done').length;
+  document.getElementById('n3prog').textContent = (done+'/'+(steps.length||3)+' erledigt');
+  if(!steps.length){
+    (s.next3||[]).forEach((n,i)=>{const li=el('div','n3-step pending'); li.textContent=(i+1)+'. '+n; N.appendChild(li);});
+    return;
+  }
+  steps.forEach(st=>{
+    const d=document.createElement('details'); d.className='n3-step '+st.status; if(st.jetzt) d.open=true;
+    const sum=document.createElement('summary');
+    sum.appendChild(el('span','n3-num',st.progress||''));
+    if(st.status==='done') sum.appendChild(el('span','n3-check','✓'));
+    else if(st.jetzt) sum.appendChild(el('span','n3-jetzt','Jetzt'));
+    else sum.appendChild(el('span','n3-wait','…'));
+    sum.appendChild(el('span','n3-label',st.label||''));
+    sum.appendChild(el('span','badge '+(st.status||''),st.status||''));
+    d.appendChild(sum);
+    const x=el('div','erk'); erk(x,st.warum,st.fund,st.next); d.appendChild(x);
+    N.appendChild(d);
+  });
+}
+function renderBypass(s){
+  const bp=s.bypass||{};
+  const card=document.getElementById('bypassCard');
+  card.className='card eye bypass-panel bypass-'+(bp.status||'pending');
+  const st=document.getElementById('bpStatus'); st.textContent=bp.status||'pending'; st.className='badge '+(bp.status||'pending');
+  document.getElementById('bpTitle').innerHTML='';
+  const t=document.getElementById('bpTitle');
+  t.appendChild(el('b',null,bp.label||'Bypass'));
+  t.appendChild(document.createTextNode(' · Playbook '));
+  t.appendChild(el('code',null,bp.playbook||'–'));
+  if(bp.requires_oversight){const b=el('span','badge partial','Oversight nötig'); b.style.marginLeft='8px'; t.appendChild(b);}
+  erk(document.getElementById('bpErk'),bp.warum,bp.fund,bp.next);
+}
+function renderDynamic(s){
+  const d=s.dynamic_step||{};
+  const card=document.getElementById('dynCard');
+  if(!card) return;
+  card.className='card eye dynamic-panel bypass-'+(d.status||'pending');
+  const st=document.getElementById('dynStatus'); st.textContent=d.status||'pending'; st.className='badge '+(d.status||'pending');
+  const t=document.getElementById('dynTitle'); t.replaceChildren();
+  t.appendChild(el('b',null,d.label||'Dynamic'));
+  t.appendChild(document.createTextNode(' · Playbook '));
+  t.appendChild(el('code',null,d.playbook||'–'));
+  if(d.requires_oversight){const b=el('span','badge partial','Oversight Pflicht'); b.style.marginLeft='8px'; t.appendChild(b);}
+  if((d.tools_used||[]).length){t.appendChild(document.createTextNode(' · Tools: '+(d.tools_used||[]).join(', ')));}
+  erk(document.getElementById('dynErk'),d.warum,d.fund,d.next);
+}
+function renderFindings(s){
+  const box=document.getElementById('findings'); box.replaceChildren();
+  document.getElementById('findRan').textContent='zuletzt: '+(s.last_ran_at||s.updated_at||'–');
+  const finds=s.findings||[];
+  if(!finds.length){box.appendChild(el('p','mut','Noch keine strukturierten Funde.')); return;}
+  const table=el('table','findings');
+  const head=el('tr'); ['Tool','Adresse','Titel','Snippet','Links'].forEach(h=>head.appendChild(el('th',null,h)));
+  table.appendChild(head);
+  finds.forEach(f=>{
+    const tr=el('tr');
+    const td0=el('td'); td0.appendChild(el('code',null,f.tool||'')); td0.appendChild(el('div','mut',f.soldier||'')); tr.appendChild(td0);
+    const td1=el('td'); td1.appendChild(el('code','addr',f.address||'–')); tr.appendChild(td1);
+    tr.appendChild(el('td',null,f.title||''));
+    tr.appendChild(el('td','snip',f.snippet||''));
+    const tdL=el('td');
+    if(f.evidence_url){const a=el('a','pill','Evidence'); a.href=f.evidence_url; tdL.appendChild(a);}
+    if(f.dossier_url){const a=el('a','pill','Dossier'); a.href=f.dossier_url; tdL.appendChild(a);}
+    tr.appendChild(tdL); table.appendChild(tr);
+  });
+  box.appendChild(table);
+}
+function render(s){
+  const ph=document.getElementById('phase'); ph.textContent=(s.phase_de||s.phase)+(s.finished?'':' · läuft'); ph.className='badge '+(s.finished?'':'live');
+  document.getElementById('title').textContent=(s.title||'–')+(s.sample_sha?'  ('+s.sample_sha.slice(0,12)+'…)':'');
+  document.getElementById('soldier').textContent=s.active_soldier||'–';
+  document.getElementById('playbook').textContent=s.active_playbook||'–';
+  const o=s.oversight||{}; document.getElementById('oversight').textContent='dynamic='+(s.dynamic||'no')+' · Oversight '+(o.oversight_confirmed?'bestätigt':'nicht gesetzt');
+  document.getElementById('updated').textContent=s.last_ran_at||s.updated_at||'';
+  const L=document.getElementById('links'); L.replaceChildren();
+  const lk=s.links||{};
+  if(lk.canonical_brain){const a=el('a','pill','🧠 Gehirn :1001'); a.href=lk.canonical_brain; L.appendChild(a);}
+  [['case','Fall'],['dossier','Dossier'],['ledger','Ledger']].forEach(([k,t])=>{ if(lk[k]){const a=el('a','pill','📄 '+t); a.href=lk[k]; L.appendChild(a);} });
+  (lk.evidence||[]).slice(0,14).forEach(u=>{const a=el('a','pill','🔎 '+decodeURIComponent(u.split('/').pop())); a.href=u; L.appendChild(a);});
+  const e=s.erklaerbaer||{}; const erkEl=document.getElementById('erk'); if(erkEl) erk(erkEl,e.warum,e.fund,e.next);
+  renderNext3(s); renderBypass(s); renderDynamic(s); renderFindings(s);
+  const H=document.getElementById('hops'); H.replaceChildren();
+  if(!(s.hops||[]).length){H.appendChild(el('p','mut','Noch keine Hops – lade auf der Startseite ein Sample hoch.'));}
+  (s.hops||[]).forEach((h,i)=>{const d=el('div','hop '+(h.status||'')); const t=el('h3',null,(i+1)+'. '+h.op+'  '); t.appendChild(el('span','badge '+(h.status||''),h.skill||'')); d.appendChild(t);
+    d.appendChild(el('div',null,h.summary_de)); const x=el('div','erk'); erk(x,h.warum,h.fund,h.next); d.appendChild(x); H.appendChild(d);});
+  const B=document.getElementById('blockers'); B.replaceChildren(); (s.blockers||[]).forEach(n=>B.appendChild(el('li',null,n))); if(!(s.blockers||[]).length)B.appendChild(el('li','mut','keine'));
+}
+render(JSON.parse(document.getElementById('initial').textContent));
+let timer=null;
+async function poll(){try{const r=await fetch('/api/brain/snapshot'+(CASE?'?case='+encodeURIComponent(CASE):''),{cache:'no-store'}); const s=await r.json(); render(s); if(s.finished&&CASE){return;}}catch(e){} timer=setTimeout(poll,2000);}
+poll();
+</script>
+{% endblock %}

@@ -180,7 +180,7 @@ code { font-size: .85em; color: #79c0ff; }
 .sc-tabs button.active { background:#17233c; color:#9fd0ff; border-color:#38507e; }
 .sc-bar { height:4px; background:#121a2b; border-radius:3px; overflow:hidden; margin:.2rem 0 .4rem; }
 .sc-bar span { display:block; height:100%; width:0; background:linear-gradient(90deg,#38e0ff,#3fffa3); transition:width .3s; }
-.sc-body { max-height:280px; overflow:auto; }
+.sc-body { max-height:420px; overflow:auto; }
 .pb { border:1px solid #182236; border-radius:4px; padding:.35rem .45rem; margin:.3rem 0; background:#0b1120; }
 .pb-off { opacity:.5; }
 .pb-head { display:flex; justify-content:space-between; align-items:center; gap:.4rem; }
@@ -203,6 +203,26 @@ ul.tasks li input { width:auto; }
 .vault-grid { display:flex; flex-wrap:wrap; gap:.3rem; margin:.3rem 0; }
 .vfile { background:#101726; color:#8fb4e8; border:1px solid #223; font-size:.7rem; padding:.2rem .45rem; margin:0; }
 .vault-pre { background:#06080e; font-size:.7rem; max-height:200px; overflow:auto; white-space:pre-wrap; }
+
+.skill-toolbar { display:flex; flex-wrap:wrap; gap:.3rem; align-items:center; margin:.2rem 0 .4rem; }
+.skill-toolbar button { background:#101726; color:#8a92a6; border:1px solid #1d2740; border-radius:4px;
+  padding:.15rem .5rem; margin:0; font-size:.7rem; }
+.skill-toolbar button.active { background:#17233c; color:#9fd0ff; border-color:#38507e; }
+.skill-md { font-size:.78rem; line-height:1.45; color:#d5e2f5; max-height:360px; overflow:auto;
+  background:#06080e; border:1px solid #182236; border-radius:5px; padding:.5rem .6rem; }
+.skill-md .skill-h { color:#9fd0ff; margin:.55rem 0 .25rem; font-size:.92rem; }
+.skill-md .skill-p { margin:.2rem 0; }
+.skill-md .skill-quote { margin:.3rem 0; padding:.3rem .5rem; border-left:3px solid #38507e;
+  background:rgba(56,224,255,.05); color:#b8c7e0; }
+.skill-md .skill-ul, .skill-md .skill-ol { margin:.2rem 0 .35rem 1.1rem; }
+.skill-md .skill-meta { display:flex; gap:.45rem; font-size:.68rem; color:#8a92a6;
+  border-bottom:1px dashed #1d2740; padding:.1rem 0; }
+.skill-md .skill-meta span { color:#79c0ff; min-width:5rem; text-transform:uppercase; }
+.skill-md .skill-pre { background:#04060a; border:1px solid #1d2740; border-radius:4px;
+  padding:.4rem .5rem; overflow:auto; font-size:.7rem; }
+.skill-md code { background:#121a2b; padding:0 .25rem; border-radius:3px; color:#ffcf7a; font-size:.86em; }
+.vault-pre { max-height:280px; }
+
 .mem-add textarea { width:100%; max-width:none; min-height:48px; font-size:.75rem; }
 .mem-list { list-style:none; padding:0; margin:.3rem 0 0; }
 .mem-list li { display:flex; justify-content:space-between; gap:.4rem; font-size:.74rem;
@@ -541,12 +561,7 @@ button.wlan-queen-btn { background: linear-gradient(135deg,#3a5fd0,#6a3fd0); bor
 .wlan-heat-count { margin-left:auto; color:var(--glow); font-variant-numeric:tabular-nums; }
 
 
-/* ---- Blue Queen ---- */
-.phase-chip.blue { border-color:#2a5a8a; color:#7ec8ff; background:#0a1524; }
-#blue-run-log.feed { background:#0a0d16; border:1px solid #1d2740; padding:.6rem;
-  font-family: ui-monospace, monospace; font-size:.82rem; color:#c9d4e6; }
-
-/* ---- Blue Queen Kolonie ---- */
+/* ---- Blue Queen (eigenständige Ansicht /blue) ---- */
 body.blue-body {
   --blue-glow: #38e0ff;
   --blue-deep: #061018;
@@ -794,3 +809,22 @@ body.blue-body .sc-pb-chip {
 .lg-pill.lg-pass { color:#3fffa3; border-color:#2a5a46; background:#08241a; }
 #blue-ledger-table tr.lg-fail td:first-child { box-shadow: inset 3px 0 0 #ff9f4a; }
 #blue-ledger-table tr.lg-pass td:first-child { box-shadow: inset 3px 0 0 #3fffa3; }
+
+.blue-firstrun{margin:.6rem 0 0;font-size:.82rem;opacity:.85}
+.blue-firstrun a{color:#7fe0ff}
+
+/* Soldaten-Karten (Target): Tools + Oversight-Hinweis je Playbook */
+.pb-tools { display:flex; flex-wrap:wrap; gap:.2rem; margin:.15rem 0 .25rem; }
+.pb-gate { font-size:.66rem; color:#ffcf7a; background:#1d1606; border:1px dashed #6b5420; border-radius:5px; padding:.15rem .4rem; margin:.15rem 0 .25rem; }
+
+/* WLAN-Features: Clients-/Geräte-Tabellen + Geräteklassen-Badges */
+.clients-table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .82rem; }
+.clients-table th, .clients-table td { text-align: left; padding: .3rem .45rem; border-bottom: 1px solid rgba(110,231,255,.12); }
+.clients-table th { color: #7ad0ff; font-weight: 600; }
+.dev-kind { display: inline-block; padding: .1rem .45rem; border-radius: 5px; font-size: .74rem; border: 1px solid; }
+.dev-kind-router { color: #3fffa3; border-color: #1d5c3a; background: #06170e; }
+.dev-kind-repeater { color: #7ad0ff; border-color: #1d4a6b; background: #061019; }
+.dev-kind-iot { color: #ffd166; border-color: #6b5420; background: #191306; }
+.dev-kind-unknown { color: #9aa6c3; border-color: #3a4258; background: #0d1017; }
+.dev-fw-old { color: #ff6b6b; }
+.dev-fw-ok { color: #3fffa3; }

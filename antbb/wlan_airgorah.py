@@ -183,7 +183,7 @@ def airgorah_status(preferred_iface: str = "") -> dict:
         caveats.append(
             "Kein Root und kein NOPASSWD-sudo: Monitor-Mode / Deauth / Capture "
             "können nicht scharf starten – Status wird gemeldet, nichts still "
-            "fehlgeschlagen. Entscheidung: root oder NOPASSWD-sudo für USER.")
+            "fehlgeschlagen. Entscheidung: root oder NOPASSWD-sudo für lordix.")
     if preferred and not mon.get("monitor") and mon.get("exists"):
         caveats.append(
             f"'{preferred}' ist nicht im Monitor-Mode ({mon.get('raw_type') or 'managed'}). "
@@ -234,6 +234,29 @@ def list_clients_honest_empty(iface: str = "", bssid: str = "") -> dict:
         return out
     mon = iface_monitor_mode(iface)
     if not mon.get("monitor"):
+        # Ein-Klick-Modus (Service läuft als Root): Monitor-Mode automatisch
+        # an/aus, NUR passiv mithören (~15 s), dann zurück auf managed.
+        geteuid = getattr(__import__("os"), "geteuid", None)
+        if geteuid is not None and geteuid() == 0:
+            try:
+                from . import wlan_clients as wc
+                res = wc.enumerate_clients(iface, seconds=15, oversight_ok=True)
+                if res.get("ok"):
+                    clients = res.get("clients") or []
+                    if bssid:
+                        clients = [c for c in clients
+                                   if c.get("assoc_bssid", "").lower() == bssid]
+                    return {"iface": iface, "bssid": bssid, "clients": clients,
+                            "tool": "airodump-ng", "honest_empty": not clients,
+                            "monitor": {"monitor": True, "auto": True},
+                            "reason": (f"{len(clients)} Client(s) – passiv ~15 s, "
+                                       f"Monitor-Mode automatisch an/aus (Root). "
+                                       f"Kein Deauth/Injection.")}
+                out["reason"] = f"Auto-Enumeration fehlgeschlagen: {res.get('error')}"
+                return out
+            except Exception as exc:
+                out["reason"] = f"Auto-Enumeration Fehler: {type(exc).__name__}: {exc}"
+                return out
         out["reason"] = (
             f"Interface '{iface}' nicht im Monitor-Mode "
             f"({mon.get('reason') or mon.get('raw_type') or 'managed'}). "

@@ -14,8 +14,8 @@ import threading
 import time
 from typing import Any, Optional
 
-from fastapi import (FastAPI, File, Form, HTTPException, Request, UploadFile,
-                     WebSocket, WebSocketDisconnect)
+from fastapi import (FastAPI, Form, HTTPException, Request, WebSocket,
+                     WebSocketDisconnect)
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -33,7 +33,6 @@ from ..active_oversight import (
 from ..reports import CHAIN_STEPS, ReportDraft, empty_chain
 from ..service import AntBBService
 from ..oauth import OAuthError, TokenStore, provider_from_config
-from .. import telemetry
 
 BASE = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
@@ -336,17 +335,13 @@ def index(request: Request):
         d["scope_count"] = len(svc.list_scopes(t["id"]))
         d["mode"] = svc.mode_status(t["id"])
         targets.append(d)
-    remote_status = svc.remote_full_status()
+    remote_status = svc.remote_status()
     return templates.TemplateResponse(request, "index.html", {
         "targets": targets, "disclaimer": DISCLAIMER_TEXT,
         "archived_count": len(svc.list_archived_targets()),
         "remote": remote_status,
         "remote_steps": svc.remote_setup_steps(remote_status["mode"]),
-        "remote_access_steps": svc.cloudflare_access_setup_steps(
-            (remote_status.get("active_url") or "").replace("https://", "").replace("http://", "").split("/")[0]
-            or "<dein-tunnel-hostname>"),
-        "remote_warp_steps": svc.warp_setup_steps(),
-        "remote_summary": svc.remote_capability_summary(),
+        "active_queen": "red",
     })
 
 
@@ -419,6 +414,17 @@ def brain_page(request: Request):
 
 
 
+def _gb_static_status() -> dict:
+    """Greenbone-Status für den Seitenaufbau OHNE Netz-/Socket-Sondierung (die
+    Karte aktualisiert sich anschließend über /api/blue/greenbone/status)."""
+    try:
+        from .. import greenbone as _gb
+        return _gb.status(probe=False)
+    except Exception as exc:  # defensiv: /blue darf nie an Greenbone scheitern
+        return {"available": False, "error": f"Greenbone nicht verfügbar ({type(exc).__name__})",
+                "message": "", "import_available": True}
+
+
 @app.get("/blue", response_class=HTMLResponse)
 def blue_page(request: Request):
     """Blue Queen – Verteidigungs-Kolonie (Soldaten, Jobs, Splunk-Status)."""
@@ -436,41 +442,66 @@ def blue_page(request: Request):
     blues = cap.get("soldiers") or []
     pb_n = sum(len(s.get("playbooks") or []) for s in blues)
     task_n = sum(((s.get("skill") or {}).get("task_count") or 0) for s in blues)
+    from .. import blue_checks as _bc
+    led = _bc.ledger_load()
+    lst = _bc.ledger_stats(led)
+    _sevrank = {"high": 0, "medium": 1, "low": 2, "info": 3}
     ledger_rows = []
-    lst = {"open_total": 0, "closed_total": 0, "tracked": 0, "updated_at": 0}
-    try:
-        from .. import blue_checks as _bc
-        led = _bc.ledger_load()
-        lst = _bc.ledger_stats(led)
-        _sevrank = {"high": 0, "medium": 1, "low": 2, "info": 3}
-        for cid, e in (led.get("checks") or {}).items():
-            since = e.get("failed_since") if e.get("status") == "fail" else e.get("closed_at")
-            ledger_rows.append({
-                "check_id": cid, "title": e.get("title", cid), "status": e.get("status", "?"),
-                "severity": e.get("severity", "low"), "detail": e.get("last_detail", ""),
-                "since": (_t.strftime("%Y-%m-%d %H:%M", _t.localtime(since)) if since else "—"),
-                "closed_count": int(e.get("closed_count", 0)),
-            })
-        ledger_rows.sort(key=lambda r: (0 if r["status"] == "fail" else 1,
-                                        _sevrank.get(r["severity"], 9), r["check_id"]))
-    except Exception:
-        pass
+    for cid, e in (led.get("checks") or {}).items():
+        since = e.get("failed_since") if e.get("status") == "fail" else e.get("closed_at")
+        ledger_rows.append({
+            "check_id": cid, "title": e.get("title", cid), "status": e.get("status", "?"),
+            "severity": e.get("severity", "low"), "detail": e.get("last_detail", ""),
+            "since": (_t.strftime("%Y-%m-%d %H:%M", _t.localtime(since)) if since else "—"),
+            "closed_count": int(e.get("closed_count", 0)),
+        })
+    ledger_rows.sort(key=lambda r: (0 if r["status"] == "fail" else 1,
+                                    _sevrank.get(r["severity"], 9), r["check_id"]))
     blue_stats = {
         "soldiers": int(cap.get("soldier_count") or len(blues)),
         "playbooks": pb_n,
         "tasks": task_n,
         "jobs": len(jobs),
-        "open": lst.get("open_total", 0),
-        "closed": lst.get("closed_total", 0),
-        "tracked": lst.get("tracked", 0),
+        "open": lst["open_total"],
+        "closed": lst["closed_total"],
+        "tracked": lst["tracked"],
         "updated": (_t.strftime("%Y-%m-%d %H:%M", _t.localtime(lst["updated_at"]))
                     if lst.get("updated_at") else ""),
     }
+    # --- Soldaten-Karten + Phasen-Pipeline (server-seitig, sofort lesbar) ---
+    phase_meta = {
+        "assess": ("Assess", "Bestand & Lage erfassen"),
+        "watch": ("Watch", "Veränderungen beobachten"),
+        "harden": ("Harden", "Konfiguration härten"),
+        "defend": ("Defend", "Erkennen & Täuschen"),
+        "remediate": ("Remediate", "Lücken schließen"),
+        "verify": ("Verify", "Schließung belegen"),
+    }
+    blue_phases = []
+    for ph in (cap.get("blue_phases") or []):
+        _lb, _nt = phase_meta.get(ph, (ph.title(), ""))
+        blue_phases.append({"key": ph, "label": _lb, "note": _nt,
+                            "soldiers": [s for s in blues if ph in (s.get("blue_phases") or [])]})
+    ov_all = cap.get("overrides") or {}
+    for s in blues:
+        ovs = {(o.get("playbook"), o.get("key")): o.get("value")
+               for o in ov_all.get(s.get("name"), [])}
+        done = total = 0
+        for pb in s.get("playbooks") or []:
+            for ti in pb.get("task_items") or []:
+                total += 1
+                v = ovs.get((pb["name"], "task:%s:%s" % (pb["name"], ti["task"])))
+                ti["checked"] = v in ("done", "verifiziert")
+                done += 1 if ti["checked"] else 0
+        s["progress"] = {"done": done, "total": total}
     return templates.TemplateResponse(request, "blue.html", {
         "targets": targets, "jobs": jobs, "job_runs": job_runs,
         "splunk": cap.get("splunk", {}),
         "blue_stats": blue_stats, "ledger_rows": ledger_rows,
+        "blue_soldiers": blues, "blue_phases": blue_phases, "blue_view": True,
+        "gb_status": _gb_static_status(),
         "disclaimer": DISCLAIMER_TEXT,
+        "active_queen": "blue",
     })
 
 
@@ -490,15 +521,29 @@ def api_blue_run(payload: Optional[dict] = None):
     params = {"online": bool(payload.get("online", True))}
     if payload.get("ecosystems"):
         params["ecosystems"] = payload["ecosystems"]
+    depth = str(payload.get("depth") or "light").lower().strip()
+    if depth in ("intensiv", "intensive", "deep", "full"):
+        depth = "intense"
+    if depth not in ("light", "intense"):
+        depth = "light"
+    params["depth"] = depth
+    # Leicht = Assess+Harden; Intensiv = volle Blue-Phasen
+    if depth == "light":
+        phases = ("assess", "harden")
+    else:
+        phases = None
     try:
+        import logging
+        logging.getLogger("antbb.blue").info(
+            "blue run start depth=%s target_id=%s apply_fixes=%s", depth, tid, apply_fixes)
         result = svc.run_blue(target_id=tid, apply_fixes=apply_fixes,
-                              oversight_ack=ack, params=params)
+                              oversight_ack=ack, params=params, phases=phases)
     except OversightError as exc:
         raise HTTPException(403, str(exc))
     except Exception as exc:
         return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
     return JSONResponse({
-        "ok": True, "run_id": result.run_id,
+        "ok": True, "run_id": result.run_id, "depth": depth,
         "finding_count": len(result.findings),
         "closed_count": result.closed_count(),
         "severity": result.by_severity(),
@@ -507,6 +552,54 @@ def api_blue_run(payload: Optional[dict] = None):
                       "status": f.status, "category": f.category,
                       "agent": f.agent} for f in result.findings[:80]],
     })
+
+
+@app.get("/api/blue/findings")
+def api_blue_remediation_findings():
+    from ..remediation_apply import SUPPORTED
+    rows = []
+    for row in svc.list_findings():
+        item = _rowdict(row)
+        if not str(item.get("category", "")).startswith("blue-"):
+            continue
+        evidence = item.get("evidence") or {}
+        if isinstance(evidence, str):
+            import json
+            try:
+                evidence = json.loads(evidence)
+            except json.JSONDecodeError:
+                evidence = {}
+        item["evidence"] = evidence
+        item["can_apply"] = evidence.get("check_id") in SUPPORTED
+        rows.append(item)
+    return JSONResponse({"findings": rows, "supported": sorted(SUPPORTED)})
+
+
+@app.post("/api/blue/findings/{finding_id}/apply")
+def api_blue_remediation_apply(finding_id: int, payload: dict):
+    row = svc.store.get_finding(finding_id)
+    if row is None:
+        raise HTTPException(404, "Finding nicht gefunden")
+    finding = _rowdict(row)
+    if not payload.get("oversight_ack") or not svc.is_confirmed(finding["target_id"]):
+        raise HTTPException(403, "Human Oversight für dieses Target fehlt; Remediation bleibt aus.")
+    from .. import remediation_apply
+    try:
+        result = remediation_apply.apply_fix(finding, payload)
+    except remediation_apply.RemediationError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    if result.get("closed") is True:
+        svc.store.close_finding(finding_id, result["evidence"])
+    evidence = finding.get("evidence") or {}
+    if isinstance(evidence, str):
+        import json
+        evidence = json.loads(evidence)
+    svc.store.add_scan_step(
+        finding["run_id"], "remediation",
+        {"finding_id": finding_id, "check_id": evidence.get("check_id"), **result},
+        phase="remediate", agent="blue-remediation",
+    )
+    return JSONResponse({"finding_id": finding_id, **result})
 
 
 @app.get("/api/blue/jobs")
@@ -575,6 +668,83 @@ def api_blue_softwarescan(online: int = 1):
     return JSONResponse(svc.softwarescan(online=bool(online)))
 
 
+# ---------------- Greenbone / OpenVAS (Blue Queen) ----------------
+@app.get("/api/blue/greenbone/status")
+def api_blue_greenbone_status():
+    """Ehrlicher GVM-Status: nie ein Fehler-500, nie Zugangsdaten."""
+    return JSONResponse(svc.greenbone_status())
+
+
+@app.post("/api/blue/greenbone/import")
+async def api_blue_greenbone_import(request: Request):
+    """Defensiv (ohne Oversight): Report-Import. Multipart `file` ODER JSON
+    {"path": "<Datei unter data/greenbone/>", "target_id": optional}."""
+    from .. import greenbone as _gb
+    ctype = (request.headers.get("content-type") or "").lower()
+    target_id = None
+    try:
+        if ctype.startswith("multipart/"):
+            form = await request.form()
+            up = form.get("file")
+            if up is None or not hasattr(up, "read"):
+                raise HTTPException(400, "Feld 'file' fehlt.")
+            data = await up.read(_gb.MAX_IMPORT_BYTES + 1)
+            if form.get("target_id"):
+                target_id = int(form.get("target_id"))
+            out = svc.greenbone_import(data=data, filename=up.filename or "report.xml",
+                                       target_id=target_id)
+        else:
+            payload = await request.json() if ctype.startswith("application/json") else {}
+            payload = payload if isinstance(payload, dict) else {}
+            if payload.get("target_id") not in (None, ""):
+                target_id = int(payload["target_id"])
+            out = svc.greenbone_import(path=str(payload.get("path") or ""), target_id=target_id,
+                                       min_severity=str(payload.get("min_severity") or "high"))
+    except HTTPException:
+        raise
+    except (_gb.GvmError, ValueError) as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+    if out.get("empty"):
+        return JSONResponse(out, status_code=404)
+    return JSONResponse(out)
+
+
+@app.post("/api/blue/greenbone/scan")
+def api_blue_greenbone_scan(payload: dict):
+    """AKTIV: Scan gegen EIN In-Scope-Ziel. Pflicht: target_id, host und
+    oversight_ack=true (default-deny). Fehlt GVM → ehrlicher 503."""
+    payload = payload or {}
+    ack = payload.get("oversight_ack", payload.get("confirm"))
+    try:
+        tid = int(payload.get("target_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "target_id fehlt (Scope ist default-deny).")
+    try:
+        res = svc.greenbone_scan(
+            tid, str(payload.get("host") or ""), ack is True,
+            scan_config=str(payload.get("scan_config") or ""),
+            wait_seconds=min(int(payload.get("wait_seconds") or 0), 900))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if res.get("ok"):
+        return JSONResponse(res)
+    code = {"oversight": 403, "scope": 403, "target": 400, "config": 400,
+            "unavailable": 503, "credentials": 503, "busy": 429,
+            "rate_limit": 429, "gvm": 502}.get(res.get("reason"), 400)
+    return JSONResponse(res, status_code=code)
+
+
+@app.get("/api/blue/greenbone/scan/{task_id}")
+def api_blue_greenbone_scan_status(task_id: str, fetch: int = 0, target_id: Optional[int] = None):
+    """Lesend: Scan-Status; `fetch=1` holt einen fertigen Report und importiert ihn."""
+    from .. import greenbone as _gb
+    try:
+        res = svc.greenbone_scan_status(task_id, import_report=bool(fetch), target_id=target_id)
+    except (_gb.GvmError, ValueError) as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+    return JSONResponse(res, status_code=200 if res.get("ok") else 502)
+
+
 # ---------------- Form-Handler (HTML) – rufen nur Service-Funktionen ----------------
 @app.post("/target/add")
 def html_add_target(name: str = Form(...), description: str = Form(""),
@@ -637,6 +807,7 @@ async def api_remote_tunnel_start(request: Request):
     {"confirm": true}. Ohne confirm wird NICHTS gestartet/exponiert. Ein
     benannter Tunnel (named=true) liest sein Token nur zur Laufzeit aus
     CLOUDFLARE_TUNNEL_TOKEN (nie gespeichert/geloggt)."""
+    from .. import remote_access as _ra
     try:
         p = await request.json()
         if not isinstance(p, dict):
@@ -649,76 +820,23 @@ async def api_remote_tunnel_start(request: Request):
             {"ok": False, "running": False, "url": "",
              "reason": "Oversight-Bestätigung fehlt (confirm=true erforderlich)."},
             status_code=403)
-    res = svc.start_cloudflare_tunnel(oversight=True, named=bool(p.get("named")))
-    res["status"] = svc.remote_full_status()
+    res = _ra.start_cloudflare_tunnel(oversight=True, named=bool(p.get("named")))
+    # Modus auf cloudflare setzen, damit die Startseite den aktiven Transport zeigt.
+    try:
+        if res.get("ok"):
+            svc.set_remote_mode("cloudflare")
+    except Exception:
+        pass
+    res["status"] = svc.remote_status()
     return JSONResponse(res)
 
 
 @app.post("/api/remote/tunnel/stop")
 def api_remote_tunnel_stop():
     """Stoppt den von antbb verwalteten Cloudflare-Tunnel."""
-    res = svc.stop_cloudflare_tunnel()
-    res["status"] = svc.remote_full_status()
-    return JSONResponse(res)
-
-
-@app.get("/api/remote/full")
-def api_remote_full_status():
-    """Erweiterter Status (Funnel/Access/DNS/WARP/API) – rein lesend, kein Secret."""
-    return JSONResponse(svc.remote_full_status())
-
-
-@app.post("/api/remote/tailscale/up")
-async def api_remote_tailscale_up(request: Request):
-    """Aktiviert Tailscale – NUR mit confirm=true (Oversight)."""
-    try:
-        p = await request.json()
-        if not isinstance(p, dict):
-            p = {}
-    except Exception:
-        p = {}
-    if not bool(p.get("confirm")):
-        return JSONResponse(
-            {"ok": False, "reason": "Oversight-Bestätigung fehlt (confirm=true erforderlich)."},
-            status_code=403)
-    res = svc.enable_tailscale(oversight=True)
-    res["status"] = svc.remote_full_status()
-    return JSONResponse(res)
-
-
-@app.post("/api/remote/tailscale/down")
-async def api_remote_tailscale_down(request: Request):
-    """Trennt Tailscale – NUR mit confirm=true (Oversight)."""
-    try:
-        p = await request.json()
-        if not isinstance(p, dict):
-            p = {}
-    except Exception:
-        p = {}
-    if not bool(p.get("confirm")):
-        return JSONResponse(
-            {"ok": False, "reason": "Oversight-Bestätigung fehlt (confirm=true erforderlich)."},
-            status_code=403)
-    res = svc.disable_tailscale(oversight=True)
-    res["status"] = svc.remote_full_status()
-    return JSONResponse(res)
-
-
-@app.post("/api/remote/tailscale/funnel")
-async def api_remote_tailscale_funnel(request: Request):
-    """Schaltet Tailscale Funnel an/aus – NUR mit confirm=true (Oversight)."""
-    try:
-        p = await request.json()
-        if not isinstance(p, dict):
-            p = {}
-    except Exception:
-        p = {}
-    if not bool(p.get("confirm")):
-        return JSONResponse(
-            {"ok": False, "reason": "Oversight-Bestätigung fehlt (confirm=true erforderlich)."},
-            status_code=403)
-    res = svc.tailscale_funnel(enable=bool(p.get("enable", True)), oversight=True)
-    res["status"] = svc.remote_full_status()
+    from .. import remote_access as _ra
+    res = _ra.stop_cloudflare_tunnel()
+    res["status"] = svc.remote_status()
     return JSONResponse(res)
 
 
@@ -788,7 +906,8 @@ def html_set_mode(target_id: int, mode_policy: str = Form("auto")):
 
 @app.post("/target/{target_id}/scan")
 def html_scan(target_id: int, active: str = Form("off"), fuzz: str = Form("off"),
-              offensive: str = Form("off"), oversight_active: str = Form("off")):
+              offensive: str = Form("off"), oversight_active: str = Form("off"),
+              depth: str = Form("light")):
     """Startet Scan asynchron – Nutzer bleibt in der GUI (Live-Feed).
 
     Das Offensiv-Häkchen (`offensive`) ENGAGIERT den Offensiv-Modus: bei
@@ -799,6 +918,15 @@ def html_scan(target_id: int, active: str = Form("off"), fuzz: str = Form("off")
     """
     a, f, o = (active == "on"), (fuzz == "on"), (offensive == "on")
     ack = oversight_active == "on"
+    depth_norm = (depth or "light").lower().strip()
+    if depth_norm in ("intensiv", "intensive", "deep", "full"):
+        depth_norm = "intense"
+    if depth_norm not in ("light", "intense"):
+        depth_norm = "light"
+    import logging
+    logging.getLogger("antbb.scan").info(
+        "swarm start target=%s depth=%s active=%s fuzz=%s offensive=%s",
+        target_id, depth_norm, a, f, o)
     try:
         # Vorab-Gate: ohne Target-Oversight sofort Fehlerseite
         if not svc.is_confirmed(target_id):
@@ -813,8 +941,9 @@ def html_scan(target_id: int, active: str = Form("off"), fuzz: str = Form("off")
         ack_val = ack if will_engage else None
         if will_engage:
             enforce_active_oversight(ack_val, action="offensiver/aktiver Schwarm-Lauf")
+        phases = ("recon", "scan", "report") if depth_norm == "light" else None
         _start_scan_async(target_id, active=a, fuzz=f, offensive=off,
-                          oversight_ack=ack_val)
+                          oversight_ack=ack_val, phases=phases)
     except OversightError as exc:
         return templates_error(target_id, str(exc))
     except HTTPException as exc:
@@ -1014,7 +1143,14 @@ def api_scan(target_id: int, payload: Optional[dict] = None):
     # "oversight_ack"). Nur relevant, wenn der Lauf aktiv/offensiv wäre.
     ack = payload.get("oversight_active", payload.get("oversight_ack", None))
     phases = payload.get("phases")
-    ph = tuple(phases) if phases else None
+    depth = str(payload.get("depth") or "light").lower().strip()
+    if depth in ("intensiv", "intensive", "deep", "full"):
+        depth = "intense"
+    if depth not in ("light", "intense"):
+        depth = "light"
+    ph = tuple(phases) if phases else (("recon", "scan", "report") if depth == "light" else None)
+    import logging
+    logging.getLogger("antbb.scan").info("swarm api start target=%s depth=%s", target_id, depth)
     try:
         if not svc.is_confirmed(target_id):
             from ..oversight import require_oversight
@@ -1045,6 +1181,34 @@ def api_feed(since: int = 0):
     """Live-Feed ab Index `since` (Polling)."""
     return {"events": LIVE_FEED[since:], "total": len(LIVE_FEED),
             "scan": dict(SCAN_STATE), **_agents_payload()}
+
+
+@app.post("/api/findings/{finding_id}/to-blue")
+def api_finding_to_blue(finding_id: int, payload: Optional[dict] = None):
+    """Red-Finding → Blue Remediate-Job (sichtbare Fix-Brücke)."""
+    payload = payload or {}
+    row = svc.store.get_finding(finding_id)
+    if row is None:
+        raise HTTPException(404, "Finding nicht gefunden")
+    fd = _rowdict(row) if not isinstance(row, dict) else row
+    tid = payload.get("target_id") or fd.get("target_id")
+    title = payload.get("title") or fd.get("title") or f"Finding #{finding_id}"
+    name = f"Fix: {title}"[:80]
+    try:
+        jid = svc.blue_job_create(
+            name=name,
+            kind="remediate",
+            interval_sec=0,
+            target_id=int(tid) if tid is not None else None,
+            params={"finding_id": int(finding_id), "from": "red", "title": title},
+        )
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, status_code=400)
+    import logging
+    logging.getLogger("antbb.bridge").info(
+        "finding %s promoted to blue job %s (target=%s)", finding_id, jid, tid)
+    return JSONResponse({"ok": True, "job_id": jid, "finding_id": finding_id,
+                         "kind": "remediate", "href": "/blue#blue-runs"})
 
 
 @app.get("/api/targets/{target_id}/findings")
@@ -1410,6 +1574,118 @@ def api_wlan_heatmap_floorplan_del(target_id: Optional[int] = None):
     return {"ok": True}
 
 
+# ---------------- WLAN-Grundriss-Schätzung (aus Scan/Survey, passiv) ----------------
+@app.post("/api/wlan/floorplan")
+def api_wlan_floorplan(payload: dict):
+    """Grundriss NÄHERUNGSWEISE aus WLAN-Daten schätzen (APs + RSSI).
+
+    Body: points [{x, y, obs:[{bssid, rssi, ssid}]}] ODER scans [[{bssid, rssi, ssid}]]
+    ODER use_last_scan:true (nutzt den letzten persistierten Scan).
+    Ergebnis wird persistiert und bei Reload wieder angezeigt."""
+    import json as _json
+    from ..wlan_floorplan import (Observation, SurveyPoint, floorplan_from_survey,
+                                  estimate_from_scans_only)
+    threshold = float(payload.get("threshold") if payload.get("threshold") is not None else -75.0)
+
+    points_raw = payload.get("points") or []
+    scans_raw = payload.get("scans") or []
+    if not points_raw and not scans_raw and payload.get("use_last_scan"):
+        raw = svc.store.get_wlan_state("last_scan")
+        if raw:
+            try:
+                observations = _json.loads(raw).get("observations") or []
+                scans_raw = [[o for o in observations if o.get("bssid")]] if observations else []
+            except ValueError:
+                scans_raw = []
+
+    if points_raw:
+        pts = [SurveyPoint(float(p.get("x", 0)), float(p.get("y", 0)),
+                           [Observation(o.get("bssid", ""), float(o.get("rssi", -100)),
+                                        o.get("ssid") or "") for o in (p.get("obs") or [])])
+               for p in points_raw]
+        result = floorplan_from_survey(pts, threshold)
+    elif scans_raw:
+        scans = [[Observation(o.get("bssid", ""), float(o.get("rssi", -100)),
+                              o.get("ssid") or "") for o in scan]
+                 for scan in scans_raw if scan]
+        result = estimate_from_scans_only(scans)
+    else:
+        return JSONResponse({"ok": False,
+                             "error": "keine Survey-Daten (points/scans/letzter Scan)"})
+
+    if result.get("ok"):
+        svc.store.set_wlan_state("floorplan_estimate", _json.dumps(result, ensure_ascii=False))
+    return JSONResponse(result)
+
+
+@app.get("/api/wlan/floorplan")
+def api_wlan_floorplan_last():
+    """Letzte Grundriss-Schätzung (für Reload-Restore)."""
+    import json as _json
+    raw = svc.store.get_wlan_state("floorplan_estimate")
+    if raw:
+        try:
+            return JSONResponse(_json.loads(raw))
+        except ValueError:
+            pass
+    return JSONResponse({"ok": False, "error": "keine Schätzung vorhanden"})
+
+
+# ---------------- WLAN-Client-Enumeration (EIN Klick, passiv, Oversight) ----------------
+@app.post("/api/wlan/clients")
+def api_wlan_clients(payload: dict):
+    """EIN-KLICK: wlan1 in Monitor-Mode, ~20 s passiv mithören, zurück auf managed.
+
+    KEIN Deauth/Injection. Scope default-deny (nur erlaubte BSSIDs + unassoziierte
+    Clients). Oversight-Pflicht; Root direkt oder via sudoers-Wrapper."""
+    oversight_ok = bool(payload.get("oversight_ok"))
+    if not oversight_ok:
+        return JSONResponse({"ok": False, "error":
+            "Human-Oversight erforderlich (Monitor-Mode ist eine aktive Aktion)."})
+    try:
+        seconds = max(5, min(120, int(payload.get("seconds") or 20)))
+    except (TypeError, ValueError):
+        seconds = 20
+    channel = payload.get("channel")
+    try:
+        channel = int(channel) if channel else None
+    except (TypeError, ValueError):
+        channel = None
+    iface = (payload.get("iface") or "wlan1").strip() or "wlan1"
+    return JSONResponse(svc.wlan_enumerate_clients(
+        iface=iface, seconds=seconds, channel=channel, oversight_ok=True))
+
+
+# ---------------- WLAN-Geraete-Erkennung (nmap, read-only) ----------------
+@app.post("/api/wlan/devices")
+def api_wlan_devices(payload: dict):
+    """EIN-KLICK: lokales Subnetz per nmap scannen (read-only), Geraete klassifizieren.
+
+    Erkennt Fritzbox/Router, Repeater/Mesh, IoT; Versionsbanner -> Firmware-Hinweise.
+    Nur private lokale Subnetze (Scope-Regel). Oversight-Pflicht."""
+    import json as _json
+    oversight_ok = bool(payload.get("oversight_ok"))
+    if not oversight_ok:
+        return JSONResponse({"ok": False, "error":
+            "Human-Oversight erforderlich (aktiver Netz-Scan)."})
+    result = svc.wlan_discover_devices(oversight_ok=True)
+    if result.get("ok"):
+        svc.store.set_wlan_state("last_devices",
+                                 _json.dumps(result, ensure_ascii=False))
+    return JSONResponse(result)
+
+
+@app.get("/api/wlan/devices")
+def api_wlan_devices_last():
+    """Letztes Geraete-Scan-Ergebnis (Reload-Restore)."""
+    import json as _json
+    raw = svc.store.get_wlan_state("last_devices")
+    if raw:
+        try:
+            return JSONResponse(_json.loads(raw))
+        except ValueError:
+            pass
+    return JSONResponse({"ok": False, "error": "kein Geraete-Scan vorhanden"})
 
 
 # ---------------- WLAN-OFFENSIV (AUTORISIERT: Engagement-Gate + Oversight) ----------------
@@ -1876,12 +2152,6 @@ async def _on_startup() -> None:
         FEED_HUB.bind_loop(asyncio.get_running_loop())
     except Exception:
         pass
-    # Optionale, anonyme Telemetrie (standardmaessig AUS; siehe antbb/telemetry.py).
-    try:
-        print("[antbb] " + telemetry.status_line())
-        telemetry.start_heartbeat()
-    except Exception:
-        pass
     try:
         svc.store.purge_expired_sessions()
     except Exception:
@@ -2133,13 +2403,33 @@ def _fmt_ts(ts) -> str:
 
 
 @app.get("/api/runs")
-def api_runs(target_id: Optional[int] = None):
+def api_runs(target_id: Optional[int] = None, colony: Optional[str] = None):
+    """Persistente Run-Historie.
+
+    colony=offensive → ohne Blue-Queen-Läufe (für /brain).
+    colony=blue → nur Blue-Queen-Läufe.
+    ohne colony → alles (Historie).
+    Blue Queen hat zusätzlich eigene Job-APIs unter /api/blue/*.
+    """
+    want = (colony or "").strip().lower()
     out = []
     for r in svc.store.list_run_history(target_id):
         d = _rowdict(r)
+        rid = str(d.get("run_id") or "").lower()
+        mode = str(d.get("mode") or "").lower()
+        is_blue = (
+            rid.startswith("blue-") or rid.startswith("blue_")
+            or mode in ("blue", "blue-queen")
+            or str(d.get("colony") or "").lower() == "blue"
+        )
+        if want in ("offensive", "red", "brain") and is_blue:
+            continue
+        if want == "blue" and not is_blue:
+            continue
         d["when"] = _fmt_ts(d.get("created_at"))
         out.append(d)
     return out
+
 
 @app.get("/api/runs/{key}/timeline")
 def api_run_timeline(key: str):
@@ -2300,31 +2590,6 @@ def _export_index() -> list[dict]:
     return items
 
 
-
-
-
-def _export_index() -> list[dict]:
-    import json as _json
-    exports_dir = os.path.join(
-        os.path.dirname(os.path.dirname(BASE)), "data", "exports")
-    items = []
-    try:
-        for name in sorted(os.listdir(exports_dir), reverse=True):
-            fp = os.path.join(exports_dir, name)
-            if not os.path.isfile(fp):
-                continue
-            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-            st = os.stat(fp)
-            items.append({
-                "name": name, "kind": ext or "datei",
-                "size_kb": round(st.st_size / 1024, 1),
-                "when": _fmt_ts(st.st_mtime),
-            })
-    except FileNotFoundError:
-        pass
-    return items
-
-
 @app.get("/api/exports")
 def api_exports():
     return _export_index()
@@ -2361,93 +2626,6 @@ def history_page(request: Request):
     return templates.TemplateResponse(request, "history.html", {
         "runs": runs, "exports": _export_index(), "disclaimer": DISCLAIMER_TEXT,
     })
-
-
-# ======================= Yellow Queen (Reverse Engineering) =======================
-@app.get("/yellow", response_class=HTMLResponse)
-def yellow_page(request: Request):
-    """Gelbe Koenigin - Reverse-Engineering-Kolonie (Soldaten, Proben, Erklaerpfad)."""
-    cap = svc.yellow_capabilities()
-    yellows = cap.get("soldiers") or []
-    uploads = []
-    try:
-        uploads = svc.list_uploads()
-    except Exception:
-        uploads = []
-    yellow_stats = {
-        "soldiers": int(cap.get("soldier_count") or len(yellows)),
-        "playbooks": cap.get("playbook_count", 0),
-        "tasks": cap.get("task_count", 0),
-        "samples": len(uploads),
-    }
-    return templates.TemplateResponse(request, "yellow.html", {
-        "yellow_stats": yellow_stats, "soldiers": yellows,
-        "uploads": uploads, "phases": cap.get("yellow_phases", []),
-        "disclaimer": DISCLAIMER_TEXT,
-    })
-
-
-@app.get("/yellow/upload", response_class=HTMLResponse)
-def yellow_upload_page(request: Request):
-    """Upload-Ansicht fuer RE-Proben (read-only, lokal gespeichert)."""
-    try:
-        uploads = svc.list_uploads()
-    except Exception:
-        uploads = []
-    return templates.TemplateResponse(request, "yellow_upload.html", {
-        "uploads": uploads, "disclaimer": DISCLAIMER_TEXT,
-    })
-
-
-@app.post("/yellow/upload")
-async def yellow_upload_post(file: UploadFile = File(...)):
-    """Nimmt eine RE-Probe entgegen und speichert sie read-only unter data/uploads."""
-    data = await file.read()
-    if not data:
-        raise HTTPException(400, "Leere Datei.")
-    if len(data) > 64 * 1024 * 1024:
-        raise HTTPException(413, "Probe zu gross (max 64 MiB).")
-    info = svc.save_upload(file.filename or "sample", data)
-    return JSONResponse({"ok": True, **info})
-
-
-@app.get("/yellow/brain", response_class=HTMLResponse)
-def yellow_brain_page(request: Request):
-    """Gelber Anteil am gemeinsamen Neural Brain (derselbe Brain, eingefaerbt)."""
-    return templates.TemplateResponse(request, "brain.html", {
-        "disclaimer": DISCLAIMER_TEXT, "colony": "yellow",
-    })
-
-
-@app.get("/api/yellow")
-def api_yellow():
-    return JSONResponse(svc.yellow_capabilities())
-
-
-@app.post("/api/yellow/run")
-def api_yellow_run(payload: Optional[dict] = None):
-    payload = payload or {}
-    sample = payload.get("sample") or payload.get("sample_path")
-    deep = bool(payload.get("deep"))
-    ack = payload.get("oversight_ack")
-    if ack is not None:
-        ack = bool(ack)
-    try:
-        result = svc.run_yellow(sample_path=sample, deep=deep, oversight_ack=ack)
-    except OversightError as exc:
-        raise HTTPException(403, str(exc))
-    except Exception as exc:
-        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
-    return JSONResponse({
-        "ok": True, "run_id": result.run_id,
-        "finding_count": len(result.findings),
-        "severity": result.by_severity(),
-        "status": result.by_status(),
-        "findings": [{"title": f.title, "severity": f.severity,
-                      "status": f.status, "category": f.category,
-                      "agent": f.agent} for f in result.findings[:80]],
-    })
-
 
 
 # ---------------- Routen-Reihenfolge: literale /api/brain/*-Pfade zuerst ----------------

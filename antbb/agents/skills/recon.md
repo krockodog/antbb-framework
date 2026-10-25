@@ -64,10 +64,10 @@ You are the reconnaissance expert of this offensive-security swarm, trained on t
 ## Hinterlegter Scope (Octogent Deck)
 
 **Erlaubte Ziele:**
-- https://shop.example.com/de/
-- https://demo.example.com/
-- https://shop.example.com/
-- https://engagement.example.com/
-- https://app.example.com/
+- https://partybrueller.de/de/
+- https://spassprofi.de/
+- https://scherzartikel-onlineshop.de/
+- https://dc-infosec.de/
+- https://carescribe.de/
 
-**Tags:** pentest, recon, example-shop, example-demo, example-engagement, example-app
+**Tags:** pentest, recon, partybrueller, spassprofi, dc-infosec, carescribe

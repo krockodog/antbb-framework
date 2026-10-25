@@ -40,8 +40,10 @@ class RemediationAnt(BlueAgent):
                         "dedup_key": f.key(), "evidence": f.evidence,
                         "severity": f.severity})
         # Nur remedierbare Kategorien.
-        remediable = {"blue-hardening-gap", "blue-outdated-software"}
-        return [f for f in out if f.get("category") in remediable]
+        return [f for f in out
+                if f.get("category") == "blue-outdated-software"
+                or (str(f.get("category", "")).startswith("blue-")
+                    and str(f.get("category", "")).endswith("-gap"))]
 
     async def work(self, task: Task) -> list[AgentFinding]:
         findings: list[AgentFinding] = []
