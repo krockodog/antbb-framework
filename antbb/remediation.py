@@ -12,6 +12,7 @@ oversight-gated Schritt außerhalb dieses Moduls.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -126,6 +127,27 @@ def verify_closed(finding: dict) -> RemediationStep:
                 return step
         step.closed = None
         step.evidence = {"reason": f"Check '{check_id}' nicht auffindbar."}
+        return step
+
+    if cat == "blue-av-infection":
+        path = str(ev.get("path") or "")
+        step.verify_method = ("Pfad erneut prüfen: GESCHLOSSEN nur bei ClamAV-clean "
+                              "oder belegtem Quarantäne-Move.")
+        if not path:
+            step.closed = None
+            step.evidence = {"reason": "Kein Pfad im AV-Finding."}
+            return step
+        from . import quarantine as _q
+        rec = _q.recheck_original(
+            path,
+            scope_check=lambda asset, _path=path: os.path.abspath(str(asset)) == os.path.abspath(_path),
+        )
+        if rec.get("status") == "unavailable":
+            step.closed = None
+        else:
+            step.closed = True if rec.get("closed") else False
+        step.evidence = {"before": rec.get("before"), "after": rec.get("after"),
+                         "recheck_status": rec.get("status"), "detail": rec.get("reason")}
         return step
 
     if cat == "blue-outdated-software":

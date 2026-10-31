@@ -34,10 +34,12 @@ STATUS_TO_CONFIRM = "ZU BESTÄTIGEN"
 STATUS_CONDITIONAL = "BEDINGT"
 #: Fremd-CVE / Muster / Hypothese (Referenz, kein eigener Nachweis).
 STATUS_REFERENCE = "REFERENZ"
+#: Nach Re-Check geschlossen (Blue). Kein Ersatz für VERIFIZIERT.
+STATUS_CLOSED = "GESCHLOSSEN"
 
 ALL_STATUSES = frozenset({
     STATUS_VERIFIED, STATUS_PASSIVE, STATUS_TO_CONFIRM,
-    STATUS_CONDITIONAL, STATUS_REFERENCE,
+    STATUS_CONDITIONAL, STATUS_REFERENCE, STATUS_CLOSED,
 })
 
 #: Evidence-Schlüssel, die einen echten Request belegen.

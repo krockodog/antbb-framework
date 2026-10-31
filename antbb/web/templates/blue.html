@@ -107,7 +107,7 @@
       {% for ph in blue_phases %}<button type="button" class="bq-chip" data-filter-phase="{{ ph.key }}">{{ ph.label }}</button>{% endfor %}
     </div>
   </div>
-  {% set icons = {'swscan':'🔎','patchmgmt':'🩹','hardening':'🧱','fwaudit':'🔥','idhygiene':'🪪','tlsposture':'🔐','defense':'📡','logintegrity':'📜','honeypot':'🍯','backupverify':'💾','remediation':'🩺','vulnticket':'🎫','ticketclose':'✅','incident':'🚨','watcher':'👁','netdef':'🕸','webharden':'🧰','credhygiene':'🗝','logging':'🗒','supplychain':'📦','patchverify':'🧪','greenbone':'🌿'} %}
+  {% set icons = {'swscan':'🔎','av':'🧪','patchmgmt':'🩹','hardening':'🧱','fwaudit':'🔥','idhygiene':'🪪','tlsposture':'🔐','defense':'📡','logintegrity':'📜','honeypot':'🍯','backupverify':'💾','remediation':'🩺','vulnticket':'🎫','ticketclose':'✅','incident':'🚨','watcher':'👁','netdef':'🕸','webharden':'🧰','credhygiene':'🗝','logging':'🗒','supplychain':'📦','patchverify':'🧪','greenbone':'🌿'} %}
   <div id="blue-soldier-cards" class="bq-grid">
   {% for s in blue_soldiers %}
     {% set key = s.name|replace('blue-','') %}

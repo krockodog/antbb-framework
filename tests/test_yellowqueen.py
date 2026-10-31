@@ -1,4 +1,15 @@
-"""Smoke-Tests der Gelben Königin (Reverse-Engineering-Kolonie)."""
+"""Smoke-Tests der Gelben Königin (Reverse-Engineering-Kolonie).
+
+antbb.agents.yellow wurde in Commit 8397411 entfernt. Die Datei wird
+übersprungen, statt Yellow-Soldaten neu zu erfinden.
+"""
+import pytest
+
+pytest.skip(
+    "antbb.agents.yellow wurde in 8397411 entfernt; Yellow-Soldaten werden nicht neu erfunden.",
+    allow_module_level=True,
+)
+
 import hashlib
 import os
 import tempfile
