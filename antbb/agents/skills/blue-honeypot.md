@@ -1,6 +1,6 @@
 ---
 name: skill-blue-honeypot
-description: "Sichere Honeypot-/Decoy-Rezepte als Playbook. Start default-deny, nur mit Oversight (Scaffold: nichts gestartet)."
+description: "Decoy-Rezepte lesend. Deploy startet einen Loopback-Canary (HTTP/SSH-Banner) nur mit Oversight und Scope. Cowrie wird nicht installiert."
 version: 1.0.0
 colony: blue
 license: MIT

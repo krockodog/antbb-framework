@@ -24,7 +24,7 @@ from typing import Optional
 from . import proofgate as _pg
 from .agents.base import (
     AgentFinding, STATUS_VERIFIED, STATUS_PASSIVE, STATUS_TO_CONFIRM,
-    STATUS_CONDITIONAL, STATUS_REFERENCE,
+    STATUS_CONDITIONAL, STATUS_REFERENCE, STATUS_CLOSED,
 )
 
 # --- Gewichte (Single Source of Truth für Rating UND Heatmap) ---
@@ -35,6 +35,7 @@ STATUS_MULT = {
     STATUS_TO_CONFIRM: 0.5,
     STATUS_CONDITIONAL: 0.4,
     STATUS_REFERENCE: 0.25,
+    STATUS_CLOSED: 0.0,
     "": 0.5,
 }
 
@@ -225,7 +226,7 @@ def build_heatmap(findings: list[AgentFinding]) -> dict:
                   for d in DIMENSIONS}
     # Dimension × Status
     statuses = (STATUS_VERIFIED, STATUS_PASSIVE, STATUS_TO_CONFIRM,
-                STATUS_CONDITIONAL, STATUS_REFERENCE)
+                STATUS_CONDITIONAL, STATUS_REFERENCE, STATUS_CLOSED)
     status_matrix = {d: {st: {"count": 0, "risk": 0.0} for st in statuses}
                      for d in DIMENSIONS}
 

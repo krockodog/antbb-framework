@@ -1,14 +1,16 @@
-"""Blue-Soldat: Hardening-Audit (CIS-artig, read-only).
+"""Blue-Soldat: Hardening-Audit und reversibles Apply.
 
-Prüft lokale System-/Dienst-Konfiguration rein lesend und liefert je Check
-einen konkreten Fix-VORSCHLAG. Anwenden eines Fixes ist non-default und nur
-mit Oversight-Freigabe (ctx.active) erlaubt – dieser Soldat führt KEINE
-verändernden Kommandos aus (Scaffold: Fix-Apply ist dokumentiert/gated).
+Der Audit bleibt lesend. In der Phase `harden` werden mit Oversight und
+Scope die bereits kodierten Schritte angewandt (SSH PasswordAuthentication,
+sysctl, Firewall-Bind auf riskante Wildcard-Ports) und danach neu geprüft.
+Ohne Freigabe wird nichts verändert.
 """
 from __future__ import annotations
 
 from .base import BlueAgent, AgentFinding, Playbook, Task
 from ... import hardening as _hd
+from ... import hardening_apply as _ha
+from ...active_oversight import ACTIVE_LEGAL_NOTICE
 
 
 class HardeningAnt(BlueAgent):
@@ -25,8 +27,13 @@ class HardeningAnt(BlueAgent):
                  "Kernel-sysctl) mit Fix-Empfehlung je Befund."),
         Playbook("hardening-apply", "defensive", True,
                  ["apply-recommended-fix"],
-                 "Anwenden einer empfohlenen Härtung – NUR mit Oversight-"
-                 "Freigabe (default-deny, Scaffold/dokumentiert)."),
+                 "SSH-Passwortlogin, sysctl und Firewall-Bind reversibel "
+                 "anwenden – nur mit Oversight und Scope, danach Re-Check.",
+                 tasks=["Oversight und Scope prüfen",
+                        "PasswordAuthentication no (Drop-in, mit Backup)",
+                        "sysctl-Drop-in setzen",
+                        "Riskante Ports per ufw an localhost binden",
+                        "Re-Check: GESCHLOSSEN nur bei pass"]),
     )
 
     async def work(self, task: Task) -> list[AgentFinding]:
@@ -59,8 +66,49 @@ class HardeningAnt(BlueAgent):
                 dedup_key=f"blue-hardening:{r.check_id}",
             ))
 
-        if self.active_allowed():
-            self.ctx.log("[blue-hardening] ⚠️ Fix-Apply freigegeben (Oversight) – "
-                         "im Scaffold werden Fixes dokumentiert, NICHT automatisch "
-                         "ausgeführt (bewusst konservativ).")
+        if task.phase != "harden" or not self.playbook_enabled("hardening-apply"):
+            return findings
+        if not self.active_allowed():
+            self.ctx.log("[blue-hardening] Fix-Apply nicht ausgeführt "
+                         "(Oversight fehlt, default-deny).")
+            return findings
+        params = task.params or {}
+        runner = params.get("remediation_runner")
+        recheck = params.get("remediation_recheck")
+        self.ctx.log(f"⚖ {ACTIVE_LEGAL_NOTICE}")
+        actions = _ha.apply_reversible(
+            results, active=True, scope_check=self.ctx.scope_check,
+            runner=runner if callable(runner) else None,
+            recheck=recheck if callable(recheck) else None,
+            params={k: v for k, v in params.items()
+                    if k not in ("remediation_runner", "remediation_recheck")},
+        )
+        for action in actions:
+            closed = bool(action.get("closed"))
+            check_id = action.get("check_id")
+            if closed:
+                for finding in findings:
+                    ev = finding.evidence or {}
+                    if ev.get("check_id") == check_id and finding.category == "blue-hardening-gap":
+                        finding.status = "GESCHLOSSEN"
+                        finding.category = "blue-remediation-verified"
+                        finding.severity = "info"
+                        finding.title = "[GESCHLOSSEN] " + finding.title
+                        ev["before"] = "fail"
+                        ev["after"] = action.get("evidence")
+                        ev["closed"] = True
+                        ev["commands"] = action.get("commands")
+                        ev["backups"] = action.get("backups")
+            findings.append(AgentFinding(
+                agent=self.name,
+                title=f"[{action.get('status')}] Härtung {check_id}",
+                category="blue-remediation-verified" if closed else "blue-hardening-apply",
+                severity="info", asset="localhost",
+                description=action.get("reason") or "",
+                evidence=action.get("evidence") or {"check_id": check_id, "closed": closed},
+                status="GESCHLOSSEN" if closed else (
+                    "REFERENZ" if action.get("status") == "denied" else "ZU BESTÄTIGEN"),
+                dedup_key=f"blue-hardening-apply:{check_id}",
+            ))
+            self.ctx.log(f"[blue-hardening] Apply {check_id}: {action.get('status')}")
         return findings
