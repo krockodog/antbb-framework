@@ -9,13 +9,14 @@
 ## Inhalt
 
 1. [Das Konzept](#das-konzept)
-2. [Screenshots](#screenshots)
-3. [Alle Menüpunkte im Detail](#alle-menüpunkte-im-detail)
-4. [Architektur](#architektur)
-5. [Installation](#installation)
-6. [Betrieb](#betrieb)
-7. [Leitplanken & Sicherheitsmodell](#leitplanken--sicherheitsmodell)
-8. [Roadmap](#roadmap)
+2. [Leistungsübersicht](#leistungsübersicht)
+3. [Screenshots](#screenshots)
+4. [Alle Menüpunkte im Detail](#alle-menüpunkte-im-detail)
+5. [Architektur](#architektur)
+6. [Installation](#installation)
+7. [Betrieb](#betrieb)
+8. [Leitplanken & Sicherheitsmodell](#leitplanken--sicherheitsmodell)
+9. [Roadmap](#roadmap)
 
 ---
 
@@ -34,6 +35,20 @@ Die Kette im Betrieb: **Red** beweist den Angriffspfad → **Yellow** verifizier
 
 ---
 
+
+## Leistungsübersicht
+
+Was auf der Plattform orchestriert und gebaut wurde — **hauptsächlich von Mr. bugbouty** (Ameisen-BugBounty-Plattform · Red Queen), unter Judiths Oversight:
+
+- **🔴 Red** — offensive Tests im engen Scope: 5-Phasen-Pipeline (Recon → Assessment → Exploitation → Post-Ex → Reporting), 18 Soldaten, Proof-Gate, Fix-Brücke nach Blau; `mode_policy` auto mit Scope + Human Oversight.
+- **🛡 Blue** — Safety / Defensive: Assess → Harden → Defend → Remediate → Verify; 25 Soldaten (Greenbone, Hardening, Watcher, AV/ClamAV, Remediation mit Vorher/Nachher, Re-Check).
+- **🟡 Yellow** — Reverse Engineering: Fall-Pipeline mit echten Artefakten, 9 RE-Soldaten (triage/pe/dotnet/android/elf/hex/carve/dos/dynamic), Ghidra/ghidra-mcp, Next-Steps aus echten Funden.
+- **📡 WLAN · Geräte** — Scope / Coverage & Scan / Heatmap / Offensiv; Live-USB-Erkennung (Flipper, ESP/Spiel High, D-Autor); Geräte-Fähigkeitskatalog inkl. „Was passiert“ + Blue-Schutz; ESP32-Firmware-Profile (Ghost / Marauder / Bruce, Flash nur gated).
+- **🧠 UI / Plattform** — All-and-One-Hub auf `:1001`, Queen-Seiten same-origin, Neural Brain, Historie/Zeitraffer, Zurück-Button, Undo für Scope/Target ohne Oversight-Bypass.
+
+Harte Leitplanken überall: Scope **default-deny**, Oversight-Pflicht für Aktives, nicht destruktiv, keine Secrets im Repo (Keys nur zur Laufzeit).
+
+---
 ## Screenshots
 
 ### Hub (`/`)
@@ -70,6 +85,19 @@ Run-Historie aller Königinnen — inklusive Zeitraffer (Lauf auswählen, abspie
 WLAN-Scope, Coverage & Scan, Heatmap, Offensiv/Airgorah (Engagement-Gate) — plus Bluetooth/BLE- und IoT-Lab-Karten (passiv frei, aktiv nur mit Oversight, Kette Red→Yellow→Blue).
 
 ![WLAN · BT · IoT](docs/screenshots/shot-wlan.jpg)
+
+#### WLAN-Tabs einzeln
+| Tab | Bild |
+|---|---|
+| Scope | ![WLAN Scope](docs/screenshots/shot-wlan-scope.jpg) |
+| Coverage & Scan | ![WLAN Coverage](docs/screenshots/shot-wlan-coverage.jpg) |
+| Heatmap | ![WLAN Heatmap](docs/screenshots/shot-wlan-heatmap.jpg) |
+| Offensiv/Airgorah | ![WLAN Offensiv](docs/screenshots/shot-wlan-offensive.jpg) |
+
+### Königinnen einzeln (Sprites)
+![Rote Königin](docs/screenshots/queen-red.png)
+![Blaue Königin](docs/screenshots/queen-blue.png)
+![Gelbe Königin](docs/screenshots/queen-yellow.png)
 
 ---
 
