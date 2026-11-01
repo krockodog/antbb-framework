@@ -1,8 +1,68 @@
-# All and One — RED · BLUE · Yellow · Ant-Team
+# All and One - RED-BLUE-Yellow-Ant-Team
+
+![Python](docs/images/badges/python.svg) ![FastAPI](docs/images/badges/fastapi.svg) ![three.js](docs/images/badges/three.svg) ![MIT](docs/images/badges/license.svg) ![§202a-c](docs/images/badges/legal.svg) ![Scope](docs/images/badges/oversight.svg)
 
 **Orchestrierte Ameisenfarmen** — eine Plattform, drei Königinnen: Bug Bounty & Pentest (Red), Schutz & Hardening (Blue), Reverse Engineering (Yellow). Ein Framework, ein Prozess, eine Adresse.
 
 > Unbefugtes Ausspähen, Abfangen oder Vorbereiten von Angriffen auf Daten ist strafbar (§ 202a–c StGB; im US-Kontext der CFAA). Dieser Hinweis ersetzt kein Oversight. Aktive Arbeit läuft nur mit gesetztem Häkchen und einem konkreten Ziel auf der Allowlist. Dieser Schwarm führt keine Angriffe aus.
+
+---
+
+## Die drei Königinnen
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/images/red-queen.png" alt="Rote Königin" width="100%"><br><b>🔴 Rote Königin</b><br><sub>Herrscherin des Schwarms</sub></td>
+<td align="center" width="33%"><img src="docs/images/blue-queen.png" alt="Blaue Königin" width="100%"><br><b>🛡 Blaue Königin</b><br><sub>Schutz &amp; Hardening</sub></td>
+<td align="center" width="33%"><img src="docs/images/yellow-queen.png" alt="Gelbe Königin" width="100%"><br><b>🟡 Gelbe Königin</b><br><sub>Schmiedin · Reverse Engineering</sub></td>
+</tr>
+<tr valign="top">
+<td>
+
+**Können**
+- Bug Bounty &amp; Pentest im engen Scope
+- 5-Phasen-Pipeline
+- Findings mit Proof-Gate
+- Fix-Brücke „In Blau reparieren“
+- Optional: PDF-Report, interactsh-OOB, Metasploit nur `auxiliary/scanner`
+
+</td>
+<td>
+
+**Können**
+- 6-Phasen-Pipeline (Assess → Watch → Harden → Defend → Remediate → Verify)
+- read-only als Standard
+- Greenbone/OpenVAS (Import + Scan im Scope)
+- Posture-Ledger, SIEM, Remediation mit Vorher/Nachher-Evidence
+
+</td>
+<td>
+
+**Können**
+- Samples: EXE/DLL/APK/ELF/HEX
+- RE-Pipeline (Triage → Identifikation → Entpacken → Static → Dynamic → Dossier)
+- Upload nur mit Autorisierungs- und Oversight-Gate
+- Tool-Doctor
+
+</td>
+</tr>
+</table>
+
+Auf `/red`, `/blue` und `/yellow` steht jede Königin als 3D-Modell (Lazy-Viewer, 2D-Fallback ohne WebGL).
+
+## Der Späher im WLAN
+
+<p align="center"><img src="docs/images/wlan-scout.png" alt="Späher im Funk-Labor" width="70%"></p>
+
+Im Funk-Labor (`/wlan`) erkundet der Späher WLAN-Scope, Coverage und Heatmap. Passiv ist frei, aktiv nur mit Engagement-Gate und Oversight.
+
+## Die Ameisenstadt – unser neuronales Gedächtnis
+
+<p align="center"><img src="docs/images/brain-city.png" alt="3D-Ameisenstadt mit Pheromonspuren" width="100%"></p>
+
+Das Neuronale Gehirn (`/brain`) zeigt die 3D-Ameisenstadt, lokal eingebettet ohne CDN. In der Mitte thront die Rote Königin, vor ihr kniet der Späher und um sie herum steht ihr rotes Volk. Links steht das blaue Volk, rechts das gelbe. Feine Pheromonspuren verbinden die Soldaten und verblassen langsam. Die Kenntnis-Zeichen zeigen echte Namen und Skills aus `/api/soldiers`.
+
+<p align="center"><img src="docs/images/brain-city-capital.png" alt="Hauptstadt mit Thron der Roten Königin" width="100%"></p>
 
 ---
 
