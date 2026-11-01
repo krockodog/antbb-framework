@@ -71,6 +71,12 @@ WLAN-Scope (Allowlist), Coverage & Scan (passiv und Königin-Voll-Scan mit rein 
 
 **Späher (Scout):** Im Tab *Coverage & Scan* zeigt `/wlan` den WLAN-Späher als 3D-Modell (`queen-viewer.js`, Modell `archer.glb`) neben dem Königin-Voll-Scan und den erkannten Geräten. Ohne WebGL erscheint statt des Modells nur der Text-Hinweis „WebGL nicht verfügbar“ (Text-Fallback).
 
+| Späher |
+|---|
+| ![Späher](docs/screenshots/scout.png) |
+
+*Echter Render des Späher-Modells (`archer.glb`) aus `queen-viewer.js`, im selben Stil wie die Königinnen.*
+
 ![WLAN-Späher auf /wlan](docs/images/wlan-scout.png)
 
 Erkannte Geräte im Funk-Labor:
@@ -100,6 +106,8 @@ Erkannte Geräte im Funk-Labor:
 
 Route `/blue`. 25 Soldaten (Greenbone, Hardening, Watcher, AV/ClamAV, Remediation, Re-Check).
 
+> **Betriebsstand (Bestandsaufnahme 01.11.2026):** Greenbone ist eingebaut, auf dem Referenz-Laptop läuft der Dienst aber nicht (gvmd/Socket und `python-gvm` fehlen) – der Report-Import aus Datei funktioniert. Der ClamAV-Scan ist echt; `freshclam` und `clamd` laufen dort nicht als Dienst. Canary/Fallen sind echt, lauschen aber nur auf Loopback und sind flüchtig.
+
 ![Blue Queen – Seitenkopf](docs/images/blue-queen.png)
 
 ![Blue Queen](docs/screenshots/shot-heute-blue.jpg)
@@ -116,6 +124,8 @@ Route `/blue`. 25 Soldaten (Greenbone, Hardening, Watcher, AV/ClamAV, Remediatio
 ## Yellow Queen – Reverse Engineering
 
 Route `/yellow`. 9 RE-Soldaten (triage, pe, dotnet, android, elf, hex, carve, dos, dynamic), Ghidra/ghidra-mcp.
+
+> **Betriebsstand (Bestandsaufnahme 01.11.2026):** Die normale Fall-Pipeline ist echt (`file`, `strings`, `readelf`, `rizin`, Live-JSONL). Die Orchestrate-Schritte haben derzeit einen Pfadfehler (`orchestrator.py`: `DATA_DIR/cases` statt `CASES_DIR/<id>/evidence`); `analyzeHeadless` (Ghidra headless), `capa` und `floss` sind auf dem Referenzsystem nicht installiert.
 
 ![Yellow Queen – Seitenkopf](docs/images/yellow-queen.png)
 
@@ -296,6 +306,12 @@ Danach im Browser: `http://<host>:1001` — Hub → Königin wählen → Ziel an
 ## Roadmap
 
 Offene Punkte (noch nicht umgesetzt):
+
+- **Yellow:** Pfadfix in den Orchestrate-Schritten und Ghidra headless (`analyzeHeadless`) anbinden.
+- **Persistenter Honeypot** mit Speicherung in `attack_events`.
+- **Manipulationssicheres Audit-Log** (`/audit`).
+- **Greenbone-Dienst** betriebsbereit machen (gvmd, `python-gvm`).
+- **Watcher-Event-Quelle** (auditd) für die Blue Queen.
 
 - **3D-Gebäude je Wissensstufe:** Die Ausbaustufe wird bereits berechnet und angezeigt; die passenden Gebäude in der 3D-Stadt fehlen noch.
 - **Schaufenster-/Demo-Version ohne Backend:** statische Vorschau der Oberfläche ohne laufenden Server.
