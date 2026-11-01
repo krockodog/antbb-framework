@@ -101,6 +101,18 @@ WLAN-Scope, Coverage & Scan, Heatmap, Offensiv/Airgorah (Engagement-Gate) — pl
 
 ---
 
+
+### Aktueller Stand (heute neu aufgenommen)
+Frisch erzeugte Screenshots vom laufenden `:1001` (nicht die alten vom 25.10.):
+
+| Ansicht | Bild |
+|---|---|
+| 🔴 Red Queen | ![Red heute](docs/screenshots/shot-heute-red.jpg) |
+| 🛡 Blue Queen | ![Blue heute](docs/screenshots/shot-heute-blue.jpg) |
+| 🟡 Yellow Queen | ![Yellow heute](docs/screenshots/shot-heute-yellow.jpg) |
+| 📡 WLAN-Späher (erkannte Geräte) | ![WLAN heute](docs/screenshots/shot-heute-wlan.jpg) |
+
+---
 ## Alle Menüpunkte im Detail
 
 Die Menüleiste ist auf **allen** Seiten identisch:
