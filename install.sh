@@ -71,6 +71,12 @@ have() { command -v "$1" >/dev/null 2>&1; }
 RED_TOOLS="nmap httpx nuclei whatweb sslscan"
 BLUE_TOOLS="openssl ss ufw sha256sum"
 YELLOW_TOOLS="file strings nm objdump readelf radare2 binwalk apktool jadx unzip"
+# Optionale Scan-/Report-Tools (Monatslauf-Lücken): PDF-Engine, OOB/OAST, Metasploit.
+# Fehlen sie, degradiert antbb EHRLICH (HTML statt PDF, "nur Indikator" statt OOB-Nachweis,
+# Skip statt Fake bei msfconsole). Nichts wird vorgetäuscht.
+REPORT_TOOLS="wkhtmltopdf"          # Alternative zur Python-Engine weasyprint
+OOB_TOOLS="interactsh-client"       # OOB/OAST-Verifikation blinder Funde (SSRF/RCE/XXE)
+MSF_TOOLS="msfconsole"              # Metasploit – NUR auxiliary/scanner (hart allowlisted)
 
 check_group() {
   # $1 = Label, $2 = tool list (durch Leerzeichen getrennt) ; MISSING = Anzahl fehlend
@@ -103,6 +109,17 @@ doctor() {
   check_group "Blaue Koenigin (Schutz/Hardening)"  "$BLUE_TOOLS";   blue_missing=$MISSING
   check_group "Gelbe Koenigin (Reverse Eng.)"      "$YELLOW_TOOLS"; yellow_missing=$MISSING
 
+  say "Doctor · Scan-/Report-Tools (optional, ehrlicher Fallback)"
+  if python3 -c "import weasyprint" >/dev/null 2>&1; then
+    ok "PDF-Engine: weasyprint (Python) vorhanden"
+  elif have wkhtmltopdf; then
+    ok "PDF-Engine: wkhtmltopdf vorhanden"
+  else
+    warn "keine PDF-Engine (weasyprint/wkhtmltopdf) – Reports fallen ehrlich auf HTML zurueck"
+  fi
+  if have interactsh-client; then ok "OOB/OAST: interactsh-client vorhanden";     else warn "interactsh-client fehlt – blinde Funde bleiben ehrlich 'nur Indikator'"; fi
+  if have msfconsole; then ok "Metasploit: msfconsole vorhanden (nur auxiliary/scanner)";     else warn "msfconsole fehlt – Metasploit-Checks werden ehrlich uebersprungen (kein Fake)"; fi
+
   say "Doctor · Bilanz"
   printf '  Red fehlend: %s · Blue fehlend: %s · Yellow fehlend: %s\n' \
     "$red_missing" "$blue_missing" "$yellow_missing"
@@ -118,6 +135,38 @@ install_tools() {
   sudo apt-get update -y && sudo apt-get install -y \
     binutils file radare2 binwalk unzip openssl python3-venv python3-pip \
     || warn "Einige Pakete konnten nicht installiert werden (fortfahren)."
+
+  # --- Scan-/Report-Tools (optional) ---------------------------------------
+  # PDF-Engine: weasyprint (Python) braucht System-Bibliotheken (Pango/Cairo).
+  say "Optionale PDF-Engine (weasyprint + Systembibliotheken)"
+  sudo apt-get install -y \
+    libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libffi-dev \
+    || warn "weasyprint-Systembibliotheken unvollstaendig – ggf. wkhtmltopdf nutzen."
+  # weasyprint selbst wird ins venv installiert (siehe ensure_venv/requirements).
+  # Alternative Engine ohne Python-Deps:
+  if ! have wkhtmltopdf; then
+    sudo apt-get install -y wkhtmltopdf || warn "wkhtmltopdf optional – uebersprungen."
+  fi
+
+  # OOB/OAST: interactsh-client (ProjectDiscovery, Go-Binary).
+  if ! have interactsh-client; then
+    if have go; then
+      say "Installiere interactsh-client via go install"
+      GOBIN="${HOME}/.local/bin" go install github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest \
+        || warn "interactsh-client Go-Build fehlgeschlagen – OOB bleibt 'nur Indikator'."
+    else
+      warn "interactsh-client fehlt und 'go' ist nicht installiert."
+      warn "  Option A: apt-get install -y golang-go && GOBIN=~/.local/bin go install github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
+      warn "  Option B: Release-Binary von https://github.com/projectdiscovery/interactsh/releases nach ~/.local/bin legen."
+    fi
+  fi
+
+  # Metasploit (msfconsole): grosses Paket; NUR auxiliary/scanner-Module werden genutzt.
+  if ! have msfconsole; then
+    warn "Metasploit (msfconsole) nicht installiert – Metasploit-Checks werden ehrlich uebersprungen."
+    warn "  Kali/Debian:  sudo apt-get install -y metasploit-framework"
+    warn "  Sonst:        https://docs.metasploit.com/docs/using-metasploit/getting-started/nightly-installers.html"
+  fi
 }
 
 # --- AI-Setup: pro Koenigin EIN Anbieter (9 Provider) ------------------------

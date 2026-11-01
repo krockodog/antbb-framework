@@ -1,0 +1,5 @@
+# Optionale PDF-Report-Engine für die Rote Königin.
+# Fehlt dieses Paket (oder seine System-Bibliotheken Pango/Cairo), erzeugt antbb
+# den Report EHRLICH als HTML statt PDF – es wird nie ein Fake-PDF geschrieben.
+# System-Libs (Debian/Ubuntu): libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libffi-dev
+weasyprint>=60

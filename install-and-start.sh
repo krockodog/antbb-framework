@@ -501,6 +501,19 @@ else
   warn "pip install hatte Probleme – prüfe, ob der Kern trotzdem importierbar ist …"
 fi
 
+# Optional: PDF-Report-Engine (weasyprint). Darf scheitern → ehrlicher HTML-Fallback.
+REQ_REPORT="${ROOT}/requirements-report.txt"
+if [ -f "$REQ_REPORT" ]; then
+  say "Optional: PDF-Report-Engine (weasyprint) – HTML-Fallback bleibt, falls es fehlschlägt …"
+  _safe "pip-report" "$PIP" install --retries 3 --timeout 60 -r "$REQ_REPORT"
+  # Ehrlich prüfen: nur "installiert" melden, wenn der Import wirklich klappt.
+  if "$PY" -c 'import weasyprint' >/dev/null 2>&1; then
+    ok "PDF-Engine weasyprint installiert"
+  else
+    warn "weasyprint nicht installiert (Systembibliotheken Pango/Cairo fehlen?) – Reports bleiben HTML."
+  fi
+fi
+
 # Kern-Verifikation: lässt sich die Web-App importieren?
 if "$PY" -c 'import fastapi, uvicorn; import antbb.web.app' >/dev/null 2>&1; then
   CORE_OK=1; ok "Kern-Importe (fastapi/uvicorn/antbb.web.app) OK"
