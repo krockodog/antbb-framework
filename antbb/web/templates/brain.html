@@ -269,14 +269,6 @@
   @media (max-width: 720px) { .wiki-box { padding: 1rem 1rem .9rem; } }
 </style>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "/static/vendor/three/three.module.js",
-    "three/addons/": "/static/vendor/three/jsm/"
-  }
-}
-</script>
 <script type="module">
   import { mountBrain } from "/static/brain/mount.js";
   const el = document.getElementById("brain-canvas");
@@ -304,7 +296,7 @@
 <script src="/static/brain/ants.js?v=20261024-j7-20261024013043"></script>
 <script src="/static/brain/queens.js?v=1"></script>
 <!-- 🐜 3D-Völker (GLB, Overlay; Rot herrscht, Blau/Gelb darunter) -->
-<script type="module" src="/static/brain/ants3d.js?v=1"></script>
+<script type="module" src="/static/brain/ants3d.js?v=9"></script>
 {% endblock %}
 
 <style id="ant-colony-noclip">

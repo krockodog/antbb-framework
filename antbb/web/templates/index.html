@@ -12,6 +12,7 @@
   </div>
   <div class="rq-hero-inner">
     <div class="rq-crest" aria-hidden="true">🎯</div>
+    <div id="qv-red" class="qv-slot rq-qv" aria-label="Rote Königin 3D"></div>
     <div class="rq-hero-copy">
       <p class="rq-kicker">Offensiv-Kolonie · eigenständige Ansicht</p>
       <h2>Red Queen <span class="rq-sub">die Rote Königin</span></h2>
@@ -301,4 +302,15 @@
 window.RQ_TARGETS = {{ targets|tojson }};
 </script>
 <script src="/static/red_cards.js?v=2026102501"></script>
+
+<style>
+.qv-slot,.rq-qv{width:min(340px,42vw);height:300px;margin:8px 0 4px;flex:0 0 auto;border:1px solid rgba(255,59,59,.4);
+  box-shadow:0 0 48px rgba(255,59,59,.22), inset 0 0 30px rgba(255,59,59,.1)}
+.rq-hero-inner{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.rq-hero-copy{flex:1 1 280px}
+</style>
+<script type="module">
+  import { mountWhenVisible } from "/static/brain/queen-viewer.js?v=2";
+  mountWhenVisible(document.getElementById("qv-red"), "red");
+</script>
 {% endblock %}
