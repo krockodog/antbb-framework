@@ -62,6 +62,40 @@ def _default_runner() -> Runner:
     return _sudo_runner
 
 
+def _require_key_login(execute: Callable[..., str]) -> None:
+    """Selbstausschluss-Schutz: Passwort-Login nur abschalten, wenn Key-Login tragfaehig ist."""
+    import pwd
+    try:
+        cfg = execute(["sshd", "-T"])
+    except RemediationError as exc:
+        raise RemediationError(f"Selbstausschluss-Risiko: sshd -T nicht pruefbar ({exc}).") from exc
+    if re.search(r"^pubkeyauthentication\s+no\s*$", cfg, re.I | re.M):
+        raise RemediationError("Selbstausschluss-Risiko: PubkeyAuthentication ist deaktiviert – Passwort-Login bleibt an.")
+    users: list[str] = []
+    for name in (os.environ.get("SUDO_USER"), os.environ.get("USER")):
+        if name and name not in users:
+            users.append(name)
+    try:
+        users.append(pwd.getpwuid(os.getuid()).pw_name)
+    except Exception:
+        pass
+    for name in users:
+        try:
+            home = pwd.getpwnam(name).pw_dir
+        except KeyError:
+            continue
+        ak = os.path.join(home, ".ssh", "authorized_keys")
+        try:
+            with open(ak, encoding="utf-8", errors="ignore") as fh:
+                if any(l.strip() and not l.lstrip().startswith("#") for l in fh):
+                    return
+        except OSError:
+            continue
+    raise RemediationError(
+        "Selbstausschluss-Risiko: kein nicht-leeres ~/.ssh/authorized_keys fuer "
+        + ", ".join(sorted(set(users)) or ["?"]) + " – Passwort-Login wird NICHT abgeschaltet.")
+
+
 def apply_fix(
     finding: dict,
     params: dict,
@@ -118,6 +152,7 @@ def apply_fix(
             "evidence": {"before": "fail", "after": "reboot scheduled", "schedule": schedule},
         }
     elif check_id == "ssh-password-auth":
+        _require_key_login(execute)
         backup("/etc/ssh/sshd_config")
         write("/etc/ssh/sshd_config.d/99-antbb-hardening.conf", "PasswordAuthentication no\n")
         execute(["sshd", "-t"])

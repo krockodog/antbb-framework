@@ -75,7 +75,7 @@
     btn.disabled = true;
     btn.textContent = "läuft…";
     try {
-      const r = await fetch(base + "/step", {
+      const r = await fetch(base.replace(/\/state$/, "") + "/step", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: action, oversight_ok: true })

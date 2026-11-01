@@ -19,7 +19,7 @@ for env in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
 from antbb import llm_providers as lp
 
 EXPECTED = {"openai", "anthropic", "gemini", "minimax", "moonshot",
-            "mistral", "deepseek", "xai", "ollama"}
+            "mistral", "deepseek", "xai", "ollama", "qwen"}
 
 
 def test_registry_loads_all():

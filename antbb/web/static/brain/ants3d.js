@@ -5,7 +5,8 @@
 (async function () {
   const host = document.createElement("div");
   host.id = "kimi-city-host";
-  host.style.cssText = "position:fixed;inset:0;z-index:2;pointer-events:none;";
+  // z-index 1 < main (z-index 2): /brain-Bedienelemente bleiben klickbar, leere Flaechen orbiten die Stadt
+  host.style.cssText = "position:fixed;inset:0;z-index:1;pointer-events:none;";
   const iframe = document.createElement("iframe");
   iframe.id = "kimi-city-frame";
   iframe.title = "Ameisenmetropole — Neural Brain City";
@@ -206,16 +207,20 @@
   addEventListener("resize", layoutBadges);
 
   // Click Stadt preset inside iframe when ready (best overview of the metropolis)
+  // Preset nur EINMAL setzen – sonst ueberschreibt der 2s-ready-Ping jede Nutzer-Ansicht
+  let stadtOnce = false;
   function tryStadt() {
+    if (stadtOnce) return;
     try {
       const doc = iframe.contentDocument;
       if (!doc) return;
       const btn = [...doc.querySelectorAll("button")].find(b => /^\s*Stadt\s*$/i.test(b.textContent || ""));
-      if (btn) btn.click();
+      if (btn) { btn.click(); stadtOnce = true; }
     } catch (_) {}
   }
   iframe.addEventListener("load", () => { setTimeout(tryStadt, 8000); setTimeout(tryStadt, 16000); });
   addEventListener("message", (ev) => {
+    if (ev.source !== iframe.contentWindow || ev.origin !== location.origin) return;
     if (ev.data && ev.data.type === "kimi-city" && ev.data.ready) tryStadt();
   });
 

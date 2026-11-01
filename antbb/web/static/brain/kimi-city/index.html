@@ -23,7 +23,6 @@ button{appearance:none;border:1px solid transparent;background:transparent;color
 @media(max-width:850px){.topbar{height:68px;padding:0 18px}.hero{left:20px;top:92px}.hero h1{font-size:39px}.hero p,.tags,.hierarchy,.stats{display:none}.hint{left:50%;transform:translateX(-50%);bottom:91px;white-space:nowrap;font-size:8px}.controls{bottom:20px;max-width:calc(100vw - 20px);overflow-x:auto}.view-buttons{display:flex}.controls .optional{display:none}.brand-sub{display:none}.live{font-size:8px}}
 </style>
   <script type="module" crossorigin="" src="./assets/index-CR9Vm8Nj.js"></script>
-<script src="https://www.kimi.ai/sdk-seed.js" defer="" data-kimi-disable-watermark="false" data-kimi-analytics="true" data-kimi-website-id="1a193e93-5712-8f95-8000-0000dd194fce" data-kimi-website-env="published"></script>
 <style id="antbb-embed">
 /* Embed mode: hide her chrome so antbb brain chrome shows; city canvas stays full-bleed */
 html.antbb-embed .topbar,
@@ -43,7 +42,7 @@ html.antbb-embed body:after{opacity:.15}
   const q=new URLSearchParams(location.search);
   if(q.get('embed')==='1') document.documentElement.classList.add('antbb-embed');
   // Tell parent when ready
-  function ping(){ try{ parent.postMessage({type:'kimi-city', ready:true, tris:(document.body.innerText.match(/tris\s+(\d+)/)||[])[1]}, '*'); }catch(e){} }
+  function ping(){ try{ parent.postMessage({type:'kimi-city', ready:true, tris:(document.body.innerText.match(/tris\s+(\d+)/)||[])[1]}, location.origin); }catch(e){} }
   setInterval(ping, 2000); setTimeout(ping, 5000);
 })();
 </script>

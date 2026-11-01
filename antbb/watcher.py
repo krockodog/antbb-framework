@@ -402,7 +402,13 @@ def run_watch(events: Optional[list[dict]] = None, *,
 
     if do_apply:
         from . import quarantine as _q
-        for path in _event_files(events):
+        # Nur Dateien aus Events mit eigener Detection – nicht der ganze Batch.
+        detected_files: list[str] = []
+        for d in detections:
+            fp = (d.evidence or {}).get("file")
+            if fp and str(fp) not in detected_files:
+                detected_files.append(str(fp))
+        for path in detected_files:
             moved = _q.quarantine_move(path, active=True, scope_check=scope_check)
             report.protects.append({
                 "ok": moved.ok, "applied": moved.applied,
