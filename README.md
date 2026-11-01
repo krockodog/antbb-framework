@@ -73,9 +73,9 @@ WLAN-Scope (Allowlist), Coverage & Scan (passiv und Königin-Voll-Scan mit rein 
 
 ![WLAN-Späher auf /wlan](docs/images/wlan-scout.png)
 
-| Späher (Render des 3D-Modells) | Erkannte Geräte |
-|---|---|
-| ![Späher](docs/screenshots/scout.png) | ![WLAN-Späher – erkannte Geräte](docs/screenshots/shot-heute-wlan.jpg) |
+Erkannte Geräte im Funk-Labor:
+
+![WLAN – erkannte Geräte](docs/screenshots/shot-heute-wlan.jpg)
 
 | Tab | Bild |
 |---|---|
@@ -284,13 +284,14 @@ Danach im Browser: `http://<host>:1001` — Hub → Königin wählen → Ziel an
 
 ## Roadmap
 
-Bewusst **nicht** als Mock eingebaut — diese Bausteine brauchen echte Hardware bzw. Zugänge:
+Offene Punkte (noch nicht umgesetzt):
 
-- **Geräte-Agenten**: Flipper Zero, Ghost ESP, ESP32-Marauder, BleShark Nano, AI-ESP32 als checkbare Workflow-Schritte mit automatischer Evidence (Geräte-Registry + Treiber-Schicht).
-- **Yellow-Crack-Pipeline**: aircrack-ng / hashcat / john mit lokalen Wortlisten, komplett offline, maskierte Ergebnisse, Schwellenlogik (trivial/schwach → Blue-Ticket).
-- **Blue-Konnektoren**: FritzBox (TR-064/LUA) für WPS aus / Passwort-Rotation / Gastnetz-Segmentierung; Freigabe-Matrix (auto / 1-Klick / 4-Augen) mit Dry-Run-Diff, Apply, Verify, Rollback.
-- **Neuronales Gehirn – Wissensbasis**: `/history` und `/brain` als gemeinsames Wissen der Kolonien (Techniken, Gegenmaßnahmen, Lehren, verlinkt auf Evidence).
-- **Debrief-Dashboard**: Katz-und-Maus-Scoreboard (Angriffe vs. Abwehr je Klasse), Residual-Risk-Trend, Export PDF/PPTX für Kunden-Aufklärung.
+- **3D-Gebäude je Wissensstufe:** Die Ausbaustufe wird bereits berechnet und angezeigt; die passenden Gebäude in der 3D-Stadt fehlen noch.
+- **Schaufenster-/Demo-Version ohne Backend:** statische Vorschau der Oberfläche ohne laufenden Server.
+- **Echte Yellow-Soldaten-Daten:** Die gelben Schilder im Neuronalen Gehirn kommen derzeit aus einer statischen Liste in `ants3d.js` statt aus der API.
+- **MiniMax M-Plan-Key:** Unterstützung des Abo-Schlüssels zusätzlich zum Pay-as-you-go-Key.
+- **Blue-Remediation pro Befund:** gezielte Behebung und Re-Test je einzelnem Finding.
+- **Echte Executor an `/api/queens/{q}/runs`:** Läufe über diese Route an reale Ausführung anbinden.
 
 ---
 
