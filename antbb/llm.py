@@ -123,6 +123,9 @@ def _read_key(cfg: ProviderConfig) -> Optional[str]:
     if (not val or not val.strip()) and cfg.name == "gemini":
         # Google akzeptiert beide Variablennamen.
         val = os.environ.get("GOOGLE_API_KEY")
+    if (not val or not val.strip()) and cfg.name == "qwen":
+        # DashScope / Qwen: DASHSCOPE_API_KEY oder QWEN_API_KEY.
+        val = os.environ.get("QWEN_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")
     if val and val.strip():
         return val.strip()
     return None

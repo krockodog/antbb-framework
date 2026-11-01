@@ -17,19 +17,20 @@ bash install-and-start.sh
 Ausgabe z. B. `Startseite: http://127.0.0.1:8000/`  
 `./run.sh` ist ein Wrapper. Port: `ANTBB_PORT=1001 bash install-and-start.sh`
 
-## KI-Menü beim Start (interaktiv)
+## KI-/Zugangs-Menü beim Start (interaktiv)
 
-`./run.sh` / `install-and-start.sh` fragt zuerst:
+`./run.sh` / `install-and-start.sh` fragt:
 
-| Wahl | Bedeutung |
-|---|---|
-| **[1] Eigene KI** | API-Key für MiniMax, OpenAI, Anthropic, Google/Gemini, Grok/xAI, Kimi, OpenCode oder Custom |
-| **[2] Ollama** | lokale Null-Euro-KI — prüft Erreichbarkeit, optional Pull eines kleinen Modells (`llama3.2:1b` / `qwen2.5:1.5b` / `gemma2:2b`) |
-| **[3] / Enter** | **ohne KI** weiter — Plattform läuft (UI, Geräte, Scans); nur LLM-Features bleiben inaktiv |
+| Wahl | Bedeutung | Edition |
+|---|---|---|
+| **[1] Eigene KI (API-Key)** | Nur gängige Groß-Modelle: **MiniMax** (Pflicht-Angebot), Claude, ChatGPT, Gemini, Qwen, Mistral | Free |
+| **[2] Ollama** | lokale Null-Euro-KI; optional kleines Modell pullen | Free |
+| **[3] OAuth-Login** | Identifikation über verdrahtete OAuth-Flows (OpenAI Sign-in, Kimi Device-Code). **→ Plan-Version** mit erweiterten Features | **Plan** |
+| **Enter** | ohne KI weiter | Free |
 
-Die Wahl landet in lokaler `antbb.env` (`chmod 600`, gitignored): `ANTBB_AI_MODE=api|ollama|none`, bei Bedarf `ANTBB_LLM_PROVIDER`, `OLLAMA_BASE_URL`, `ANTBB_MAIN_MODEL` / Keys. Es werden **nur** Variablen geschrieben, die du wirklich setzt.
+Wahl landet in `antbb.env` (`chmod 600`, gitignored): `ANTBB_AI_MODE`, `ANTBB_EDITION=free|plan`, ggf. `ANTBB_LLM_PROVIDER` / `ANTBB_OAUTH_PROVIDER`, Keys, `OLLAMA_BASE_URL`. Keine Secrets im Repo; OAuth-Tokens verschlüsselt in `data/oauth_tokens.enc`.
 
-Pro Cloud-Anbieter: API-Schlüssel hier, oder OAuth nur wo verdrahtet (aktuell OpenAI in der GUI). Wo kein OAuth existiert, sagt das Script das ehrlich.
+Google-/GitHub-Identity als Plattform-Login braucht deine eigene OAuth-App-Client-ID in `antbb.env` — wir hardcoden keine Client-Secrets.
 
 Non-interactive: `ANTBB_ASK_KEY=0 bash install-and-start.sh`
 

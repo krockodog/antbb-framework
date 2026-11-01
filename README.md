@@ -230,13 +230,14 @@ python3 -m venv .venv
 cp antbb.env.example antbb.env   # optional manuell; niemals committen (gitignore sicher)
 ```
 
-Beim ersten `./run.sh` erscheint ein **KI-Menü**:
+Beim ersten `./run.sh` erscheint ein **KI-/Zugangs-Menü**:
 
-1. **Eigene KI** — API-Key für MiniMax / OpenAI / Anthropic / Google / …  
-2. **Ollama** — lokale Null-Euro-KI (Erreichbarkeit prüfen, kleines Modell pullen)  
-3. **Ohne KI** (Enter) — Plattform startet trotzdem; nur LLM-Features bleiben inaktiv  
+1. **Eigene KI (API-Key)** — nur MiniMax (Pflicht-Angebot), Claude, ChatGPT, Gemini, Qwen, Mistral · Free  
+2. **Ollama** — lokale Null-Euro-KI · Free  
+3. **OAuth-Login** — Identifikation → **Plan-Version** (erweiterte Features)  
+4. **Enter** — ohne KI · Free  
 
-Die Wahl wird in `antbb.env` gespeichert (`ANTBB_AI_MODE=api|ollama|none`, ggf. `ANTBB_LLM_PROVIDER`, Keys, `OLLAMA_BASE_URL`). Details: `INSTALL.md`.
+Gespeichert in `antbb.env`: `ANTBB_AI_MODE`, `ANTBB_EDITION=free|plan`, Provider/Keys. Details: `INSTALL.md`.
 
 Weitere optionale Variablen (sane Defaults): `ANTBB_HOST`/`ANTBB_PORT`, `COLONY_DB`, `COLONY_DATA`, `YELLOW_QUEEN_ROOT`, `ANTBB_WIFI=1`, `GVM_USERNAME`/`GVM_PASSWORD`, `ANTBB_SPLUNK_HEC_URL/TOKEN`, `MINIMAX_API_KEY` (nur zur Laufzeit).
 

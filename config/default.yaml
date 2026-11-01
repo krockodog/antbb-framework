@@ -122,6 +122,18 @@ llm:
       default_model: mistral-large-latest
       fast_model: mistral-small-latest
 
+    qwen:
+      # Alibaba Cloud DashScope – OpenAI-kompatibler Endpoint für Qwen.
+      # Key: DASHSCOPE_API_KEY (alternativ QWEN_API_KEY, siehe llm._read_key).
+      base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_style: openai
+      auth_mode: key
+      auth_method: api_key
+      oauth_available: false
+      key_env: DASHSCOPE_API_KEY
+      default_model: qwen-plus
+      fast_model: qwen-turbo
+
     deepseek:
       # DeepSeek (OpenAI-kompatibel, api-docs.deepseek.com).
       base_url: https://api.deepseek.com/v1

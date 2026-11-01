@@ -326,7 +326,23 @@ def _start_scan_async(target_id: int, active: bool, fuzz: bool,
 
 
 # ---------------- HTML-Seiten ----------------
+# --- All-and-One-Landing (Next.js-Static-Export aus all-and-one/out) als Startseite ---
+LANDING_OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "all-and-one", "out")
+if os.path.isdir(os.path.join(LANDING_OUT, "_next")):
+    app.mount("/_next", StaticFiles(directory=os.path.join(LANDING_OUT, "_next")), name="landing_next")
+
+
 @app.get("/", response_class=HTMLResponse)
+def landing(request: Request):
+    """Startseite: gebaute All-and-One-Landing; Fallback = Rote Königin, falls kein Build."""
+    f = os.path.join(LANDING_OUT, "index.html")
+    if os.path.isfile(f):
+        from fastapi.responses import FileResponse
+        return FileResponse(f, media_type="text/html")
+    return index(request)
+
+
+@app.get("/red", response_class=HTMLResponse)
 def index(request: Request):
     targets = []
     for t in svc.list_targets():
@@ -385,10 +401,7 @@ def target_page(request: Request, target_id: int):
 
 
 
-@app.get("/red", response_class=HTMLResponse)
-def red_queen_page(request: Request):
-    """Rote Königin: Alias auf die Offensiv-Startseite."""
-    return RedirectResponse("/", status_code=307)
+# /red rendert jetzt direkt die Rote Königin (index() ist unter /red registriert).
 
 
 
@@ -405,14 +418,16 @@ def _yellow_templates():
 def _yellow_ctx(request: Request, **extra):
     """Minimal context for yellow-queen templates when served from antbb."""
     try:
-        import sys
-        yroot = os.path.join(os.path.dirname(os.path.dirname(BASE)), "yellow-queen")
-        if yroot not in sys.path:
-            sys.path.insert(0, yroot)
-        import config as yq_config  # type: ignore
-        from doctor import report as doctor_report  # type: ignore
-        from db import list_cases  # type: ignore
-        from gates import GATE_TEXT  # type: ignore
+        import sys, importlib
+        # Yellow-Queen-Module nutzen paket-relative Importe (from . import config);
+        # daher als Paket "yellow_queen" laden (Repo-Root auf sys.path, Alias-Symlink yellow_queen -> yellow-queen).
+        repo_root = os.path.dirname(os.path.dirname(BASE))
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+        yq_config = importlib.import_module("yellow_queen.config")
+        doctor_report = importlib.import_module("yellow_queen.doctor").run_doctor
+        list_cases = importlib.import_module("yellow_queen.db").list_cases
+        GATE_TEXT = importlib.import_module("yellow_queen.gates").GATE_TEXT_DE
         cases = list_cases()
         doc = doctor_report()
         ctx = {
@@ -438,6 +453,39 @@ def _yellow_ctx(request: Request, **extra):
 def yellow_queen_page(request: Request):
     """Gelbe Königin — RE-Kolonie (Template aus yellow-queen/)."""
     return _yellow_templates().TemplateResponse(request, "yellow.html", _yellow_ctx(request))
+
+
+def _mount_yellow_routes() -> None:
+    """Hängt die ECHTEN Yellow-Queen-Routen (Upload, Fälle, Live-Log, Orchestrate,
+    /api/cases) in diese App ein. /yellow selbst bleibt die antbb-Route oben.
+    Nur Pfade, die antbb noch nicht hat → keine Kollision."""
+    try:
+        import sys, importlib
+        root = os.path.dirname(os.path.dirname(BASE))
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        yapp = importlib.import_module("yellow_queen.web.app").app
+    except Exception as e:  # noqa: BLE001
+        print(f"[yellow] Routen nicht eingehängt: {type(e).__name__}: {e}")
+        return
+    have = {(r.path, tuple(sorted(getattr(r, "methods", None) or ()))) for r in app.router.routes}
+    for r in yapp.router.routes:
+        path = getattr(r, "path", "")
+        if not (path.startswith("/yellow/") or path.startswith("/api/cases")):
+            continue
+        key = (path, tuple(sorted(getattr(r, "methods", None) or ())))
+        if key not in have:
+            app.router.routes.append(r)
+
+
+_mount_yellow_routes()
+
+
+@app.get("/api/wlan/devices")
+def api_wlan_devices():
+    """Live: aktuell angeschlossene USB-/Seriell-Geräte (nur lesen)."""
+    from .. import usbdevices
+    return usbdevices.list_devices()
 
 
 @app.get("/wlan", response_class=HTMLResponse)
@@ -802,6 +850,25 @@ def api_blue_greenbone_scan_status(task_id: str, fetch: int = 0, target_id: Opti
 
 
 # ---------------- Form-Handler (HTML) – rufen nur Service-Funktionen ----------------
+@app.get("/api/undo")
+def api_undo_peek():
+    """Letzte rückgängig machbare Target-/Scope-Änderung (oder null)."""
+    return {"last": svc.undo_peek()}
+
+
+@app.post("/api/undo")
+def api_undo():
+    """Macht die letzte Target-/Scope-Änderung rückgängig. Setzt NIE Oversight."""
+    return svc.undo_last()
+
+
+@app.post("/undo")
+def form_undo(request: Request):
+    svc.undo_last()
+    ref = request.headers.get("referer") or "/red"
+    return RedirectResponse(ref, status_code=303)
+
+
 @app.post("/target/add")
 def html_add_target(name: str = Form(...), description: str = Form(""),
                     mode_policy: str = Form("auto")):
@@ -1390,6 +1457,51 @@ def api_heatmap(target_id: int):
 
 
 # ---------------- Soldaten (Skills/Playbooks/Overrides/Mems) ----------------
+@app.get("/api/queens")
+def api_queens():
+    """Live-Status der drei Königinnen für die Landing (hub-real.js).
+    Nur echte Daten: Soldaten aus der Registry (Rot/Blau) bzw. dem Yellow-REGISTRY,
+    Läufe/Fälle aus der DB. Keine Mock-Namen, keine erfundenen Läufe."""
+    out = []
+    try:
+        sol = svc.capabilities(rebuild=False).get("soldiers", [])
+    except Exception:  # noqa: BLE001
+        sol = []
+    red = [s["name"] for s in sol if not str(s.get("name", "")).startswith("blue-")]
+    blue = [s["name"] for s in sol if str(s.get("name", "")).startswith("blue-")]
+    n_targets = len(svc.list_targets())
+    out.append({"queen_id": "red", "soldier_ids": red,
+                "live_satz": f"Bereit · {len(red)} Soldaten · {n_targets} aktive(s) Ziel(e)"})
+    out.append({"queen_id": "blue", "soldier_ids": blue,
+                "live_satz": f"Bereit · {len(blue)} Soldaten (read-only Default)"})
+    try:
+        import importlib
+        yreg = list(importlib.import_module("yellow_queen.soldiers").REGISTRY)
+        ycases = importlib.import_module("yellow_queen.db").list_cases(1000)
+        ysatz = f"Bereit · {len(yreg)} Soldaten · {len(ycases)} Fall/Fälle"
+    except Exception as e:  # noqa: BLE001
+        yreg, ysatz = [], f"Yellow-Daten nicht ladbar ({type(e).__name__})"
+    out.append({"queen_id": "yellow", "soldier_ids": yreg, "live_satz": ysatz})
+    # Feste Texte 1:1 aus all-and-one/src/components/queen-cards.tsx (STATIC) – Datenvertrag der Landing.
+    meta = {
+        "red": dict(name="Rote Königin", kicker="Red-Teaming", cta="Zur Roten Königin", href="/red",
+                    summary="Bug Bounty und Pentest im engen Scope. Aktive Arbeit nur mit Scope und Oversight.",
+                    tut="Grenzschau", strip_teil="Rot tut Grenzschau"),
+        "blue": dict(name="Blaue Königin", kicker="Blue Safety-Teaming", cta="Zur Blauen Königin", href="/blue",
+                     summary="Schutz und Hardening mit echten Colony-Prüfungen und Greenbone-Anbindung.",
+                     tut="Härtelage", strip_teil="Blau tut Härtelage"),
+        "yellow": dict(name="Gelbe Königin", kicker="Yellow Reverse-Teaming", cta="Zur Gelben Königin", href="/yellow",
+                       summary="Reverse Engineering mit echten RE-Soldaten. Ohne Oversight bleiben tiefe Schritte gesperrt.",
+                       tut="Wegerklärung", strip_teil="Gelb tut Wegerklärung"),
+    }
+    for q in out:
+        q.update(meta[q["queen_id"]])
+        q.setdefault("oversight", False)
+        q.setdefault("scope", [])
+        q.setdefault("playbook_ids", [])
+    return out
+
+
 @app.get("/api/soldiers")
 def api_soldiers():
     """Alle Soldaten mit Skill + Playbooks + Task-Items (Registry, Volltext-fähig)."""
@@ -1812,12 +1924,181 @@ def api_wlan_offensive_run(action: str, payload: dict):
             packets=int(payload.get("packets", 10)),
             capture_path=payload.get("capture_path", "") or "",
             wordlist=payload.get("wordlist"),
+            engine=payload.get("engine"),
             dry_run=bool(payload.get("dry_run", True)))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     # Findings sind AgentFinding-dicts; nicht nötig für die UI-Kurzantwort.
     res.pop("findings", None)
     return JSONResponse(res)
+
+
+@app.get("/api/wlan/device-caps")
+def api_wlan_device_caps():
+    """Statischer Fähigkeiten-Katalog + Zuordnung zu aktuell erkannten Geräten."""
+    from antbb import device_caps as _dc
+    from antbb import usbdevices as _usb
+    det = _usb.list_devices()
+    detected = []
+    for d in det.get("devices", []):
+        if d.get("category") in ("flipper", "esp", "playshark"):
+            caps = _dc.caps_for_category(d.get("category", ""), d.get("vidpid", ""),
+                                         d.get("type", ""))
+            detected.append({"vidpid": d.get("vidpid", ""), "type": d.get("type", ""),
+                             "category": d.get("category", ""),
+                             "tty": d.get("tty", []),
+                             "caps_key": (caps or {}).get("key"),
+                             "caps": caps})
+    return JSONResponse({"devices": _dc.all_caps(), "detected": detected})
+
+
+@app.get("/api/wlan/esp-firmwares")
+def api_wlan_esp_firmwares():
+    """ESP32-Firmware-Profile (Metadaten) + echter lokaler Binary-Status + ESP-Geraete."""
+    from antbb import esp_firmware as _fw
+    from antbb import usbdevices as _usb
+    det = _usb.list_devices()
+    esp_devices = [{"type": d.get("type", ""), "category": d.get("category", ""),
+                    "vidpid": d.get("vidpid", ""), "tty": d.get("tty", [])}
+                   for d in det.get("devices", [])
+                   if d.get("category") in ("playshark", "esp")]
+    return JSONResponse({"esptool_available": _fw.esptool_available(),
+                         "profiles": _fw.profiles_status(),
+                         "esp_devices": esp_devices})
+
+
+@app.post("/api/wlan/esp-flash")
+def api_wlan_esp_flash(payload: dict):
+    """Flash NUR nach Oversight+Bestaetigung+lokaler Binary. Default dry_run: nur Befehl."""
+    from antbb import esp_firmware as _fw
+    key = (payload.get("profile") or "").strip()
+    port = (payload.get("port") or "").strip()
+    oversight = bool(payload.get("oversight"))
+    confirm = bool(payload.get("confirm"))
+    dry_run = payload.get("dry_run", True)
+    dry_run = True if dry_run is None else bool(dry_run)
+
+    prof = _fw.get_profile(key)
+    if not prof:
+        return JSONResponse({"ok": False, "blocked": f"Unbekanntes Firmware-Profil: {key}"})
+    if not oversight or not confirm:
+        return JSONResponse({"ok": False,
+                             "blocked": "Oversight+Bestätigung erforderlich"})
+    bin_path = _fw.local_bin(key)
+    if not bin_path:
+        return JSONResponse({"ok": False,
+            "blocked": f"Firmware-Binary nicht vorhanden — bitte Release von "
+                       f"{prof['project_url']} bereitstellen unter data/esp_firmware/{key}/"})
+    if not port:
+        return JSONResponse({"ok": False, "blocked": "Kein Port angegeben (z.B. /dev/ttyACM0)"})
+    cmd = _fw.flash_command(key, port, bin_path)
+    if dry_run:
+        return JSONResponse({"ok": True, "dry_run": True, "command": cmd,
+                             "note": "Dry-Run: kein Flash ausgeführt."})
+    import subprocess
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        return JSONResponse({"ok": proc.returncode == 0, "dry_run": False,
+                             "command": cmd, "returncode": proc.returncode,
+                             "stdout": proc.stdout[-4000:], "stderr": proc.stderr[-4000:]})
+    except Exception as exc:  # pragma: no cover
+        return JSONResponse({"ok": False, "dry_run": False, "command": cmd,
+                             "error": str(exc)})
+
+
+@app.get("/api/wlan/orchestration")
+def api_wlan_orchestration():
+    """ECHTER Laufzustand aus .wlan_run_state.json. Kein Lauf -> active=false,
+    Helfer aus aktueller Geraeteerkennung mit 'bereit'. Keine erfundenen Schritte."""
+    from antbb import usbdevices as _usb
+    import json as _json
+    st = None
+    try:
+        st = _json.loads(_usb.WLAN_RUN_STATE_FILE.read_text())
+    except (OSError, ValueError):
+        st = None
+    running = isinstance(st, dict) and st.get("status") == "running"
+    det = _usb.list_devices()
+    helpers = [{"device": d.get("type", ""), "rolle": d.get("rolle", ""),
+                "activity": d.get("activity", "bereit")}
+               for d in det.get("devices", []) if d.get("rolle")]
+    if not running:
+        return JSONResponse({"active": False, "engagement": None,
+                             "orchestrator": "Königin", "helpers": helpers,
+                             "steps": [], "note": "Kein aktiver Lauf — bereit."})
+    eng = st.get("engagement")
+    engagement = None
+    if isinstance(eng, dict):
+        engagement = {"ssid": eng.get("ssid", ""), "bssid": eng.get("bssid", ""),
+                      "oversight": bool(eng.get("oversight"))}
+    raw = st.get("steps_list") or st.get("live_steps") or []
+    steps = []
+    if isinstance(raw, list):
+        total = len(raw)
+        for i, stp in enumerate(raw, 1):
+            if not isinstance(stp, dict):
+                continue
+            steps.append({"idx": stp.get("idx", i), "total": stp.get("total", total),
+                          "label": stp.get("label", ""), "tool": stp.get("tool", ""),
+                          "device": stp.get("device", ""), "status": stp.get("status", ""),
+                          "ts": stp.get("ts", "")})
+    return JSONResponse({"active": True, "engagement": engagement,
+                         "orchestrator": "Königin", "helpers": helpers,
+                         "steps": steps, "note": st.get("note", "Lauf aktiv.")})
+
+
+@app.get("/api/wlan/toolbox")
+def api_wlan_toolbox():
+    """Funk-/WLAN-Werkzeugkasten mit ECHTER Verfuegbarkeit (shutil.which)."""
+    import shutil as _sh
+
+    def t(name, note=None):
+        d = {"name": name, "available": bool(_sh.which(name))}
+        if note:
+            d["note"] = note
+        return d
+
+    groups = [
+        {"name": "WLAN-Capture/Angriff", "tools": [t(x) for x in
+            ["airmon-ng", "airodump-ng", "aireplay-ng", "aircrack-ng",
+             "hcxdumptool", "hcxpcapngtool", "mdk4", "wifite"]]},
+        {"name": "WPS", "tools": [t(x) for x in ["reaver", "bully", "pixiewps"]]},
+        {"name": "Recon/Multi-Funk", "tools": [t(x) for x in ["bettercap", "kismet", "iw"]]},
+        {"name": "Crack-Engines", "tools": [t(x) for x in ["hashcat", "john", "aircrack-ng"]]},
+        {"name": "Bluetooth", "tools": [t(x) for x in
+            ["bluetoothctl", "hcitool", "btmgmt", "ubertooth-rx"]]},
+    ]
+    kismet_ok = bool(_sh.which("kismet"))
+    groups.append({"name": "IR/SDR (über Kismet-Capture)", "tools": [
+        {"name": "kismet-capture (RF/SDR-Datasources)", "available": kismet_ok,
+         "note": "via kismet" if kismet_ok else "kismet nicht vorhanden"}]})
+    groups.append({"name": "Pwnagotchi", "tools": [
+        {"name": "pwnagotchi", "available": bool(_sh.which("pwnagotchi")),
+         "note": "eigenes Raspberry-Pi-Image, kein apt-Tool"}]})
+    return JSONResponse({"groups": groups})
+
+
+@app.get("/api/wlan/wordlists")
+def api_wlan_wordlists():
+    """Auswählbare Handshake-Crack-Wortlisten (nur echt vorhandene Dateien)."""
+    from antbb import wordlists as _wl
+    return JSONResponse({"wordlists": _wl.wifi_crack_candidates()})
+
+
+@app.get("/api/wlan/crack-engines")
+def api_wlan_crack_engines():
+    """Verfügbare Offline-Crack-Engines (nur per shutil.which auffindbare)."""
+    import shutil as _sh
+    cands = [
+        ("hashcat", "hashcat", "hashcat"),
+        ("aircrack-ng", "aircrack-ng", "aircrack-ng"),
+        ("john", "john", "John the Ripper"),
+    ]
+    out = []
+    for key, binname, label in cands:
+        if _sh.which(binname):
+            out.append({"key": key, "label": label, "available": True})
+    return JSONResponse({"engines": out})
 
 
 @app.get("/api/wlan/credentials")
@@ -2012,9 +2293,22 @@ def html_attackpath(target_id: int):
         "<script src='/static/attackpath.js'></script></body></html>")
 
 
+@app.get("/api/edition")
+def api_edition():
+    """Free vs Plan – ohne Secrets. Plan nur nach OAuth-Menüwahl."""
+    from .. import edition as _edition
+    return _edition.status()
+
+
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "antbb", "scan": SCAN_STATE["status"]}
+    from .. import edition as _edition
+    return {
+        "status": "ok",
+        "service": "antbb",
+        "scan": SCAN_STATE["status"],
+        "edition": _edition.status(),
+    }
 
 
 # ===================================================================
