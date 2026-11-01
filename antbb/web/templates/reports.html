@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Reports · All and One{% endblock %}
+{% block content %}
+<p><a href="/history">← Historie</a></p>
+<h2>Reports</h2>
+<p class="hint">Fester Ablageort je Königin: <code>data/reports/&lt;red|blue|yellow&gt;/</code> (HTML + PDF, PDF-Engine: {{ engine or "keine – nur HTML" }}).</p>
+<section class="card">
+  <h3>Report erzeugen</h3>
+  <form id="rep-gen" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+    <select name="queen"><option value="red">Red · Ziel-ID</option><option value="blue">Blue · Lauf-ID</option><option value="yellow">Yellow · Fall-ID</option></select>
+    <input name="ref" placeholder="ID" required style="max-width:240px">
+    <button type="submit">PDF erzeugen</button>
+    <span id="rep-out" class="hint"></span>
+  </form>
+</section>
+{% for q, label in [("red","Red Queen"),("blue","Blue Queen"),("yellow","Yellow Queen")] %}
+<section class="card" id="reports-{{ q }}">
+  <h3>{{ label }} ({{ reports[q]|length }})</h3>
+  <ul>
+  {% for r in reports[q] %}
+    <li><a href="{{ r.url }}" target="_blank">{{ r.name }}</a> <small>· {{ r.kind }} · {{ r.size_kb }} KB · {{ r.when }}</small></li>
+  {% else %}<li>Noch keine Reports.</li>{% endfor %}
+  </ul>
+</section>
+{% endfor %}
+<script>
+(function(){
+  var f=document.getElementById("rep-gen"),o=document.getElementById("rep-out");
+  var key={red:"target_id",blue:"run_id",yellow:"case_id"};
+  var q=new URLSearchParams(location.search);
+  if(q.get("queen")){f.queen.value=q.get("queen");} if(q.get("ref")){f.ref.value=q.get("ref");}
+  f.addEventListener("submit",function(e){
+    e.preventDefault(); o.textContent="erzeuge…";
+    var b={queen:f.queen.value}; b[key[f.queen.value]]=f.ref.value;
+    fetch("/api/reports/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
+      .then(function(r){return r.json();}).then(function(d){
+        if(!d.ok){o.textContent="Fehler: "+(d.detail||d.error||"");return;}
+        o.innerHTML=d.pdf?'<a href="'+d.pdf+'" target="_blank">PDF öffnen</a>':'Kein PDF ('+(d.note||'keine Engine')+') – <a href="'+d.html+'" target="_blank">HTML</a>';
+        setTimeout(function(){location.reload();},1500);
+      }).catch(function(){o.textContent="Fehler.";});
+  });
+})();
+</script>
+{% endblock %}

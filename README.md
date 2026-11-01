@@ -148,6 +148,17 @@ Persistente Run-Historie aller Teams mit Zeitraffer sowie Export-Index (`GET /ap
 
 ![Historie](docs/screenshots/shot-history.jpg)
 
+### Reports (alle Teams)
+Feste Ablage je Königin unter `data/reports/<red|blue|yellow>/` (gitignored, da echte Befunde). Pro Lauf bzw. Fall entsteht ein HTML- und – mit weasyprint/wkhtmltopdf – ein PDF-Report (`antbb/report_store.py`, nutzt die bestehende Report-Logik).
+
+| Team | Quelle | Erzeugen |
+|---|---|---|
+| Red | gebrandeter Ziel-Report (`brandedreport`) | `POST /api/reports/generate` mit `{"queen":"red","target_id":…}` |
+| Blue | Lauf aus der Run-Historie + Ziel-Findings | `{"queen":"blue","run_id":…}` |
+| Yellow | `dossier.md` / `ledger.md` des Falls | `{"queen":"yellow","case_id":…}` |
+
+Übersicht und Erzeugen-Formular: `GET /reports`; Liste als JSON: `GET /api/reports`; Download: `GET /reports/<queen>/<datei>` (Dateinamen per Whitelist, Pfad per `resolve()` geprüft). In der Historie hat jeder Lauf einen **PDF**-Button.
+
 ### Weitere Routen
 | Route | Inhalt |
 |---|---|

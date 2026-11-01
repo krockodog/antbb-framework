@@ -10,7 +10,7 @@
   <table id="runs-table">
     <thead><tr>
       <th data-sort>Zeit</th><th data-sort>Ziel</th><th data-sort>Modus</th>
-      <th data-sort>Findings</th><th data-sort>Status</th><th>Verteilung</th>
+      <th data-sort>Findings</th><th data-sort>Status</th><th>Verteilung</th><th>Report</th>
     </tr></thead>
     <tbody>
     {% for r in runs %}
@@ -22,9 +22,10 @@
         <td>{% if r.status == 'done' %}<span class="ok">done</span>
             {% else %}<span class="blocked">{{ r.status }}</span>{% endif %}</td>
         <td><small>{{ r.severity_str }}</small></td>
+        <td><a class="btn" href="/reports?queen={{ 'blue' if ((r.run_id or '')|lower).startswith('blue') else 'red' }}&ref={{ r.id if ((r.run_id or '')|lower).startswith('blue') else r.target_id }}">PDF</a></td>
       </tr>
     {% else %}
-      <tr><td colspan="6">Noch keine Läufe aufgezeichnet.</td></tr>
+      <tr><td colspan="7">Noch keine Läufe aufgezeichnet.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -32,7 +33,7 @@
 
 <section class="card">
   <h3>Export-Index ({{ exports|length }})</h3>
-  <p class="hint">Alle erzeugten Reports/Exporte (PDF/JSON/MD/HTML) mit Download-Link.</p>
+  <p class="hint">Alle erzeugten Reports/Exporte (PDF/JSON/MD/HTML) mit Download-Link. Feste Report-Ablage je Königin: <a href="/reports">Reports</a>.</p>
   <ul>
   {% for e in exports %}
     <li><a href="/exports/{{ e.name }}" target="_blank">{{ e.name }}</a>

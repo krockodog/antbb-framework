@@ -2992,3 +2992,54 @@ def _reorder_brain_routes() -> None:
 
 
 _reorder_brain_routes()
+
+
+# ==========================================================================
+#  Reports: fester Ablageort je Königin (data/reports/<queen>/), HTML + PDF
+# ==========================================================================
+@app.get("/reports", response_class=HTMLResponse)
+def html_reports(request: Request):
+    from .. import report_store as rs
+    return templates.TemplateResponse(request, "reports.html", {
+        "reports": rs.list_reports(), "engine": svc.pdf_engine()})
+
+
+@app.get("/api/reports")
+def api_reports():
+    from .. import report_store as rs
+    return JSONResponse({"engine": svc.pdf_engine(), "dir": str(rs.REPORTS_ROOT),
+                         "reports": rs.list_reports()})
+
+
+@app.get("/reports/{queen}/{name}")
+def download_report(queen: str, name: str):
+    from fastapi.responses import FileResponse
+    from .. import report_store as rs
+    try:
+        p = rs.safe_path(queen, name)
+    except rs.ReportError as exc:
+        raise HTTPException(400, str(exc))
+    if not p.is_file():
+        raise HTTPException(404, "Report nicht gefunden.")
+    media = "application/pdf" if p.suffix == ".pdf" else "text/html; charset=utf-8"
+    return FileResponse(str(p), media_type=media, filename=p.name)
+
+
+@app.post("/api/reports/generate")
+def api_reports_generate(payload: Optional[dict] = None):
+    """Erzeugt einen Report (nur lesend auf Läufe/Fälle; startet keinen Scan)."""
+    from .. import report_store as rs
+    p = payload or {}
+    q = str(p.get("queen") or "").lower()
+    try:
+        if q == "red":
+            res = rs.generate_red(svc, int(p.get("target_id")))
+        elif q == "blue":
+            res = rs.generate_blue(svc, p.get("run_id"))
+        elif q == "yellow":
+            res = rs.generate_yellow(str(p.get("case_id") or ""))
+        else:
+            raise rs.ReportError("queen muss red, blue oder yellow sein.")
+    except (rs.ReportError, TypeError, ValueError) as exc:
+        return JSONResponse({"ok": False, "detail": str(exc)}, status_code=400)
+    return JSONResponse(res)
