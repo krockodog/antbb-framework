@@ -1,0 +1,84 @@
+<!DOCTYPE html><html lang="de"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#090a0d"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 64 64&#39;%3E%3Crect width=&#39;64&#39; height=&#39;64&#39; rx=&#39;12&#39; fill=&#39;%23090a0d&#39;/%3E%3Ctext x=&#39;32&#39; y=&#39;45&#39; text-anchor=&#39;middle&#39; font-size=&#39;42&#39; fill=&#39;%23d5ae63&#39;%3E%E2%99%9B%3C/text%3E%3C/svg%3E"/>
+<title>Ameisenkönigin — Neurale 3D-Welt</title>
+<style>
+:root{color-scheme:dark;--gold:#d5ae63;--gold2:#f0d89d;--ink:#090a0d;--glass:rgba(16,17,21,.76);--line:rgba(224,190,119,.2);--muted:#96938b}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f2efe8}canvas{display:block;width:100%;height:100%;touch-action:none}
+body:after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 45%,transparent 40%,rgba(0,0,0,.38) 100%);z-index:1}
+.ui{position:fixed;z-index:3;pointer-events:none}.ui button,.ui a{pointer-events:auto}
+.topbar{top:0;left:0;right:0;height:84px;display:flex;align-items:center;justify-content:space-between;padding:0 34px;border-bottom:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(8,9,12,.7),transparent)}
+.brand{display:flex;align-items:center;gap:13px}.sigil{width:34px;height:38px;display:grid;place-items:center;color:var(--gold);border:1px solid var(--line);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:rgba(213,174,99,.06);font-size:17px}.brand-name{font-size:12px;font-weight:750;letter-spacing:.2em}.brand-sub{font-size:9px;letter-spacing:.25em;color:var(--muted);margin-top:4px}
+.live{display:flex;align-items:center;gap:9px;font-size:10px;letter-spacing:.16em;color:#b9b6ad}.dot{width:6px;height:6px;border-radius:50%;background:#b38a45;box-shadow:0 0 12px #c79b50}.ready .dot{background:#7fa98b;box-shadow:0 0 12px #7fa98b}
+.hero{left:36px;top:126px;max-width:300px}.eyebrow{font-size:10px;letter-spacing:.27em;color:var(--gold);margin-bottom:17px}.hero h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(38px,4vw,60px);line-height:.94;letter-spacing:-.035em;margin:0 0 19px}.hero p{font-size:12px;line-height:1.7;color:#aaa69c;margin:0;max-width:235px}.tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:23px}.tag{border:1px solid var(--line);padding:7px 9px;font-size:8px;letter-spacing:.16em;color:#c8b17e;background:rgba(15,15,17,.45)}
+.hierarchy{right:34px;top:125px;width:208px;padding:18px 19px;border:1px solid rgba(255,255,255,.07);background:linear-gradient(135deg,rgba(22,22,25,.74),rgba(10,11,14,.46));backdrop-filter:blur(12px)}.panel-title{font-size:9px;letter-spacing:.23em;color:#8d8980;margin-bottom:15px}.chain{display:flex;align-items:center;gap:10px}.chain-icon{width:27px;height:27px;border:1px solid var(--line);display:grid;place-items:center;color:var(--gold);font-family:Georgia,serif;font-size:13px}.chain strong{display:block;font-size:11px;font-weight:600}.chain small{display:block;color:#88847b;font-size:9px;margin-top:3px}.chain-line{width:1px;height:17px;background:var(--line);margin:4px 0 4px 13px}.direct{color:var(--gold)}
+.controls{left:50%;bottom:34px;transform:translateX(-50%);display:flex;align-items:center;gap:7px;padding:7px;border:1px solid rgba(255,255,255,.1);background:var(--glass);backdrop-filter:blur(18px);box-shadow:0 18px 60px rgba(0,0,0,.35);border-radius:8px;white-space:nowrap}
+button{appearance:none;border:1px solid transparent;background:transparent;color:#b9b6ae;height:38px;padding:0 13px;border-radius:4px;font:600 10px/1 Inter,ui-sans-serif,system-ui;letter-spacing:.06em;cursor:pointer;transition:.18s ease;display:inline-flex;align-items:center;justify-content:center;gap:7px}button:hover{color:#fff;background:rgba(255,255,255,.07)}button:focus-visible{outline:1px solid var(--gold);outline-offset:2px}button.active{color:var(--gold2);border-color:var(--line);background:rgba(213,174,99,.09)}button.primary{background:var(--gold);color:#17130c;min-width:91px}button.primary:hover{background:#e4c27e}.divider{height:22px;width:1px;background:rgba(255,255,255,.1);margin:0 3px}.icon{font-size:13px;line-height:1}.view-buttons{display:flex;gap:2px}
+.hint{left:34px;bottom:39px;font-size:9px;letter-spacing:.12em;color:#6f6d68}.stats{right:34px;bottom:40px;text-align:right;font-size:9px;line-height:1.8;letter-spacing:.12em;color:#6f6d68}.stats b{color:#aaa69c;font-weight:500}
+#hud{position:fixed;left:-10000px;top:-10000px}
+.loading{position:fixed;z-index:10;inset:0;display:flex;align-items:center;justify-content:center;background:#090a0d;transition:opacity .6s ease,visibility .6s}.loading.done{opacity:0;visibility:hidden}.loader-inner{text-align:center;width:min(320px,76vw)}.loader-crown{font-family:Georgia,serif;color:var(--gold);font-size:34px;margin-bottom:22px;animation:pulse 1.6s ease-in-out infinite}.loader-title{font-family:Georgia,serif;font-size:25px;margin-bottom:9px}.loader-sub{font-size:9px;letter-spacing:.2em;color:#858179;text-transform:uppercase}.track{height:1px;background:#292721;margin:26px 0 12px;overflow:hidden}.track span{display:block;width:4%;height:100%;background:var(--gold);transition:width .25s}.load-value{font-size:9px;color:#736f66;letter-spacing:.14em}.error{color:#d99d8d;line-height:1.6;font-size:12px}
+@keyframes pulse{50%{opacity:.38;transform:translateY(-3px)}}
+@media(max-width:850px){.topbar{height:68px;padding:0 18px}.hero{left:20px;top:92px}.hero h1{font-size:39px}.hero p,.tags,.hierarchy,.stats{display:none}.hint{left:50%;transform:translateX(-50%);bottom:91px;white-space:nowrap;font-size:8px}.controls{bottom:20px;max-width:calc(100vw - 20px);overflow-x:auto}.view-buttons{display:flex}.controls .optional{display:none}.brand-sub{display:none}.live{font-size:8px}}
+</style>
+  <script type="module" crossorigin="" src="./assets/index-CR9Vm8Nj.js"></script>
+<script src="https://www.kimi.ai/sdk-seed.js" defer="" data-kimi-disable-watermark="false" data-kimi-analytics="true" data-kimi-website-id="1a193e93-5712-8f95-8000-0000dd194fce" data-kimi-website-env="published"></script>
+<style id="antbb-embed">
+/* Embed mode: hide her chrome so antbb brain chrome shows; city canvas stays full-bleed */
+html.antbb-embed .topbar,
+html.antbb-embed .hero,
+html.antbb-embed .hierarchy,
+html.antbb-embed .bottombar,
+html.antbb-embed .stats,
+html.antbb-embed .dock,
+html.antbb-embed .live,
+html.antbb-embed [class*="topbar"],
+html.antbb-embed [class*="hero"],
+html.antbb-embed .ui > *:not(canvas){opacity:0;pointer-events:none!important}
+html.antbb-embed body:after{opacity:.15}
+</style>
+<script>
+(function(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('embed')==='1') document.documentElement.classList.add('antbb-embed');
+  // Tell parent when ready
+  function ping(){ try{ parent.postMessage({type:'kimi-city', ready:true, tris:(document.body.innerText.match(/tris\s+(\d+)/)||[])[1]}, '*'); }catch(e){} }
+  setInterval(ping, 2000); setTimeout(ping, 5000);
+})();
+</script>
+
+</head>
+<body>
+<div class="ui topbar">
+  <div class="brand"><div class="sigil">♛</div><div><div class="brand-name">ANTBB</div><div class="brand-sub">NEURAL WORLD SIMULATION</div></div></div>
+  <div class="live" id="live"><span class="dot"></span><span id="live-text">MODELL WIRD GELADEN</span></div>
+</div>
+<section class="ui hero">
+  <div class="eyebrow">01 // OBERSTE INSTANZ</div>
+  <h1>Ameisen-<br/>königin</h1>
+  <p>Vier terrassierte Distrikte mit <span data-stat="buildings">228</span> Gebäuden, grünen Inseln und leuchtenden Kanälen umgeben REDs Hof. 1.800 Lastträger, BLUEs Rekruten und YELLOWs Schmiede erfüllen die Wege, während acht Machtadern und 11.200 CHI-Astralpartikel die Metropole durchströmen.</p>
+  <div class="tags"><span class="tag">UNANTASTBAR</span><span class="tag">CHI AURA</span><span class="tag">NEURALE WELT</span></div>
+</section>
+<aside class="ui hierarchy">
+  <div class="panel-title">BEFEHLSKETTE</div>
+  <div class="chain"><div class="chain-icon">Q</div><div><strong>Königin</strong><small>Oberste Autorität</small></div></div>
+  <div class="chain-line"></div>
+  <div class="chain"><div class="chain-icon direct">S</div><div><strong class="direct">Späher</strong><small>Nur direkt unterstellt</small></div></div>
+</aside>
+<div class="ui controls" aria-label="Simulationssteuerung">
+  <button id="toggle" class="primary" title="Simulation pausieren"><span class="icon" id="toggle-icon">Ⅱ</span><span id="toggle-text">Pause</span></button>
+  <button id="rotate" class="active" title="Automatische Drehung umschalten"><span class="icon">↻</span>Drehung</button>
+  <div class="divider"></div>
+  <div class="view-buttons"><button data-view="city" class="active">Stadt</button><button data-view="front">Königin</button><button data-view="side">Seite</button><button data-view="back">Hinten</button><button data-view="blue">Lager</button><button data-view="yellow">Schmiede</button><button data-view="workers">Arbeiter</button><button data-view="bridge">Brücke</button></div>
+  <div class="divider optional"></div>
+  <button id="zoom-out" class="optional" title="Verkleinern">−</button><button id="zoom-in" class="optional" title="Vergrößern">+</button>
+  <button id="reset" title="Ansicht zurücksetzen"><span class="icon">⌂</span><span class="optional">Reset</span></button>
+</div>
+<div class="ui hint">ZIEHEN: ORBIT  ·  MAUSRAD: ZOOM</div>
+<div class="ui stats"><b>FULL 3D MAKE · LEBENDIGE AMEISENMETROPOLE</b><br/><span data-stat="buildings">228</span> GEBÄUDE · <span data-stat="ants">2.288</span> AMEISEN · 24 BRÜCKEN<br/>1.800 LASTTRÄGER · 64 BRÜCKENANGREIFER · 8 MACHTADERN</div>
+<div id="hud"></div>
+<div class="loading" id="loading"><div class="loader-inner"><div class="loader-crown">♛</div><div class="loader-title">Die neurale Welt erwacht</div><div class="loader-sub">Königin und CHI-Aura werden vorbereitet</div><div class="track"><span id="progress"></span></div><div class="load-value" id="load-value">INITIALISIERUNG</div></div></div>
+
+
+</body></html>
