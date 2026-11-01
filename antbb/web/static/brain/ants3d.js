@@ -10,7 +10,7 @@
   const iframe = document.createElement("iframe");
   iframe.id = "kimi-city-frame";
   iframe.title = "Ameisenmetropole — Neural Brain City";
-  iframe.src = "/static/brain/kimi-city/index.html?embed=1&v=garrison1";
+  iframe.src = "/static/brain/kimi-city/index.html?embed=1&v=queenpos2";
   iframe.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:auto;background:transparent;";
   iframe.allow = "fullscreen";
   host.appendChild(iframe);
@@ -58,13 +58,20 @@
 
   const W = () => innerWidth, H = () => innerHeight;
   // District hubs in screen space (matches her elevated 3/4 city: capital center, blue left, yellow right)
+  // Hubs = echte 3D-Positionen der Koeniginnen, aus der Kamera der Stadt projiziert
+  // (kimi-city window.__ANCHORS__). Fallback: feste Bildschirmanteile, bis die Szene bereit ist.
+  function anchors() {
+    try { const f = iframe.contentWindow; return f && f.__ANCHORS__ ? f.__ANCHORS__() : null; } catch (_) { return null; }
+  }
   function hubs() {
-    const w = W(), h = H();
+    const w = W(), h = H(), a = anchors();
+    if (a) return { red: a.red, blue: a.blue, yellow: a.yellow, scout: a.scout,
+      redRing: a.redRing, blueRing: a.blueRing, yellowRing: a.yellowRing, live: true };
     return {
-      red: { x: w * 0.50, y: h * 0.42 },
-      blue: { x: w * 0.22, y: h * 0.58 },
-      yellow: { x: w * 0.78, y: h * 0.58 },
-      scout: { x: w * 0.46, y: h * 0.52 },
+      red: { x: w * 0.50, y: h * 0.42 }, blue: { x: w * 0.22, y: h * 0.58 },
+      yellow: { x: w * 0.78, y: h * 0.58 }, scout: { x: w * 0.46, y: h * 0.52 },
+      redRing: { x: w * 0.50, y: h * 0.52 }, blueRing: { x: w * 0.22, y: h * 0.64 },
+      yellowRing: { x: w * 0.78, y: h * 0.64 }, live: false,
     };
   }
   const particles = [];
@@ -180,31 +187,60 @@
     ["carve", "re-triage"], ["dos", "dos-mz-16bit-re"], ["dynamic", "dynamic-lab-re"],
   ].map(([name, skill]) => ({ name, title: "RE-Soldat", skills: [skill] }));
 
-  function layoutBadges() {
-    badgeHost.innerHTML = "";
-    const h = hubs();
-    const items = [];
-    items.push({ el: mkBadge("red", { name: "ROTE KÖNIGIN", title: "Absolute Herrscherin · All and One", skills: [`${red.length} Soldaten`] }, true), x: h.red.x + 90, y: h.red.y - 30 });
-    items.push({ el: mkBadge("red", { name: "Scout", title: "Kniend", skills: ["recon-master"] }, false), x: h.scout.x, y: h.scout.y + 28 });
-    items.push({ el: mkBadge("blue", { name: "Blaue Königin", title: "Verteidigung", skills: [`${blue.length} Soldaten`] }, true), x: h.blue.x + 70, y: h.blue.y - 20 });
-    items.push({ el: mkBadge("yellow", { name: "Gelbe Königin", title: "RE · Schmiedin", skills: [`${YELLOW.length} Soldaten`] }, true), x: h.yellow.x - 70, y: h.yellow.y - 20 });
-    arc(Math.min(red.length, 12), h.red.x, h.red.y + 70, 100, Math.PI * 1.0, 2).forEach((p, i) => {
-      items.push({ el: mkBadge("red", red[i], false), x: p.x, y: p.y });
+  // Badges einmal bauen, Positionen laufend aus den projizierten 3D-Ankern nachfuehren
+  const items = [];
+  function buildBadges() {
+    badgeHost.innerHTML = ""; items.length = 0;
+    const add = (el, hub, f) => { items.push({ el, hub, f }); badgeHost.appendChild(el); };
+    add(mkBadge("red", { name: "ROTE KÖNIGIN", title: "Absolute Herrscherin · All and One", skills: [`${red.length} Soldaten`] }, true), "red", p => ({ x: p.x, y: p.y - 34 }));
+    add(mkBadge("red", { name: "Scout", title: "Kniend", skills: ["recon-master"] }, false), "scout", p => ({ x: p.x, y: p.y + 10 }));
+    add(mkBadge("blue", { name: "Blaue Königin", title: "Verteidigung", skills: [`${blue.length} Soldaten`] }, true), "blue", p => ({ x: p.x, y: p.y - 30 }));
+    add(mkBadge("yellow", { name: "Gelbe Königin", title: "RE · Schmiedin", skills: [`${YELLOW.length} Soldaten`] }, true), "yellow", p => ({ x: p.x, y: p.y - 30 }));
+    const ring = (list, n, hub, r, spread, rows) => arc(n, 0, 0, r, spread, rows).forEach((o, i) => {
+      add(mkBadge(hub.replace("Ring", ""), list[i], false), hub, p => ({ x: p.x + o.x, y: p.y - o.y * 0.6 }));
     });
-    arc(Math.min(blue.length, 8), h.blue.x, h.blue.y + 55, 70, Math.PI * 0.85, 2).forEach((p, i) => {
-      items.push({ el: mkBadge("blue", blue[i], false), x: p.x, y: p.y });
-    });
-    arc(YELLOW.length, h.yellow.x, h.yellow.y + 55, 70, Math.PI * 0.85, 2).forEach((p, i) => {
-      items.push({ el: mkBadge("yellow", YELLOW[i], false), x: p.x, y: p.y });
-    });
-    for (const it of items) {
-      it.el.style.left = it.x + "px";
-      it.el.style.top = it.y + "px";
-      badgeHost.appendChild(it.el);
-    }
+    ring(red, Math.min(red.length, 12), "redRing", 110, Math.PI * 1.1, 3);
+    ring(blue, Math.min(blue.length, 8), "blueRing", 60, Math.PI * 0.9, 3);
+    ring(YELLOW, YELLOW.length, "yellowRing", 60, Math.PI * 0.9, 3);
   }
-  layoutBadges();
-  addEventListener("resize", layoutBadges);
+  let lastKey = "";
+  function placeBadges() {
+    const h = hubs();
+    // Wunschposition je Schild (an der eigenen Koenigin), dann Kollisionsaufloesung
+    const B = [];
+    for (const it of items) {
+      const p = h[it.hub]; if (!p) continue;
+      const q = it.f(p);
+      it.el.style.display = p.vis === false ? "none" : "";
+      if (p.vis === false) continue;
+      if (!it.w) { it.w = it.el.offsetWidth || 60; it.h = it.el.offsetHeight || 20; }
+      const queen = it.el.classList.contains("queen");
+      // x = Mitte (translate -50%), y = Oberkante
+      B.push({ it, x: q.x, y: q.y, ax: q.x, ay: q.y, w: it.w + 4, h: it.h + 3, fixed: queen });
+    }
+    for (let pass = 0; pass < 24; pass++) {
+      let moved = false;
+      for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+        const a = B[i], b = B[j];
+        const ox = (a.w + b.w) / 2 - Math.abs(a.x - b.x);
+        const oy = (a.h + b.h) / 2 - Math.abs((a.y + a.h / 2) - (b.y + b.h / 2));
+        if (ox <= 0 || oy <= 0) continue;
+        moved = true;
+        const wa = a.fixed ? 0 : (b.fixed ? 1 : 0.5), wb = 1 - wa;
+        if (oy <= ox) { const d = (a.y + a.h / 2) <= (b.y + b.h / 2) ? -1 : 1; a.y += d * oy * wa; b.y -= d * oy * wb; }
+        else { const d = a.x <= b.x ? -1 : 1; a.x += d * ox * wa; b.x -= d * ox * wb; }
+      }
+      // leichter Zug zurueck zur eigenen Koenigin, damit Schilder zugeordnet bleiben
+      for (const c of B) if (!c.fixed) { c.x += (c.ax - c.x) * 0.04; c.y += (c.ay - c.y) * 0.04; }
+      if (!moved) break;
+    }
+    for (const c of B) { c.it.el.style.left = c.x.toFixed(1) + "px"; c.it.el.style.top = c.y.toFixed(1) + "px"; }
+    const key = ["red", "blue", "yellow"].map(k => Math.round(h[k].x / 8) + "," + Math.round(h[k].y / 8)).join("|");
+    if (key !== lastKey) { lastKey = key; seedTrails(); }
+  }
+  buildBadges(); placeBadges();
+  setInterval(placeBadges, 120);
+  addEventListener("resize", placeBadges);
 
   // Click Stadt preset inside iframe when ready (best overview of the metropolis)
   // Preset nur EINMAL setzen – sonst ueberschreibt der 2s-ready-Ping jede Nutzer-Ansicht
