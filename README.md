@@ -227,10 +227,18 @@ python3 -m venv .venv
 ### 2. Konfiguration
 
 ```bash
-cp antbb.env.example antbb.env   # Werte eintragen; niemals committen (gitignore sicher)
+cp antbb.env.example antbb.env   # optional manuell; niemals committen (gitignore sicher)
 ```
 
-Wichtige Variablen (alle optional, sane Defaults): `ANTBB_HOST`/`ANTBB_PORT` (Surface), `COLONY_DB`, `COLONY_DATA`, `YELLOW_QUEEN_ROOT`, `ANTBB_WIFI=1` (aktiviert das WLAN-Offensiv-Modul), `GVM_USERNAME`/`GVM_PASSWORD` (Greenbone), `ANTBB_SPLUNK_HEC_URL/TOKEN` (SIEM), `MINIMAX_API_KEY` (nur zur Laufzeit).
+Beim ersten `./run.sh` erscheint ein **KI-Menü**:
+
+1. **Eigene KI** — API-Key für MiniMax / OpenAI / Anthropic / Google / …  
+2. **Ollama** — lokale Null-Euro-KI (Erreichbarkeit prüfen, kleines Modell pullen)  
+3. **Ohne KI** (Enter) — Plattform startet trotzdem; nur LLM-Features bleiben inaktiv  
+
+Die Wahl wird in `antbb.env` gespeichert (`ANTBB_AI_MODE=api|ollama|none`, ggf. `ANTBB_LLM_PROVIDER`, Keys, `OLLAMA_BASE_URL`). Details: `INSTALL.md`.
+
+Weitere optionale Variablen (sane Defaults): `ANTBB_HOST`/`ANTBB_PORT`, `COLONY_DB`, `COLONY_DATA`, `YELLOW_QUEEN_ROOT`, `ANTBB_WIFI=1`, `GVM_USERNAME`/`GVM_PASSWORD`, `ANTBB_SPLUNK_HEC_URL/TOKEN`, `MINIMAX_API_KEY` (nur zur Laufzeit).
 
 ### 3. Hub bauen (Next.js Static Export)
 

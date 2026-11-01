@@ -17,20 +17,19 @@ bash install-and-start.sh
 Ausgabe z. B. `Startseite: http://127.0.0.1:8000/`  
 `./run.sh` ist ein Wrapper. Port: `ANTBB_PORT=1001 bash install-and-start.sh`
 
-## Optional: KI-Anbieter (interaktiv)
+## KI-Menü beim Start (interaktiv)
 
-Das Script fragt nach den bekanntesten Anbietern:
+`./run.sh` / `install-and-start.sh` fragt zuerst:
 
-OpenAI · Anthropic · Google/Gemini · MiniMax · Grok/xAI · Kimi/Moonshot · Ollama · OpenCode · Eigener Anbieter
+| Wahl | Bedeutung |
+|---|---|
+| **[1] Eigene KI** | API-Key für MiniMax, OpenAI, Anthropic, Google/Gemini, Grok/xAI, Kimi, OpenCode oder Custom |
+| **[2] Ollama** | lokale Null-Euro-KI — prüft Erreichbarkeit, optional Pull eines kleinen Modells (`llama3.2:1b` / `qwen2.5:1.5b` / `gemma2:2b`) |
+| **[3] / Enter** | **ohne KI** weiter — Plattform läuft (UI, Geräte, Scans); nur LLM-Features bleiben inaktiv |
 
-Pro Anbieter: **[1] API-Schlüssel** (→ lokale `antbb.env`, `chmod 600`) oder **[2] OAuth**
-nur dort, wo wirklich verdrahtet (aktuell: OpenAI über die Web-GUI nach dem Start).
-Wo kein OAuth existiert (MiniMax, Kimi Open Platform, Ollama, …), sagt das Script
-ehrlich „OAuth nicht verfügbar“ — nichts wird vorgetäuscht.
+Die Wahl landet in lokaler `antbb.env` (`chmod 600`, gitignored): `ANTBB_AI_MODE=api|ollama|none`, bei Bedarf `ANTBB_LLM_PROVIDER`, `OLLAMA_BASE_URL`, `ANTBB_MAIN_MODEL` / Keys. Es werden **nur** Variablen geschrieben, die du wirklich setzt.
 
-- **Enter** = ohne Key starten (Plattform läuft, KI inaktiv).
-- Es werden **nur** Variablen geschrieben, die du wirklich eingibst (keine leere `KIMI_`/`MOONSHOT_`-Variable).
-- `antbb.env` steht in `.gitignore`. Vorlage: `antbb.env.example` (nur Kommentare/Platzhalter).
+Pro Cloud-Anbieter: API-Schlüssel hier, oder OAuth nur wo verdrahtet (aktuell OpenAI in der GUI). Wo kein OAuth existiert, sagt das Script das ehrlich.
 
 Non-interactive: `ANTBB_ASK_KEY=0 bash install-and-start.sh`
 

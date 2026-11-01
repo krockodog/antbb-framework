@@ -142,40 +142,69 @@ _prompt_provider_auth() {
 }
 
 _ask_providers() {
-  if [ "${ANTBB_ASK_KEY:-auto}" = "0" ]; then warn "Anbieter-Abfrage übersprungen (ANTBB_ASK_KEY=0)"; return 0; fi
+  if [ "${ANTBB_ASK_KEY:-auto}" = "0" ]; then warn "KI-Menü übersprungen (ANTBB_ASK_KEY=0)"; return 0; fi
   if [ ! -t 0 ] && [ "${ANTBB_ASK_KEY:-}" != "1" ]; then
-    warn "Kein TTY – starte ohne interaktive Key-Abfrage."
-    warn "Später: bash install-and-start.sh  (mit TTY) oder antbb.env.example → antbb.env"
+    warn "Kein TTY – starte ohne interaktives KI-Menü."
+    warn "Später: bash install-and-start.sh (mit TTY) oder antbb.env.example → antbb.env"
     return 0
   fi
-  printf '\n\033[1;36mKI-Anbieter einrichten (optional, komplett überspringbar)\033[0m\n'
-  printf '  Ohne Key läuft die Plattform – nur KI-Features sind dann inaktiv.\n'
-  printf '  Mehrfachauswahl möglich (z. B. 1 4 5). Enter = gar keine Anbieter.\n\n'
+
+  printf '\n\033[1;36m╔══════════════════════════════════════════════════════════╗\033[0m\n'
+  printf '\033[1;36m║  KI für die Ameisen-Plattform – bitte wählen             ║\033[0m\n'
+  printf '\033[1;36m╚══════════════════════════════════════════════════════════╝\033[0m\n'
+  printf '  Die Plattform läuft in jedem Fall. KI ist optional.\n\n'
+  printf '  [1] Eigene KI  – API-Key für MiniMax, OpenAI, Anthropic, Google, …\n'
+  printf '  [2] Ollama     – lokale Null-Euro-KI (kein Cloud-Key nötig)\n'
+  printf '  [3] Ohne KI    – nur Geräte/UI/Scans; LLM-Features bleiben inaktiv\n'
+  printf '  [Enter]        – wie [3] ohne KI weiter\n\n'
+  printf '  Wahl [1/2/3, Enter=3]: '
+  local mode; IFS= read -r mode || true
+  case "${mode:-3}" in
+    1) _ask_api_keys ;;
+    2) _ask_ollama ;;
+    3|"") _env_set "ANTBB_AI_MODE" "none"
+           warn "Ohne KI gestartet – Plattform läuft, LLM-Features inaktiv."
+           ok "ANTBB_AI_MODE=none in antbb.env" ;;
+    *) warn "Unbekannte Wahl '${mode}' – behandle als ohne KI."
+       _env_set "ANTBB_AI_MODE" "none" ;;
+  esac
+}
+
+_ask_api_keys() {
+  _env_set "ANTBB_AI_MODE" "api"
+  ok "ANTBB_AI_MODE=api"
+  printf '\n\033[1;36m── Eigene KI: Anbieter wählen (Mehrfach möglich, z. B. 1 4) ──\033[0m\n'
   printf '  [1] OpenAI\n  [2] Anthropic\n  [3] Google (Gemini)\n  [4] MiniMax          (api.minimax.io)\n'
-  printf '  [5] Grok / xAI\n  [6] Kimi / Moonshot\n  [7] Ollama           (lokal, keine Auth)\n  [8] OpenCode\n  [9] Eigener Anbieter (Custom OpenAI-kompatibel)\n\n'
-  printf '  Auswahl (Nummern oder Enter): '
+  printf '  [5] Grok / xAI\n  [6] Kimi / Moonshot\n  [7] OpenCode\n  [8] Eigener Anbieter (OpenAI-kompatibel)\n'
+  printf '  [Enter] zurück ohne weiteren Key\n\n'
+  printf '  Auswahl: '
   local sel; IFS= read -r sel || true
-  if [ -z "${sel// /}" ]; then warn "Keine Anbieter gewählt – starte ohne KI-Keys."; return 0; fi
-  local n
+  if [ -z "${sel// /}" ]; then
+    warn "Kein Anbieter gewählt – Modus api ohne Key (wie ohne KI bis ein Key gesetzt wird)."
+    return 0
+  fi
+  local n first=""
   for n in $sel; do
     case "$n" in
-      1) _prompt_provider_auth "OpenAI" "OPENAI_API_KEY" "gui" ;;
-      2) _prompt_provider_auth "Anthropic" "ANTHROPIC_API_KEY" "none" ;;
+      1) _prompt_provider_auth "OpenAI" "OPENAI_API_KEY" "gui"
+         [ -z "$first" ] && [ -n "${OPENAI_API_KEY:-}" ] && first=openai ;;
+      2) _prompt_provider_auth "Anthropic" "ANTHROPIC_API_KEY" "none"
+         [ -z "$first" ] && [ -n "${ANTHROPIC_API_KEY:-}" ] && first=anthropic ;;
       3) _prompt_provider_auth "Google Gemini" "GOOGLE_API_KEY" "none"
          if [ -z "${GOOGLE_API_KEY:-}" ] && [ -t 0 ]; then
            local g; g="$(_read_secret "  Alternativ GEMINI_API_KEY (Enter=skip): ")"
            if [ -n "$g" ]; then _env_set "GEMINI_API_KEY" "$g"; unset g; ok "GEMINI_API_KEY gespeichert"; fi
-         fi ;;
-      4) _prompt_provider_auth "MiniMax" "MINIMAX_API_KEY" "none" ;;
-      5) _prompt_provider_auth "Grok/xAI" "XAI_API_KEY" "none" ;;
-      6) _prompt_provider_auth "Kimi/Moonshot" "MOONSHOT_API_KEY" "note:Open-Platform = API-Key; kein Auth-Code-OAuth für API. Variable nur bei Eingabe." ;;
-      7) printf '\n\033[1;36m── Ollama (lokal) ──\033[0m\n'
-         printf '  Keine Auth nötig. Optional Base-URL (Enter = Default http://localhost:11434).\n  Base-URL: '
-         local ou; IFS= read -r ou || true
-         if [ -n "${ou}" ]; then _env_set "OLLAMA_BASE_URL" "$ou"; ok "OLLAMA_BASE_URL gesetzt"
-         else ok "Ollama: Default http://localhost:11434 (keine Variable geschrieben)"; fi ;;
-      8) _prompt_provider_auth "OpenCode" "OPENCODE_API_KEY" "none" ;;
-      9) printf '\n\033[1;36m── Eigener Anbieter ──\033[0m\n'
+         fi
+         [ -z "$first" ] && { [ -n "${GOOGLE_API_KEY:-}" ] || [ -n "${GEMINI_API_KEY:-}" ]; } && first=gemini ;;
+      4) _prompt_provider_auth "MiniMax" "MINIMAX_API_KEY" "none"
+         [ -z "$first" ] && [ -n "${MINIMAX_API_KEY:-}" ] && first=minimax ;;
+      5) _prompt_provider_auth "Grok/xAI" "XAI_API_KEY" "none"
+         [ -z "$first" ] && [ -n "${XAI_API_KEY:-}" ] && first=xai ;;
+      6) _prompt_provider_auth "Kimi/Moonshot" "MOONSHOT_API_KEY" "note:Open-Platform = API-Key; kein Auth-Code-OAuth für API. Variable nur bei Eingabe."
+         [ -z "$first" ] && [ -n "${MOONSHOT_API_KEY:-}" ] && first=moonshot ;;
+      7) _prompt_provider_auth "OpenCode" "OPENCODE_API_KEY" "none"
+         [ -z "$first" ] && [ -n "${OPENCODE_API_KEY:-}" ] && first=opencode ;;
+      8) printf '\n\033[1;36m── Eigener Anbieter ──\033[0m\n'
          printf '  Base-URL (z. B. https://api.example.com/v1, Enter=skip): '
          local cu ck cm; IFS= read -r cu || true
          if [ -z "${cu}" ]; then warn "Custom übersprungen."
@@ -185,12 +214,81 @@ _ask_providers() {
            if [ -n "$ck" ]; then _env_set "CUSTOM_LLM_API_KEY" "$ck"; unset ck; ok "CUSTOM_LLM_API_KEY gespeichert"; fi
            printf '  Modell-Name (Enter=skip): '; IFS= read -r cm || true
            if [ -n "${cm}" ]; then _env_set "CUSTOM_LLM_MODEL" "$cm"; ok "CUSTOM_LLM_MODEL gesetzt"; fi
+           [ -z "$first" ] && first=custom
            ok "Custom-Endpoint gespeichert"
          fi ;;
       *) warn "Unbekannte Auswahl: $n" ;;
     esac
   done
+  if [ -n "$first" ]; then
+    _env_set "ANTBB_LLM_PROVIDER" "$first"
+    ok "ANTBB_LLM_PROVIDER=${first}"
+  fi
 }
+
+_ask_ollama() {
+  _env_set "ANTBB_AI_MODE" "ollama"
+  _env_set "ANTBB_LLM_PROVIDER" "ollama"
+  ok "ANTBB_AI_MODE=ollama · ANTBB_LLM_PROVIDER=ollama"
+  printf '\n\033[1;36m── Ollama (lokal, Null Euro) ──\033[0m\n'
+  printf '  Keine Cloud-Auth. Default-URL: http://127.0.0.1:11434\n'
+  printf '  Base-URL ändern (Enter = Default): '
+  local ou base; IFS= read -r ou || true
+  if [ -n "${ou}" ]; then
+    _env_set "OLLAMA_BASE_URL" "$ou"
+    base="$ou"
+    ok "OLLAMA_BASE_URL gesetzt"
+  else
+    base="http://127.0.0.1:11434"
+    ok "Ollama: Default ${base}"
+  fi
+  # Erreichbarkeit prüfen (nur lesen)
+  local tags_ok=0
+  if command -v curl >/dev/null 2>&1; then
+    if curl -fsS -m 2 "${base%/}/api/tags" >/dev/null 2>&1; then
+      tags_ok=1
+      ok "Ollama erreichbar unter ${base}"
+    else
+      warn "Ollama antwortet nicht unter ${base}."
+    fi
+  fi
+  if [ "$tags_ok" != "1" ]; then
+    if command -v ollama >/dev/null 2>&1; then
+      warn "Binary 'ollama' ist installiert, Server aber nicht erreichbar – starte z. B.: ollama serve"
+    else
+      warn "Ollama nicht gefunden. Install: https://ollama.com/download — danach erneut ./run.sh oder 'ollama serve'."
+    fi
+  fi
+  printf '\n  Kleines Modell pullen? (Null Euro, lokal)\n'
+  printf '    [1] llama3.2:1b     – sehr klein, schnell (empfohlen zum Start)\n'
+  printf '    [2] qwen2.5:1.5b   – klein, gut für DE/EN\n'
+  printf '    [3] gemma2:2b      – etwas größer\n'
+  printf '    [Enter] kein Pull jetzt\n'
+  printf '  Wahl: '
+  local m sel_model=""; IFS= read -r m || true
+  case "${m:-}" in
+    1) sel_model="llama3.2:1b" ;;
+    2) sel_model="qwen2.5:1.5b" ;;
+    3) sel_model="gemma2:2b" ;;
+    *) warn "Kein Modell-Pull." ;;
+  esac
+  if [ -n "$sel_model" ]; then
+    _env_set "ANTBB_MAIN_MODEL" "$sel_model"
+    _env_set "ANTBB_FAST_MODEL" "$sel_model"
+    ok "ANTBB_MAIN_MODEL=${sel_model} (auch als Fast-Modell)"
+    if command -v ollama >/dev/null 2>&1; then
+      say "Ziehe Modell ${sel_model} (kann dauern)…"
+      if ollama pull "$sel_model"; then
+        ok "Modell ${sel_model} bereit"
+      else
+        warn "ollama pull fehlgeschlagen – später manuell: ollama pull ${sel_model}"
+      fi
+    else
+      warn "Kein 'ollama'-Befehl – Pull übersprungen. Später: ollama pull ${sel_model}"
+    fi
+  fi
+}
+
 
 _ask_remote_access() {
   if [ "${ANTBB_ASK_REMOTE:-auto}" = "0" ]; then warn "Fernzugriff-Abfrage uebersprungen (ANTBB_ASK_REMOTE=0)"; return 0; fi
@@ -560,11 +658,21 @@ if [ -n "${REMOTE_MODE:-}" ]; then
   fi
 fi
 
-if [ -z "${MINIMAX_API_KEY:-}${OPENAI_API_KEY:-}${ANTHROPIC_API_KEY:-}${GOOGLE_API_KEY:-}${GEMINI_API_KEY:-}${XAI_API_KEY:-}${MOONSHOT_API_KEY:-}${OPENCODE_API_KEY:-}${CUSTOM_LLM_API_KEY:-}" ]; then
-  warn "Kein KI-API-Key gesetzt – Plattform startet, KI-Features inaktiv."
-else
-  ok "Mindestens ein KI-Key gesetzt (nur Laufzeit, nicht geloggt)"
+ai_mode="${ANTBB_AI_MODE:-}"
+if [ -z "$ai_mode" ] && [ -f "$ENV_FILE" ]; then
+  ai_mode=$(grep -E '^[[:space:]]*ANTBB_AI_MODE=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"' || true)
 fi
+case "${ai_mode}" in
+  ollama) ok "KI-Modus: Ollama lokal (ANTBB_AI_MODE=ollama) – kein Cloud-Key nötig" ;;
+  api)
+    if [ -z "${MINIMAX_API_KEY:-}${OPENAI_API_KEY:-}${ANTHROPIC_API_KEY:-}${GOOGLE_API_KEY:-}${GEMINI_API_KEY:-}${XAI_API_KEY:-}${MOONSHOT_API_KEY:-}${OPENCODE_API_KEY:-}${CUSTOM_LLM_API_KEY:-}" ]; then
+      warn "KI-Modus api gewählt, aber kein Key gesetzt – LLM bleibt inaktiv bis Key in antbb.env."
+    else
+      ok "KI-Modus: eigene API-Keys (nur Laufzeit, nicht geloggt)"
+    fi ;;
+  none|"") warn "KI-Modus: ohne KI – Plattform startet, LLM-Features inaktiv." ;;
+  *) ok "ANTBB_AI_MODE=${ai_mode}" ;;
+esac
 
 # ======================================================================
 # ZUSAMMENFASSUNG
