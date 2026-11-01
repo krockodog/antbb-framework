@@ -35,6 +35,8 @@
     (kein Haken-Klicken mehr). honest-empty ohne Tools.</p>
 
   <!-- Königin Ein-Klick-Voll-Scan -->
+  <div class="wlan-scout-row">
+    <div id="qv-scout" class="qv-slot wlan-scout" aria-label="WLAN-Scout 3D"></div>
   <div class="wlan-queen-box" id="wlan-queen-box">
     <div class="wlan-queen-head">
       <strong>👑 Königin · Voller WLAN-Scan</strong>
@@ -56,6 +58,8 @@
     </div>
     <div id="wlan-full-status" class="wlan-status">Bereit – Oversight setzen, dann ein Klick.</div>
   </div>
+
+  </div><!-- /wlan-scout-row -->
 
   <div id="wlan-view">lädt…</div>
 
@@ -197,5 +201,16 @@ kein GTK-Embed. Deauth/Evil-Twin/Capture nur operator-getriggert, keine autonome
   const q = new URLSearchParams(location.search).get("tab");
   show(["scope", "coverage", "heatmap", "offensive"].includes(q) ? q : "scope");
 })();
+</script>
+
+<style>
+.wlan-scout-row{display:flex;flex-wrap:wrap;gap:16px;align-items:stretch;margin:12px 0 18px}
+.wlan-scout-row .wlan-queen-box{flex:1 1 340px}
+.wlan-scout{width:min(260px,40vw);height:240px;border:1px solid rgba(255,106,59,.4);
+  box-shadow:0 0 32px rgba(255,106,59,.18), inset 0 0 24px rgba(255,106,59,.08);flex:0 0 auto}
+</style>
+<script type="module">
+  import { mountWhenVisible } from "/static/brain/queen-viewer.js?v=4";
+  mountWhenVisible(document.getElementById("qv-scout"), "scout");
 </script>
 {% endblock %}

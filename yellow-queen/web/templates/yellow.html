@@ -11,6 +11,7 @@
   </div>
   <div class="yq-hero-inner">
     <div class="yq-crest" aria-hidden="true">🔍</div>
+    <div id="qv-yellow" class="qv-slot yq-qv" aria-label="Gelbe Königin 3D"></div>
     <div class="yq-hero-copy">
       <p class="yq-kicker">Reverse-Engineering-Kolonie · eigenständige Ansicht</p>
       <h2>Yellow Queen <span class="yq-sub">die Gelbe Königin</span></h2>
@@ -157,4 +158,15 @@
   <p class="hint">Werkzeug-Status als JSON: <a href="/api/doctor">/api/doctor</a> ·
      Live-Status: <a href="/yellow/brain">/yellow/brain</a> · Wiki aller drei Königinnen: <a href="/brain">🧠 Schwarm-Wiki</a></p>
 </section>
+
+<style>
+.qv-slot,.yq-qv{width:min(320px,42vw);height:280px;margin:8px 0 4px;flex:0 0 auto;border:1px solid rgba(255,210,59,.4);
+  box-shadow:0 0 40px rgba(255,210,59,.16), inset 0 0 30px rgba(255,210,59,.08)}
+.yq-hero-inner{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.yq-hero-copy{flex:1 1 280px}
+</style>
+<script type="module">
+  import { mountWhenVisible } from "/static/brain/queen-viewer.js?v=4";
+  mountWhenVisible(document.getElementById("qv-yellow"), "yellow");
+</script>
 {% endblock %}

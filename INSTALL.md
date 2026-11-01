@@ -36,6 +36,19 @@ Non-interactive: `ANTBB_ASK_KEY=0 bash install-and-start.sh`
 
 MiniMax-Host: `https://api.minimax.io` — Key nur zur Laufzeit als `MINIMAX_API_KEY`.
 
+## Optional: Scan- und Report-Tools
+
+Fehlen diese Tools, läuft antbb trotzdem – aber **ehrlich degradiert**, nie mit Fake-Ausgabe:
+
+| Tool | Wofür | Ohne Tool | Installation |
+|---|---|---|---|
+| **weasyprint** (oder `wkhtmltopdf`) | PDF-Reports | Report wird als **HTML** geschrieben | `pip install -r requirements-report.txt` + `apt install libpango-1.0-0 libpangocairo-1.0-0 libcairo2` (oder `apt install wkhtmltopdf`) |
+| **interactsh-client** | OOB/OAST-Nachweis blinder SSRF/RCE/XXE | Fund bleibt **„nur Indikator“** | `GOBIN=~/.local/bin go install github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest` |
+| **msfconsole** (Metasploit) | nur `auxiliary/scanner`-Module (hart allowlisted) | Check wird **übersprungen** | Kali/Debian: `sudo apt install metasploit-framework` |
+
+`bash install.sh --doctor` zeigt, was vorhanden ist; `bash install.sh --install-tools` versucht die Installation.
+Scope-Prüfung, Default-Deny und Human Oversight gelten für alle aktiven Tools unverändert.
+
 ## Bewusst entfernt
 
 Keine API-Keys/Tokens/Passwörter · keine persönlichen Daten · keine echten Scope-Ziele/Reports/Captures · `data/` startet leer · kein `external/`-Upstream.

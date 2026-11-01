@@ -384,6 +384,62 @@ def target_page(request: Request, target_id: int):
     })
 
 
+
+@app.get("/red", response_class=HTMLResponse)
+def red_queen_page(request: Request):
+    """Rote Königin: Alias auf die Offensiv-Startseite."""
+    return RedirectResponse("/", status_code=307)
+
+
+
+# --- Yellow Queen under /yellow (templates live in yellow-queen/web/templates) ---
+_YQ_TMPL = None
+def _yellow_templates():
+    global _YQ_TMPL
+    if _YQ_TMPL is None:
+        from fastapi.templating import Jinja2Templates
+        ydir = os.path.join(os.path.dirname(os.path.dirname(BASE)), "yellow-queen", "web", "templates")
+        _YQ_TMPL = Jinja2Templates(directory=ydir)
+    return _YQ_TMPL
+
+def _yellow_ctx(request: Request, **extra):
+    """Minimal context for yellow-queen templates when served from antbb."""
+    try:
+        import sys
+        yroot = os.path.join(os.path.dirname(os.path.dirname(BASE)), "yellow-queen")
+        if yroot not in sys.path:
+            sys.path.insert(0, yroot)
+        import config as yq_config  # type: ignore
+        from doctor import report as doctor_report  # type: ignore
+        from db import list_cases  # type: ignore
+        from gates import GATE_TEXT  # type: ignore
+        cases = list_cases()
+        doc = doctor_report()
+        ctx = {
+            "request": request,
+            "queen_id": getattr(yq_config, "QUEEN_ID", "yellow"),
+            "version": getattr(yq_config, "__version__", "dev"),
+            "cases": cases,
+            "doctor": doc,
+            "max_mb": getattr(yq_config, "MAX_UPLOAD_MB", 64),
+            "gate_text": GATE_TEXT if isinstance(GATE_TEXT, str) else str(GATE_TEXT),
+            "error": None,
+        }
+    except Exception as e:
+        ctx = {
+            "request": request, "queen_id": "yellow", "version": "dev",
+            "cases": [], "doctor": {"present": 0, "total": 0}, "max_mb": 64,
+            "gate_text": "Yellow Queen (eingeschränkter Kontext).", "error": str(e),
+        }
+    ctx.update(extra)
+    return ctx
+
+@app.get("/yellow", response_class=HTMLResponse)
+def yellow_queen_page(request: Request):
+    """Gelbe Königin — RE-Kolonie (Template aus yellow-queen/)."""
+    return _yellow_templates().TemplateResponse(request, "yellow.html", _yellow_ctx(request))
+
+
 @app.get("/wlan", response_class=HTMLResponse)
 def wlan_page(request: Request, target_id: Optional[int] = None):
     """Eigenständige WLAN-Seite: bündelt passive Coverage/Survey, Kanal-Optimierung

@@ -64,7 +64,7 @@
       ".ant-colony::before{content:'';position:absolute;left:0;right:0;bottom:0;height:52%;",
         "background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(8,6,4,0) 18%,",
         "rgba(28,16,6,.38) 68%,rgba(42,22,8,.58) 100%);pointer-events:none;}",
-      ".ant-colony canvas.ant-pheromone{display:none!important;position:absolute;inset:0;width:100%;height:100%;",
+      ".ant-colony canvas.ant-pheromone{display:block;position:absolute;inset:0;width:100%;height:100%;",
         "pointer-events:none;}",
       ".ant{position:absolute;left:0;bottom:0;will-change:transform;pointer-events:auto;cursor:pointer;overflow:visible;",
         "transform-origin:50% 100%;filter:drop-shadow(0 4px 8px rgba(0,0,0,.65));",
@@ -124,7 +124,7 @@
   var host, pheromoneCv, pheromoneCtx, soldiers = [], queenEl = null, raf = 0;
   var last = 0, hostH = 240, hostW = 800, dpr = 1;
   var TRAIL_MAX = 0; // Spur aus (Judith)
-  var TRAIL_LIFE = 9; // s – Spur verblasst
+  var TRAIL_LIFE = 14; // s – Spur verblasst sanft
   var TRAIL_MIN_DIST = 2.2; // px between pheromone samples (continuous, not stutter)
 
   function ensureHost() {
@@ -508,7 +508,7 @@
       var trail = s.trail, n = trail.length;
       if (n < 2) continue;
       var col = s.active ? "56,224,255" : "210,160,90";
-      var amax = s.active ? 0.5 : 0.28;
+      var amax = s.active ? 0.62 : 0.4;
       var oy = hostH - s.h * 0.1;
       // Ältere Teile blasser/dünner: wenige Polylinien statt hunderter Segmente.
       for (var b = 0; b < BUCKETS; b++) {
