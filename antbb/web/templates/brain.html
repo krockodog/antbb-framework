@@ -296,7 +296,14 @@
 <script src="/static/brain/ants.js?v=20261024-j7-20261024013043"></script>
 <script src="/static/brain/queens.js?v=1"></script>
 <!-- 🐜 3D-Völker (GLB, Overlay; Rot herrscht, Blau/Gelb darunter) -->
-<script type="module" src="/static/brain/ants3d.js?v=21"></script>
+<script type="module" src="/static/brain/ants3d.js?v=23"></script>
+<style id="brain-pointer-passthrough">
+  /* Stadt-iframe (z1) muss Drag/Wheel/Touch bekommen: Wirbel + Vollflaechen-Wrapper durchlaessig, nur echte Controls klickbar */
+  body.brain-body main, body.brain-body .brain-view, body.brain-body #brain-canvas, body.brain-body #brain-canvas * { pointer-events:none !important; }
+  body.brain-body main button, body.brain-body main a, body.brain-body main input, body.brain-body main select,
+  body.brain-body main textarea, body.brain-body main [role=dialog], body.brain-body main .wiki-overlay,
+  body.brain-body main .bp-detail, body.brain-body main [class*=panel], body.brain-body main [class*=runs] { pointer-events:auto; }
+</style>
 {% endblock %}
 
 <style id="ant-colony-noclip">

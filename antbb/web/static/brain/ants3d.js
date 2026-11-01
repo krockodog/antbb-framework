@@ -10,7 +10,7 @@
   const iframe = document.createElement("iframe");
   iframe.id = "kimi-city-frame";
   iframe.title = "Ameisenmetropole — Neural Brain City";
-  iframe.src = "/static/brain/kimi-city/index.html?embed=1";
+  iframe.src = "/static/brain/kimi-city/index.html?embed=1&v=garrison1";
   iframe.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:auto;background:transparent;";
   iframe.allow = "fullscreen";
   host.appendChild(iframe);
@@ -231,3 +231,26 @@
     note: "Judith's procedural metropolis (219 buildings, canals, throne) as brain environment",
   };
 })().catch(e => console.warn("[ants3d] city embed failed:", e));
+
+// ── Gedächtnis-Wachstum (Judith): je mehr echtes Wissen, desto mehr wird gebaut ──
+// Quelle: /api/brain/nodes → counts {targets, runs, findings, logs}. Wissen = Summe.
+// Stufen: 0 (<1) nichts · 1 (≥1) Hütten · 2 (≥10) Brunnen · 3 (≥50) Steinhäuser · 4 (≥200) Türme · 5 (≥1000) moderne Gebäude.
+// Stufe 0 zeigt bewusst nichts (keine Fake-Bauten).
+(async function knowledgeGrowth() {
+  const STEPS = [[1, "🛖", "Hütten"], [10, "⛲", "Brunnen"], [50, "🏠", "Steinhäuser"], [200, "🏰", "Türme"], [1000, "🏙️", "moderne Gebäude"]];
+  let c = {};
+  try { c = (await (await fetch("/api/brain/nodes")).json()).counts || {}; } catch (_) { return; }
+  const k = ["targets", "runs", "findings", "logs"].reduce((s, n) => s + (Number(c[n]) || 0), 0);
+  const stage = STEPS.filter(([t]) => k >= t).length;
+  window.__antbbKnowledge = { knowledge: k, stage, counts: c };
+  const iframe = document.getElementById("kimi-city-frame");
+  try { iframe && iframe.contentWindow && iframe.contentWindow.postMessage({ type: "antbb-knowledge", knowledge: k, stage }, location.origin); } catch (_) {}
+  if (!stage) return;
+  const box = document.createElement("div");
+  box.id = "kimi-city-growth";
+  box.title = `Wissen ${k} (Ziele ${c.targets || 0}, Läufe ${c.runs || 0}, Funde ${c.findings || 0}, Logs ${c.logs || 0})`;
+  box.style.cssText = "position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;pointer-events:none;" +
+    "font:600 11px system-ui;color:#eef;background:rgba(4,8,18,.72);border:1px solid #d4af6a;border-radius:8px;padding:4px 10px";
+  box.textContent = `Stadtausbau Stufe ${stage}/5 · Wissen ${k} · ` + STEPS.slice(0, stage).map(([, i, n]) => `${i} ${n}`).join("  ");
+  document.body.appendChild(box);
+})();
