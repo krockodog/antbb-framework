@@ -39,7 +39,7 @@ export async function mountQueenViewer(el, kind = "red", opts = {}) {
   const rim = new THREE.DirectionalLight(cfg.color, 1.4); rim.position.set(-3, 2, -2); scene.add(rim);
   const cam = new THREE.PerspectiveCamera(32, 1, 0.05, 80);
   const controls = new OrbitControls(cam, canvas);
-  controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 0.7;
+  controls.enableDamping = true; controls.autoRotate = false; // face stays toward camera
   controls.enablePan = false; controls.minDistance = 1.2; controls.maxDistance = 8;
 
   try {
@@ -51,13 +51,18 @@ export async function mountQueenViewer(el, kind = "red", opts = {}) {
     root.position.sub(ctr);
     const s = 2.4 / Math.max(size.x, size.y, size.z);
     root.scale.setScalar(s);
+    // Face the viewer (front). Idle may only sway a few degrees.
+    // Authored side-on → yaw so face looks at camera (+Z toward us)
+    const FACE = -Math.PI / 2;
+    root.rotation.y = FACE;
     scene.add(root);
+    el._qvRoot = root; el._qvFace = FACE;
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(1.6, 48),
       new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.12 })
     );
     ground.rotation.x = -Math.PI / 2; ground.position.y = -size.y * s / 2; scene.add(ground);
-    cam.position.set(0.6, size.y * s * 0.35, 3.6);
+    cam.position.set(0.05, size.y * s * 0.28, 3.5);
     controls.target.set(0, size.y * s * 0.1, 0);
     fallback.remove();
   } catch (e) {
@@ -72,8 +77,10 @@ export async function mountQueenViewer(el, kind = "red", opts = {}) {
   };
   resize();
   const ro = new ResizeObserver(resize); ro.observe(el);
-  (function tick() {
+  (function tick(t0) {
     if (!el.isConnected) { ro.disconnect(); return; }
+    const root = el._qvRoot;
+    if (root) root.rotation.y = (el._qvFace||0) + Math.sin(performance.now() / 1000 * 0.7) * 0.12;
     controls.update(); renderer.render(scene, cam); requestAnimationFrame(tick);
   })();
 }
