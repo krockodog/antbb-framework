@@ -1,193 +1,149 @@
-# All and One — RED · BLUE · Yellow · Ant-Team
+# All and One — RED · BLUE · YELLOW Ant-Team
 
-**Orchestrierte Ameisenfarmen** — eine Plattform, drei Königinnen: Bug Bounty & Pentest (Red), Schutz & Hardening (Blue), Reverse Engineering (Yellow). Ein Framework, ein Prozess, eine Adresse.
+**Orchestriertes Security-Framework mit drei Teams:** Bug Bounty & Pentest (Red), Schutz & Hardening (Blue), Reverse Engineering (Yellow). Ein Prozess, ein Port, eine Adresse.
 
-> Unbefugtes Ausspähen, Abfangen oder Vorbereiten von Angriffen auf Daten ist strafbar (§ 202a–c StGB; im US-Kontext der CFAA). Dieser Hinweis ersetzt kein Oversight. Aktive Arbeit läuft nur mit gesetztem Häkchen und einem konkreten Ziel auf der Allowlist. Dieser Schwarm führt keine Angriffe aus.
+Jedes echte Ergebnis – Ziele, Läufe, Befunde, Logs – mehrt den Reichtum der Ameisenstadt, und dieses Wachstum kennt keine Endstufe: Wissen selbst ist ihr Wohlstand. Je mehr Wissen und Macht eine Königin sammelt, desto besser weiß sie ihr Volk zu führen, einzusetzen und zu schützen. Die Ausbaustufe der Stadt wird bereits aus den echten Zählern berechnet und angezeigt (ab 1 Hütten, 10 Brunnen, 50 Steinhäuser, 200 Türme, 1000 moderne Gebäude); die zugehörigen 3D-Gebäude sind in Arbeit.
+
+> Unbefugtes Ausspähen, Abfangen oder Vorbereiten von Angriffen auf Daten ist strafbar (§ 202a–c StGB; im US-Kontext der CFAA). Aktive Arbeit läuft nur mit bestätigtem Human Oversight und einem konkreten Ziel im Scope. Der Hinweis ersetzt kein Oversight.
 
 ---
 
 ## Inhalt
 
-1. [Das Konzept](#das-konzept)
-2. [Leistungsübersicht](#leistungsübersicht)
-3. [Screenshots](#screenshots)
-4. [Alle Menüpunkte im Detail](#alle-menüpunkte-im-detail)
-5. [Architektur](#architektur)
-6. [Installation](#installation)
-7. [Betrieb](#betrieb)
-8. [Leitplanken & Sicherheitsmodell](#leitplanken--sicherheitsmodell)
-9. [Roadmap](#roadmap)
+1. [Überblick](#überblick)
+2. [Red Queen – Offensive Sicherheit](#red-queen--offensive-sicherheit)
+3. [Blue Queen – Schutz & Hardening](#blue-queen--schutz--hardening)
+4. [Yellow Queen – Reverse Engineering](#yellow-queen--reverse-engineering)
+5. [Gemeinsame Bereiche: Hub, Neuronales Gehirn, Historie, Reports](#gemeinsame-bereiche)
+6. [Architektur](#architektur) · [Installation](#installation) · [Betrieb](#betrieb) · [Sicherheitsmodell](#leitplanken--sicherheitsmodell) · [Roadmap](#roadmap)
 
 ---
 
-## Das Konzept
+## Überblick
 
-Drei Königinnen — ein Schwarm. Jede Königin führt ihre eigene Kolonie mit eigenen Soldaten, Playbooks und Farbe; geteilt werden **Scope (default-deny)**, **Human Oversight** und der **kanonische Beweis** (Proof-Gate: „verifiziert" gilt erst mit Nachweis — alles andere bleibt Verdacht).
+| Team | Rolle | Kern |
+|---|---|---|
+| **Red Queen** | Red-Teaming | Bug Bounty & Pentest im engen Scope, 5-Phasen-Pipeline, Findings mit Proof-Gate, Fix-Brücke zu Blue, Funk-Labor (WLAN/BT/IoT) mit Späher |
+| **Blue Queen** | Blue Safety-Teaming | Schutz & Hardening, 6-Phasen-Pipeline (Assess → Verify), Greenbone-Anbindung, Remediation mit Vorher/Nachher-Evidence |
+| **Yellow Queen** | Yellow Reverse-Teaming | Reverse Engineering von Samples (EXE/DLL/APK/ELF/HEX), 6-stufige RE-Pipeline mit begründeten Schritten |
 
-| Königin | Farbe | Rolle | Kern |
-|---|---|---|---|
-| 🔴 **Rote Königin** | Rot | Red-Teaming | Bug Bounty & Pentest im engen Scope, 5-Phasen-Pipeline, Findings mit Proof-Gate und Fix-Brücke zur Blauen Königin |
-| 🛡 **Blaue Königin** | Blau | Blue Safety-Teaming | Schutz & Hardening, 6-Phasen-Pipeline (Assess→Verify), Greenbone-Anbindung, Remediation mit Vorher/Nachher-Evidence |
-| 🟡 **Gelbe Königin** | Gold | Yellow Reverse-Teaming | Reverse Engineering von Samples (EXE/DLL/APK/ELF/HEX), 6-stufige RE-Pipeline, jeder Schritt begründet sich selbst |
-| 🧠 **Neuronales Gehirn** | alle | Schwarm-Wiki & Visualisierung | Drei Königinnen über drei farbigen Armeen, klickbare Knoten, Live-Logs, Zeitraffer, Schwarm-Wiki (wer macht was, wie, wo, warum) |
+Zusammenspiel: **Red** belegt den Angriffspfad → **Yellow** verifiziert offline → **Blue** behebt, testet erneut und dokumentiert.
 
-Die Kette im Betrieb: **Red** beweist den Angriffspfad → **Yellow** verifiziert offline (z. B. geknacktes WLAN-Passwort, maskiert) → **Blue** fixt mit Re-Test und sauberem Log & Report.
+| Rote Königin | Blaue Königin | Gelbe Königin |
+|---|---|---|
+| ![Rote Königin](docs/screenshots/queen-red.png) | ![Blaue Königin](docs/screenshots/queen-blue.png) | ![Gelbe Königin](docs/screenshots/queen-yellow.png) |
+
+*Echte Renders der 3D-Modelle aus `antbb/web/static/brain/queen-viewer.js` (WebGL).*
+
+---
+
+Gemeinsame Leitplanken aller Teams (Scope default-deny, Human Oversight, Proof-Gate, Honest-empty): siehe [Sicherheitsmodell](#leitplanken--sicherheitsmodell).
 
 ---
 
+## Red Queen – Offensive Sicherheit
 
-## Leistungsübersicht
+Route `/red`. 18 Soldaten mit Playbooks, Tools und abhakbaren Aufgaben.
 
-Was auf der Plattform orchestriert und gebaut wurde — **hauptsächlich von Mr. bugbouty** (Ameisen-BugBounty-Plattform · Red Queen), unter Judiths Oversight:
+![Red Queen](docs/screenshots/shot-heute-red.jpg)
 
-- **🔴 Red** — offensive Tests im engen Scope: 5-Phasen-Pipeline (Recon → Assessment → Exploitation → Post-Ex → Reporting), 18 Soldaten, Proof-Gate, Fix-Brücke nach Blau; `mode_policy` auto mit Scope + Human Oversight.
-- **🛡 Blue** — Safety / Defensive: Assess → Harden → Defend → Remediate → Verify; 25 Soldaten (Greenbone, Hardening, Watcher, AV/ClamAV, Remediation mit Vorher/Nachher, Re-Check).
-- **🟡 Yellow** — Reverse Engineering: Fall-Pipeline mit echten Artefakten, 9 RE-Soldaten (triage/pe/dotnet/android/elf/hex/carve/dos/dynamic), Ghidra/ghidra-mcp, Next-Steps aus echten Funden.
-- **📡 WLAN · Geräte** — Scope / Coverage & Scan / Heatmap / Offensiv; Live-USB-Erkennung (Flipper, ESP/Spiel High, D-Autor); Geräte-Fähigkeitskatalog inkl. „Was passiert“ + Blue-Schutz; ESP32-Firmware-Profile (Ghost / Marauder / Bruce, Flash nur gated).
-- **🧠 UI / Plattform** — All-and-One-Hub auf `:1001`, Queen-Seiten same-origin, Neural Brain, Historie/Zeitraffer, Zurück-Button, Undo für Scope/Target ohne Oversight-Bypass.
+**Funktionen**
+- **Statistiken:** Soldaten, Playbooks, Aufgaben, Findings, Ziele, Scope-Einträge – echte Werte aus der Registry.
+- **Phasen-Pipeline:** Recon → Vulnerability Assessment → Exploitation → Post-Exploitation → Reporting (defensiv/offensiv gekennzeichnet).
+- **Red-Team-Menü** (nach Zielauswahl): Recon & OSINT · Schwachstellen-Scan · Aktive Verifikation (Oversight) · PoC aus Evidence (Oversight) · LLM-Security · Reporting. Jeder Klick legt einen echten Lauf an.
+- **Ziele & Scope-Manager:** Ziele anlegen (Name, Beschreibung, `mode_policy`), Scope-Einträge, Oversight-Status, Archivieren (`/trash`), Undo der letzten Scope-/Target-Änderung (setzt nie Oversight).
+- **Findings:** über alle Ziele, nach Schwere sortiert; „In Blau reparieren“ erzeugt einen echten Remediate-Job in `/blue`.
+- **Fernzugriff:** lokal / Tailscale / Cloudflare-Tunnel; Start nur mit Oversight-Bestätigung.
 
-Harte Leitplanken überall: Scope **default-deny**, Oversight-Pflicht für Aktives, nicht destruktiv, keine Secrets im Repo (Keys nur zur Laufzeit).
-
----
-## Screenshots
-
-### Hub (`/`)
-Einstieg mit den drei Königinnen-Karten, Live-Status aus der echten Colony und Rechtshinweis.
-
-![Hub](docs/screenshots/shot-hub.jpg)
-
-### Rote Königin (`/red`)
-Offensiv-Kolonie: Hero mit Echt-Statistiken, Phasen-Pipeline, Kolonie starten (Scan-Tiefe wählbar), Red-Team-Menü nach Scope-Auswahl, Soldaten & Playbooks, Ziele & Scope-Manager, Findings mit „In Blau reparieren"-Fix-Brücke, Läufe, Fernzugriff (Tailscale/Cloudflare).
-
-![Red Queen](docs/screenshots/shot-red.jpg)
-
-### Blaue Königin (`/blue`)
-Verteidigungs-Kolonie: Phasen-Pipeline (Assess → Watch → Harden → Defend → Remediate → Verify), Kolonie starten (read-only Default), Soldaten & Playbooks, Greenbone/OpenVAS (Import + Scoped Scan), wiederholbare Jobs, Posture-Ledger, Attack-Log, Posture/SIEM, Remediation, Läufe.
-
-![Blue Queen](docs/screenshots/shot-blue.jpg)
-
-### Gelbe Königin (`/yellow`)
-RE-Kolonie: RE-Pipeline (Triage → Identifikation → Entpacken → Static → Dynamic → Dossier), Sample-Upload mit Autorisierungs- und Oversight-Gate, Fälle, Tool-Doctor.
-
-![Yellow Queen](docs/screenshots/shot-yellow.jpg)
-
-### Neuronales Gehirn (`/brain`)
-Drei gleich große Königinnen — jede vor ihrer farblich passenden Armee (Bewegungs-Sektoren in `ants.js`). Knoten-Panel minimiert, Zeitraffer unten links, „📖 Schwarm-Wiki"-Overlay erklärt alle drei Kolonien (WER/WAS/WIE/WO/WARUM).
-
-![Neuronales Gehirn](docs/screenshots/shot-brain.jpg)
-
-### Historie (`/history`)
-Run-Historie aller Königinnen — inklusive Zeitraffer (Lauf auswählen, abspielen, 1×–8×, Scrubber).
-
-![Historie](docs/screenshots/shot-history.jpg)
+**Orchestrierung eines Laufs** (`antbb/web/app.py`, `antbb/service.py`)
+1. Ziel anlegen und Scope-Einträge pflegen (`/target/add`, `/target/{id}`).
+2. Oversight für das Ziel bestätigen (`POST /target/{id}/oversight`).
+3. Kolonie starten: Scan-Tiefe *Leicht* (recon · scan · report) oder *Intensiv* (alle Phasen); aktive bzw. offensive Schritte nur mit zusätzlichem Oversight-Häkchen.
+4. Der Lauf startet als Hintergrund-Thread (`_start_scan_async` → `svc.run_scan`); es läuft immer nur ein Scan gleichzeitig (sonst HTTP 409). Fehlt Oversight, endet der Lauf mit Status `error`.
+5. Ereignisse erscheinen im Live-Feed; nach Abschluss werden Schwere-Verteilung, Findings und der Run-Eintrag in der Historie gespeichert.
 
 ### Funk-Labor (`/wlan`)
-WLAN-Scope, Coverage & Scan, Heatmap, Offensiv/Airgorah (Engagement-Gate) — plus Bluetooth/BLE- und IoT-Lab-Karten (passiv frei, aktiv nur mit Oversight, Kette Red→Yellow→Blue).
+WLAN-Scope (Allowlist), Coverage & Scan (passiv und Königin-Voll-Scan mit rein defensiven Checks), Heatmap, Offensiv/Airgorah sowie Bluetooth/BLE- und IoT-Lab-Karten.
 
 ![WLAN · BT · IoT](docs/screenshots/shot-wlan.jpg)
 
-#### WLAN-Tabs einzeln
+**Späher (Scout):** Im Tab *Coverage & Scan* zeigt `/wlan` den WLAN-Späher als 3D-Modell (`queen-viewer.js`, Modell `archer.glb`) neben den erkannten Geräten.
+
+| Späher (3D-Modell auf `/wlan`) | Erkannte Geräte |
+|---|---|
+| ![Späher](docs/screenshots/scout.png) | ![WLAN-Späher – erkannte Geräte](docs/screenshots/shot-heute-wlan.jpg) |
+
 | Tab | Bild |
 |---|---|
-| Scope | ![WLAN Scope](docs/screenshots/shot-wlan-scope.jpg) |
 | Coverage & Scan | ![WLAN Coverage](docs/screenshots/shot-wlan-coverage.jpg) |
 | Heatmap | ![WLAN Heatmap](docs/screenshots/shot-wlan-heatmap.jpg) |
 | Offensiv/Airgorah | ![WLAN Offensiv](docs/screenshots/shot-wlan-offensive.jpg) |
 
-### Königinnen einzeln (Sprites)
-![Rote Königin](docs/screenshots/queen-red.png)
-![Blaue Königin](docs/screenshots/queen-blue.png)
-![Gelbe Königin](docs/screenshots/queen-yellow.png)
+- **Offensiv/Airgorah:** an [Airgorah](https://github.com/martin-olivier/airgorah) (MIT) angelehnte, web-native Audit-Schicht (`antbb/wlan_airgorah.py`): Interface/Monitor-Mode-Status, AP-/Client-Liste, Handshake/PMKID, gezielter Deauth, Offline-Crack. Kein Airgorah-Code eingebettet. Scharfe Aktionen nur über `wlan_offensive` mit **Engagement-Gate + Oversight + `ANTBB_WIFI=1`**; keine autonomen Ketten.
+- **Bluetooth/BLE** (passiv): Inventar, GATT-Lesekarte, Verbindungs-Tracking; Verifikation nur an eigenen Geräten mit Oversight.
+- **IoT-Lab** (eigene Geräte): Inventar (FritzBox/mDNS/SSDP), MQTT-Audit, Zigbee/Z-Wave-Karte, Default-Credential-Check; Kette Red → Yellow → Blue.
+
+### Reports (Red, zielbezogen)
+- `GET /target/{id}/branded-report` – gebrandeter HTML-Report (Firma, Logo, Farbe, Titel, Kunde als Parameter).
+- `GET /target/{id}/report/print` – druckoptimierte Ansicht (Browser: Drucken → Als PDF).
+- `GET /target/{id}/report.pdf` – PDF-Download über weasyprint/wkhtmltopdf; ohne Engine ehrlicher HTML-Fallback.
+- `GET /report/{id}/view`, `GET /report/{id}/export?format=md|json` – Markdown-Ansicht bzw. Export nach `data/exports/`; Addenda und Revisionen über `/report/{id}/addendum`, `/report/{id}/revisions`.
 
 ---
 
+## Blue Queen – Schutz & Hardening
 
-### Aktueller Stand (heute neu aufgenommen)
-Frisch erzeugte Screenshots vom laufenden `:1001` (nicht die alten vom 25.10.):
+Route `/blue`. 25 Soldaten (Greenbone, Hardening, Watcher, AV/ClamAV, Remediation, Re-Check).
 
-| Ansicht | Bild |
-|---|---|
-| 🔴 Red Queen | ![Red heute](docs/screenshots/shot-heute-red.jpg) |
-| 🛡 Blue Queen | ![Blue heute](docs/screenshots/shot-heute-blue.jpg) |
-| 🟡 Yellow Queen | ![Yellow heute](docs/screenshots/shot-heute-yellow.jpg) |
-| 📡 WLAN-Späher (erkannte Geräte) | ![WLAN heute](docs/screenshots/shot-heute-wlan.jpg) |
+![Blue Queen](docs/screenshots/shot-heute-blue.jpg)
+
+- **Phasen-Pipeline:** Assess → Watch → Harden → Defend → Remediate → Verify.
+- **Kolonie starten** (`POST /api/blue/run`): *Leicht* = Assess + Harden, *Intensiv* = alle Phasen; read-only per Default, aktive Fixes (`apply_fixes`) nur mit Oversight (sonst HTTP 403).
+- **Greenbone/OpenVAS:** Report-Import (XML/CSV/JSON, rein lesend) und Scoped Scan auf einen In-Scope-Host (Oversight-Pflicht; ohne GVM ehrlicher 503).
+- **Jobs:** wiederholbare Checks (Software-Scan, Hardening, Remediation-Verify) mit Intervall und manuellem Auslösen.
+- **Posture-Ledger:** Vorher/Nachher über Läufe; „nachweislich geschlossen“ nur mit Re-Check.
+- **Attack-Log** (append-only), **Posture/SIEM** (optional Splunk HEC), **Remediation** (Fix-Brücke aus Red; ohne Target-Oversight HTTP 403), **Blue-Läufe**.
 
 ---
-## Alle Menüpunkte im Detail
 
-Die Menüleiste ist auf **allen** Seiten identisch:
+## Yellow Queen – Reverse Engineering
 
-| Menüpunkt | Route | Beschreibung |
-|---|---|---|
-| ← Hub | `/` | Zurück zur Startseite |
-| Scope-Manager | `/` | Hub: Königinnen-Übersicht, Live-Status, Einstieg |
-| 🔴 Red Queen | `/red` | Offensiv-Kolonie (unten im Detail) |
-| 🛡 Blue Queen | `/blue` | Verteidigungs-Kolonie (unten im Detail) |
-| 🟡 Yellow Queen | `/yellow` | RE-Kolonie (unten im Detail) |
-| 📡 WLAN · BT · IoT | `/wlan` | Funk-Labor: WLAN, Bluetooth/BLE, IoT (unten im Detail) |
-| 🧠 Neuronales Gehirn | `/brain` | Schwarm-Visualisierung, Knoten, Logs, Zeitraffer, Wiki |
-| 🔒 Eigene Assets | `/assets` | Asset-Register der eigenen Systeme |
-| 🗂️ Historie | `/history` | Persistente Run-Historie aller Kolonien + Zeitraffer |
+Route `/yellow`. 9 RE-Soldaten (triage, pe, dotnet, android, elf, hex, carve, dos, dynamic), Ghidra/ghidra-mcp.
 
-### `/` — Hub
-- **Drei Königinnen-Karten** mit Live-Status aus der echten Colony (Soldaten, Scope-Status).
-- Buttons: *Neural Brain öffnen* (`/brain`), *Gelbe Fälle* (`/yellow`).
-- Rechtshinweis im Footer (§ 202a-c StGB / CFAA).
+![Yellow Queen](docs/screenshots/shot-heute-yellow.jpg)
 
-### `/red` — Rote Königin (Red-Teaming)
-- **Hero + Statistiken**: Soldaten, Playbooks, Aufgaben, Findings, Ziele, Scope-Einträge — alles echte Werte aus der Registry.
-- **⬡ Phasen-Pipeline**: Recon → Vulnerability Assessment → Exploitation → Post-Exploitation → Reporting (aus der Capability-Registry; defensiv/offensiv gekennzeichnet).
-- **🐜🎯 Kolonie starten**: Ziel (Scope) wählen, Scan-Tiefe *Leicht/Intensiv*, optional aktive/offensive Schritte mit Oversight-Häkchen. Live-Feed per Polling.
-- **🎛 Red-Team-Menü** (erscheint nach Ziel-Auswahl): Recon & OSINT · Schwachstellen-Scan · Aktive Verifikation 🔒 · PoC aus Evidence 🔒 · LLM-Security · Reporting. 🔒-Punkte sind ohne Oversight-Häkchen gesperrt; jeder Klick legt einen echten Lauf an.
-- **Soldaten & Playbooks**: Karten aller 18 Rot-Soldaten mit Playbooks, Tools und abhakbaren Aufgaben (Haken = Override, gespeichert über die API), SKILL.md-Dialog pro Soldat, Volltext-Filter.
-- **🧭 Ziele & Scope-Manager**: Ziele anlegen (Name, Beschreibung, mode_policy), Scope-Einträge, Oversight-Status, Modus, Archivieren (Soft-Delete in `/trash`).
-- **🕷 Findings**: aggregiert über alle Ziele, nach Schwere sortiert; **„🛡 In Blau reparieren"** erzeugt einen echten Remediate-Job in `/blue` (Fix-Brücke).
-- **🗂 Läufe**: persistente Historie (ohne Blue-Läufe).
-- **🔐 Fernzugriff**: Aus (nur lokal) / Tailscale / Cloudflare-Tunnel — Modus wählen, Tunnel mit Oversight starten/stoppen.
+- **RE-Pipeline:** Triage (Hex/Strings/Sektionen) → Identifikation (diec) → Entpacken (Lab, Oversight) → Static (Ghidra) → Dynamic (Frida-Lab, Oversight) → Dossier.
+- **Analyse starten:** Sample-Upload (EXE, DLL, SYS, APK, SO, ELF, BIN, HEX …) nur mit bestätigter Autorisierung; Dynamic-Lab nur mit Oversight.
+- **Orchestrierung** (`yellow-queen/queen/orchestrator.py`): Fall anlegen (erst nach bestandenem Autorisierungs-Gate) → klassifizieren → Toolchain wählen → Soldaten ausführen → Ergebnisse in Dossier, Ledger und Neuronales Gehirn zusammenführen; jeder Hop wird begründet, die nächsten drei Schritte werden aus echten Funden abgeleitet.
+- **Fälle** (`/yellow/case/{id}`, `/yellow/laeufe`): Hops, Next-3, Funde mit Adresse, Evidence-Links; je Fall `ledger.md` und `dossier.md` im Fallordner.
+- **Tool-Doctor:** Werkzeugstatus (Ghidra, diec, Frida …) mit Pfad und Zweck.
 
-### `/blue` — Blaue Königin (Blue Safety-Teaming)
-- **Hero + Statistiken**: Soldaten, Playbooks, Aufgaben, Jobs, offene Lücken, nachweislich geschlossen.
-- **⬡ Phasen-Pipeline**: Assess → Watch → Harden → Defend → Remediate → Verify.
-- **🐜🛡 Kolonie starten**: read-only Default, scope-gebunden; aktive Fixes/Honeypots nur mit Oversight-Häkchen.
-- **Soldaten & Playbooks**: 24 Blue-Soldaten mit Checklisten, 🔒-Markierung für Oversight-Pflicht.
-- **🌿 Greenbone / OpenVAS**: Report-Import (XML/CSV/JSON, rein lesend) und Scoped Scan (ein In-Scope-Host, Oversight-Pflicht).
-- **⏱ Jobs**: wiederholbare Checks (Software-Scan, Hardening, Remediation-Verify, …) mit Intervall und manuellem Auslösen.
-- **🧾 Posture-Ledger**: Vorher/Nachher über Läufe — „nachweislich geschlossen" nur mit Re-Check.
-- **🕷 Attack-Log**: append-only Protokoll (Detection, Honeypot-Umleitung, Gegenmaßnahme).
-- **📡 Posture / SIEM**: Splunk-HEC-Status (optional) + Leitplanken.
-- **🛠 Remediation**: Findings mit prüfbarem Fix und Oversight-Gate.
-- **🗂 Blue-Läufe**: nur colony=blue.
+---
 
-### `/yellow` — Gelbe Königin (Yellow Reverse-Teaming)
-- **Hero + Statistiken**: Fälle, Tools da/fehlend (Tool-Doctor), max. Upload, RE-Schritte.
-- **⬡ RE-Pipeline**: Triage (Hex/Strings/Sektionen) → Identifikation (diec) → Entpacken (Lab 🔒) → Static (Ghidra) → Dynamic (Frida-Lab 🔒) → Dossier.
-- **🐜🔍 Analyse starten**: Sample-Upload (EXE, DLL, SYS, APK, SO, ELF, BIN, HEX, …) mit **Autorisierungs-Pflicht**-Häkchen; Dynamic-Lab nur mit Oversight. Danach: Fall-Seite mit Next-3-Schritten, Funden, Begründung je Schritt.
-- **🗂 Fälle**: letzte 50 Fälle (Format, Route, Status, Zeit), volle Historie über `/api/cases`.
-- **🧰 Tool-Doctor**: Werkzeug-Status (Ghidra, diec, Frida, …) mit Pfad und Zweck.
+## Gemeinsame Bereiche
 
-### `/brain` — Neuronales Gehirn
-- **Drei Königinnen** (gleich groß, korrekte Farben, Labels) vor ihren farbigen Armeen — Armeen wandern in ihren Sektoren (blau 20–42 %, rot 42–58 %, gelb 58–80 %).
-- **Knoten-Panel** (rechts, minimiert aufklappbar): Knoten mit Status, Detail-Dialog, Logs-Tab, Löschen nur mit Menschen-Bestätigung.
-- **Zeitraffer** (unten links): Lauf auswählen, abspielen, Geschwindigkeit, Scrubber.
-- **📖 Schwarm-Wiki**: Overlay mit allen drei Königinnen nach dem Schema WER / WAS / WIE / WO / WARUM + geteilte Leitplanken.
-- **Ameisen-Overlay**: laufende Soldaten mit Namensschildern, keine Spiegelschrift.
+### Hub (`/`)
+Einstieg mit den drei Königinnen-Karten, Live-Status aus der Colony und Rechtshinweis.
 
-### `/wlan` — Funk-Labor (WLAN · BT · IoT)
-- **WLAN-Scope** (Allowlist), **Coverage & Scan** (passiv + Königin-Voll-Scan), **Heatmap**, **Offensiv/Airgorah** (Engagement + Oversight + `ANTBB_WIFI=1`).
-- **🦷 Bluetooth / BLE** (passiv): Inventar, GATT-Lesekarte, Verbindungs-Tracking; BT-Verifikation 🔒 nur an eigenen Geräten.
-- **🔌 IoT-Lab** (eigene Geräte): Inventar (FritzBox/mDNS/SSDP), MQTT-Audit, Zigbee/Z-Wave-Karte, Default-Cred-Check; Kette Red → Yellow → Blue.
+![Hub](docs/screenshots/shot-hub.jpg)
+
+### Neuronales Gehirn (`/brain`)
+Das Neuronale Gehirn speichert das Wissen der Plattform und zeigt es als 3D-Ameisenstadt: die Rote Königin auf dem Thron in der Mitte, die Blaue Königin in ihrem Wachviertel, die Gelbe Königin in ihrer Schmiede. Die Namensschilder folgen den echten 3D-Positionen; die Stadt ist drehbar. Dazu Knoten-Panel mit Logs, Zeitraffer und Schwarm-Wiki (WER / WAS / WIE / WO / WARUM). Aliasse: `/red/brain`, `/blue/brain`, `/yellow/brain`.
+
+![Neuronales Gehirn](docs/screenshots/shot-brain.jpg)
+
+### Historie (`/history`)
+Persistente Run-Historie aller Teams mit Zeitraffer sowie Export-Index (`GET /api/exports`, Download über `/exports/{name}` aus `data/exports/`).
+
+![Historie](docs/screenshots/shot-history.jpg)
 
 ### Weitere Routen
 | Route | Inhalt |
 |---|---|
-| `/target/{id}` | Ziel-Detail: Scope-Einträge, Oversight, Mode, Findings, Reports (mit Addenda & Revisionen), Scan-Status |
-| `/target/add` | Ziel-Anlage-Formular (GET) / Anlegen (POST) |
-| `/assets` | Eigene Assets (Web-Assets, TLS-/Header-Checks) |
-| `/history` | Run-Historie aller Kolonien + Zeitraffer |
-| `/trash` | Papierkorb (archivierte Ziele, wiederherstellbar) |
-| `/yellow/case/{id}` | Fall-Dossier: Hops, Next-3, Funde mit Adresse, Bypass/Dynamic-Status, Evidence-Links |
-| `/yellow/laeufe` | Gelbe Dossiers |
-| `/red/brain`, `/blue/brain`, `/yellow/brain` | Aliasse auf das geteilte neuronale Gehirn |
+| `/target/{id}` | Ziel-Detail: Scope, Oversight, Mode, Findings, Reports, Scan-Status |
+| `/target/add` | Ziel anlegen |
+| `/assets` | Eigene Assets (TLS-/Header-Checks) |
+| `/trash` | Archivierte Ziele, wiederherstellbar |
 
 ---
 
@@ -200,7 +156,7 @@ antbb.service (uvicorn, api.main:app)
 ├── /                Hub          → Next.js-Static-Export (all-and-one/out)
 ├── /red /blue       Kolonie      → antbb.web (FastAPI, Colony-Backup)
 ├── /yellow …        Yellow Queen → yellow_queen.web (FastAPI, RE-Orchestrierung)
-├── /brain           Gehirn      → Colony-Brain (Three.js-Partikelfeld + nodes-panel + runs.js + queens.js)
+├── /brain           Neuronales Gehirn → Colony-Brain (Three.js-Partikelfeld + nodes-panel + runs.js + queens.js)
 ├── /wlan /assets /history …     → Colony-Routen
 └── /api/…           Queens-APIs, Targets, Runs, Feed, Capabilities, Blue-Jobs, …
 ```
@@ -322,7 +278,7 @@ Bewusst **nicht** als Mock eingebaut — diese Bausteine brauchen echte Hardware
 - **Geräte-Agenten**: Flipper Zero, Ghost ESP, ESP32-Marauder, BleShark Nano, AI-ESP32 als checkbare Workflow-Schritte mit automatischer Evidence (Geräte-Registry + Treiber-Schicht).
 - **Yellow-Crack-Pipeline**: aircrack-ng / hashcat / john mit lokalen Wortlisten, komplett offline, maskierte Ergebnisse, Schwellenlogik (trivial/schwach → Blue-Ticket).
 - **Blue-Konnektoren**: FritzBox (TR-064/LUA) für WPS aus / Passwort-Rotation / Gastnetz-Segmentierung; Freigabe-Matrix (auto / 1-Klick / 4-Augen) mit Dry-Run-Diff, Apply, Verify, Rollback.
-- **Gedächtnis-Speicher**: `/history` als kollektives Gedächtnis (Tricks, Gegenmittel, Lehren, verlinkt auf Evidence).
+- **Neuronales Gehirn – Wissensbasis**: `/history` und `/brain` als gemeinsames Wissen der Kolonien (Techniken, Gegenmaßnahmen, Lehren, verlinkt auf Evidence).
 - **Debrief-Dashboard**: Katz-und-Maus-Scoreboard (Angriffe vs. Abwehr je Klasse), Residual-Risk-Trend, Export PDF/PPTX für Kunden-Aufklärung.
 
 ---
