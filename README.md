@@ -283,6 +283,20 @@ Bewusst **nicht** als Mock eingebaut — diese Bausteine brauchen echte Hardware
 
 ---
 
+## Credits
+
+| Beteiligte | Rolle |
+|---|---|
+| Judith Pilarski ([@krockodog](https://github.com/krockodog)) | Konzept, Architektur, Oversight, Maintainerin |
+| Cursor ([@cursoragent](https://github.com/cursoragent)) | KI-gestützte Entwicklung |
+| lordix | Commits aus der lokalen Entwicklungsumgebung |
+| Red Queen (Plattform-Identität) | Commits zu Scan-Tools und Neuronalem Gehirn |
+| Kimi Work | Commit „All and One: kompletter Stand 2026-10-25“ |
+
+Grundlage ist die Autorenliste aus `git log`.
+
+---
+
 ## Lizenz & Hinweis
 
 Siehe [LICENSE](LICENSE). Dieses Framework ist für **autorisierte Sicherheitstests, eigene Labore und Aufklärungsarbeit** gebaut. Missbrauch gegen fremde Systeme ist strafbar und technisch durch das Scope-Gate ausgeschlossen — Tricks kennen heißt schützen können.
