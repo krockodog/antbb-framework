@@ -48,17 +48,23 @@ class WatcherAnt(BlueAgent):
         events = list(params.get("events") or [])
         kinds = params.get("kinds")
         active = self.active_allowed()
-        apply_protect = bool(params.get("apply_protect")) and active
-        store = None
-        # Store nur wenn die Königin einen angehängt hat (über params)
+        # Apply nur in der ersten Phase, sonst würde defend die Aktion wiederholen.
+        apply_protect = bool(params.get("apply_protect")) and active and task.phase == self.blue_phases[0]
         store = params.get("_store")
 
         self.ctx.log(f"[blue-watcher] 👁 {len(events)} Event(s), "
-                     f"active={active}, signals={len(_w.SIGNAL_CATALOG)}.")
+                     f"active={active}, apply={apply_protect}, signals={len(_w.SIGNAL_CATALOG)}.")
+        runner = params.get("isolate_runner")
         report = _w.run_watch(
             events, active=active, apply_protect=apply_protect,
             kinds=kinds, store=store, run_id=self.ctx.run_id,
-            target_id=task.target_id or None)
+            target_id=task.target_id or None,
+            scope_check=self.ctx.scope_check,
+            isolate_runner=runner if callable(runner) else None,
+            canary_http_port=int(params.get("canary_http_port") or 8089),
+            canary_ssh_port=int(params.get("canary_ssh_port") or 2222),
+            canary_log_dir=params.get("canary_log_dir") or None,
+            start_canary=bool(params.get("start_canary", True)))
 
         # Capability / Summary immer
         findings.append(AgentFinding(
@@ -97,6 +103,23 @@ class WatcherAnt(BlueAgent):
                 description=div.get("reason") or "",
                 evidence=div, status="REFERENZ",
                 dedup_key=f"blue-watcher-divert:{i}:{div.get('recipe_id')}",
+            ))
+
+        for i, prot in enumerate(report.protects):
+            if prot.get("status") == "planned":
+                continue
+            ev = dict(prot.get("evidence") or {})
+            closed = bool(ev.get("closed"))
+            findings.append(AgentFinding(
+                agent=self.name,
+                title=(("[GESCHLOSSEN] " if closed else "Protect ")
+                       + f"{prot.get('status')}: {prot.get('action')}"),
+                category="blue-remediation-verified" if closed else "blue-watcher-protect",
+                severity="info", asset=str(ev.get("file") or "monitoring"),
+                description=prot.get("reason") or "",
+                evidence=ev, status="GESCHLOSSEN" if closed else (
+                    "REFERENZ" if prot.get("status") == "planned" else "ZU BESTÄTIGEN"),
+                dedup_key=f"blue-watcher-protect:{i}:{prot.get('action')}",
             ))
 
         attrs = (report.traceback or {}).get("attributions") or []

@@ -1,6 +1,6 @@
 ---
 name: skill-blue-hardening
-description: "System-/Dienst-Konfiguration rein lesend prüfen (SSH, Firewall, Dateirechte, sysctl) und konkrete Fix-Empfehlungen geben. Fix-Apply nur oversight-gated."
+description: "CIS-artiger Audit lesend. Mit Oversight und Scope: PasswordAuthentication no, sysctl-Drop-in und ufw-Bind für riskante Ports, jeweils mit Backup und Re-Check."
 version: 1.0.0
 colony: blue
 license: MIT

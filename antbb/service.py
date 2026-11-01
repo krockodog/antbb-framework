@@ -1084,9 +1084,17 @@ class AntBBService:
                     apply_protect: bool = False, kinds=None,
                     run_id: str = "", target_id=None) -> dict:
         from . import watcher as _w
+
+        def _scope(asset: str) -> bool:
+            if asset in ("localhost", "monitoring", "decoy"):
+                return True
+            if target_id is None:
+                return False
+            return bool(scope_mod.check_asset(self.store, int(target_id), asset))
+
         report = _w.run_watch(
             events or [], active=active, apply_protect=apply_protect,
             kinds=kinds, store=self.store, run_id=run_id or "",
-            target_id=target_id)
+            target_id=target_id, scope_check=_scope)
         return report.to_dict()
 

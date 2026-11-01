@@ -177,16 +177,20 @@ def detect_signals(events: Iterable[dict],
                 if not m:
                     continue
                 excerpt = blob[max(0, m.start() - 40): m.end() + 40]
+                evidence = {
+                    "event_keys": sorted(str(k) for k in ev.keys()),
+                    "kind": sig["kind"],
+                    "marker": marker,
+                }
+                file_path = ev.get("file") or ev.get("filepath")
+                if file_path:
+                    evidence["file"] = str(file_path)
                 out.append(Detection(
                     signal_id=sig["id"], kind=sig["kind"], title=sig["title"],
                     severity=sig["severity"], source=source,
                     matched_marker=marker, event_excerpt=excerpt[:240],
                     recipe_id=sig.get("recipe") or "http-canary",
-                    evidence={
-                        "event_keys": sorted(ev.keys()),
-                        "kind": sig["kind"],
-                        "marker": marker,
-                    },
+                    evidence=evidence,
                     ts=float(ev.get("ts") or time.time()),
                 ))
                 break  # ein Treffer je Signal-ID pro Event reicht
@@ -194,21 +198,20 @@ def detect_signals(events: Iterable[dict],
 
 
 def immediate_protect(detection: Detection, *, active: bool = False,
-                      mode: str = "recommend") -> ProtectResult:
-    """Sofortschutz für verwundbare Assets.
+                      mode: str = "recommend", scope_check=None,
+                      isolate_runner=None) -> ProtectResult:
+    """Sofortschutz. Ohne Oversight nur Empfehlung.
 
-    Default: Empfehlung (rate-limit / temporary block) ohne Anwendung.
-    Mit Oversight (`active=True`) und mode='apply': dokumentierte
-    Schutzentscheidung (applied auf Steuerungsebene). Keine destruktiven
-    System-Calls ohne explizites Backend.
+    Mit Oversight und mode='apply': echte ufw-Isolation der Quell-IP, wenn
+    sie im Scope liegt und ufw vorhanden ist. Sonst ehrlicher Status
+    (denied/unavailable), nicht applied.
     """
-    action = "temporary-block-or-rate-limit"
+    action = "isolate-source"
     steps_evidence = {
         "recommended_actions": [
-            "Rate-Limit für die Quell-Session setzen",
-            "Temporären Block (Fail2ban/nft-set) für Quelle erwägen",
-            "Betroffenes Asset in Isolation / Wartungsmodus",
-            "Honeypot-Umleitung aktivieren (siehe divert)",
+            "Quelle per ufw deny isolieren (eine IP, reversibel)",
+            "Datei nur per Quarantäne-Move sichern, nicht löschen",
+            "Loopback-Canary für weitere Versuche starten",
         ],
         "detection": detection.to_dict(),
         "non_destructive_default": True,
@@ -217,18 +220,28 @@ def immediate_protect(detection: Detection, *, active: bool = False,
         return ProtectResult(
             ok=True, applied=False, action=action,
             reason=("Sofortschutz als Empfehlung (default). Aktives Anwenden "
-                    "nur mit Oversight + mode='apply'."),
-            status="planned" if not active else "planned",
+                    "nur mit Oversight und mode='apply'."),
+            status="planned",
             evidence=steps_evidence,
         )
-    # Oversight + apply: Steuerungsentscheidung dokumentieren.
-    steps_evidence["protect_decision"] = "mark_asset_protected"
-    steps_evidence["protected_at"] = time.time()
+    from . import quarantine as _q
+    iso = _q.isolate_source(
+        detection.source or "", active=True, scope_check=scope_check,
+        runner=isolate_runner,
+    )
+    steps_evidence["isolate"] = iso.to_dict()
+    steps_evidence["recheck"] = {
+        "before": (iso.evidence or {}).get("before"),
+        "after": (iso.evidence or {}).get("after"),
+        "verified": iso.verified,
+        "closed": iso.closed,
+    }
     return ProtectResult(
-        ok=True, applied=True, action=action,
-        reason=("Sofortschutz-Entscheidung gesetzt (Asset markiert/rate-limit "
-                "empfohlen). Kein unkontrollierter Firewall-Call."),
-        status="applied", evidence=steps_evidence,
+        ok=iso.ok, applied=bool(iso.applied and iso.verified),
+        action=iso.action or action,
+        reason=iso.reason,
+        status="applied" if (iso.applied and iso.verified) else iso.status,
+        evidence=steps_evidence,
     )
 
 
@@ -316,21 +329,55 @@ def _max_sev(sevs: list[str]) -> str:
     return best
 
 
+def _event_files(events: list[dict]) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        raw = ev.get("file") or ev.get("filepath")
+        if not raw:
+            continue
+        path = str(raw)
+        if path in seen:
+            continue
+        seen.add(path)
+        found.append(path)
+    return found
+
+
 def run_watch(events: Optional[list[dict]] = None, *,
               active: bool = False,
               apply_protect: bool = False,
               apply_network: bool = False,
               kinds: Optional[Iterable[str]] = None,
               store=None, run_id: str = "",
-              target_id: Optional[int] = None) -> WatchReport:
+              target_id: Optional[int] = None,
+              scope_check=None,
+              isolate_runner=None,
+              canary_http_port: int = 8089,
+              canary_ssh_port: int = 2222,
+              canary_log_dir: Optional[str] = None,
+              start_canary: bool = True) -> WatchReport:
     """Voller Wächter-Lauf: detect → divert → protect → traceback → log.
 
     `events=None`/leer → honest-empty Report (keine Fake-Detections).
-    Aktive divert/protect nur mit `active=True` (Oversight).
+    Aktive divert/protect nur mit `active=True` (Oversight). Protect wendet
+    ufw-Isolation, Quarantäne-Move und Loopback-Canary nur an, wenn zusätzlich
+    `apply_protect` gesetzt ist. Ohne Scope bleibt die Aktion denied.
     """
     events = list(events or [])
     detections = detect_signals(events, kinds=kinds)
     report = WatchReport(detections=detections)
+    do_apply = bool(active and apply_protect)
+
+    canary = None
+    if do_apply and start_canary and detections:
+        canary = _hp.deploy_canary(
+            active=True, scope_check=scope_check,
+            http_port=canary_http_port, ssh_port=canary_ssh_port,
+            log_dir=canary_log_dir,
+        )
 
     # Divert je Detection (Plan immer; Apply nur gated).
     for d in detections:
@@ -347,8 +394,27 @@ def run_watch(events: Optional[list[dict]] = None, *,
 
         pr = immediate_protect(
             d, active=active,
-            mode="apply" if (active and apply_protect) else "recommend")
+            mode="apply" if do_apply else "recommend",
+            scope_check=scope_check, isolate_runner=isolate_runner)
+        if canary is not None:
+            pr.evidence["canary"] = canary.to_dict()
         report.protects.append(pr.to_dict())
+
+    if do_apply:
+        from . import quarantine as _q
+        for path in _event_files(events):
+            moved = _q.quarantine_move(path, active=True, scope_check=scope_check)
+            report.protects.append({
+                "ok": moved.ok, "applied": moved.applied,
+                "action": moved.action, "reason": moved.reason,
+                "status": "applied" if moved.closed else moved.status,
+                "evidence": {
+                    "quarantine": moved.to_dict(),
+                    "recheck": (moved.evidence or {}).get("recheck"),
+                    "closed": moved.closed,
+                    "file": path,
+                },
+            })
 
     tb = traceback_attacker(detections, events)
     report.traceback = tb.to_dict()
@@ -411,6 +477,8 @@ def run_watch(events: Optional[list[dict]] = None, *,
         "divert_count": len(report.diverts),
         "divert_applied": sum(1 for d in report.diverts if d.get("applied")),
         "protect_applied": sum(1 for p in report.protects if p.get("applied")),
+        "protect_closed": sum(1 for p in report.protects
+                              if (p.get("evidence") or {}).get("closed")),
         "traceback_sources": len(tb.attributions),
         "log_entries": len(report.log_ids),
         "active_oversight": bool(active),

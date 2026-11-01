@@ -58,7 +58,8 @@ class BlueResult:
 
     def closed_count(self) -> int:
         return sum(1 for f in self.findings
-                   if f.category in ("blue-remediation-verified", "blue-ticket-closure"))
+                   if f.status == "GESCHLOSSEN"
+                   or f.category in ("blue-remediation-verified", "blue-ticket-closure"))
 
 
 class BlueQueen:
