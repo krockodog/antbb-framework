@@ -80,7 +80,7 @@ export async function mountQueenViewer(el, kind = "red", opts = {}) {
   (function tick(t0) {
     if (!el.isConnected) { ro.disconnect(); return; }
     const root = el._qvRoot;
-    if (root) root.rotation.y = (el._qvFace||0) + Math.sin(performance.now() / 1000 * 0.7) * 0.12;
+    if (root) root.rotation.y = (el._qvFace||0); // no continuous self-rotate (Judith: macht schwindelig)
     controls.update(); renderer.render(scene, cam); requestAnimationFrame(tick);
   })();
 }
