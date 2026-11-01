@@ -45,6 +45,8 @@ Gemeinsame Leitplanken aller Teams (Scope default-deny, Human Oversight, Proof-G
 
 Route `/red`. 18 Soldaten mit Playbooks, Tools und abhakbaren Aufgaben.
 
+![Red Queen – Seitenkopf](docs/images/red-queen.png)
+
 ![Red Queen](docs/screenshots/shot-heute-red.jpg)
 
 **Funktionen**
@@ -67,9 +69,11 @@ WLAN-Scope (Allowlist), Coverage & Scan (passiv und Königin-Voll-Scan mit rein 
 
 ![WLAN · BT · IoT](docs/screenshots/shot-wlan.jpg)
 
-**Späher (Scout):** Im Tab *Coverage & Scan* zeigt `/wlan` den WLAN-Späher als 3D-Modell (`queen-viewer.js`, Modell `archer.glb`) neben den erkannten Geräten.
+**Späher (Scout):** Im Tab *Coverage & Scan* zeigt `/wlan` den WLAN-Späher als 3D-Modell (`queen-viewer.js`, Modell `archer.glb`) neben dem Königin-Voll-Scan und den erkannten Geräten. Ohne WebGL erscheint statt des Modells nur der Text-Hinweis „WebGL nicht verfügbar“ (Text-Fallback).
 
-| Späher (3D-Modell auf `/wlan`) | Erkannte Geräte |
+![WLAN-Späher auf /wlan](docs/images/wlan-scout.png)
+
+| Späher (Render des 3D-Modells) | Erkannte Geräte |
 |---|---|
 | ![Späher](docs/screenshots/scout.png) | ![WLAN-Späher – erkannte Geräte](docs/screenshots/shot-heute-wlan.jpg) |
 
@@ -79,6 +83,7 @@ WLAN-Scope (Allowlist), Coverage & Scan (passiv und Königin-Voll-Scan mit rein 
 | Heatmap | ![WLAN Heatmap](docs/screenshots/shot-wlan-heatmap.jpg) |
 | Offensiv/Airgorah | ![WLAN Offensiv](docs/screenshots/shot-wlan-offensive.jpg) |
 
+- **Gates im Funk-Labor:** Passive Coverage-Scans brauchen kein Engagement; die Client-Abfrage verlangt eine Oversight-Bestätigung; offensive Aktionen brauchen Engagement-Gate, Oversight und `ANTBB_WIFI=1`.
 - **Offensiv/Airgorah:** an [Airgorah](https://github.com/martin-olivier/airgorah) (MIT) angelehnte, web-native Audit-Schicht (`antbb/wlan_airgorah.py`): Interface/Monitor-Mode-Status, AP-/Client-Liste, Handshake/PMKID, gezielter Deauth, Offline-Crack. Kein Airgorah-Code eingebettet. Scharfe Aktionen nur über `wlan_offensive` mit **Engagement-Gate + Oversight + `ANTBB_WIFI=1`**; keine autonomen Ketten.
 - **Bluetooth/BLE** (passiv): Inventar, GATT-Lesekarte, Verbindungs-Tracking; Verifikation nur an eigenen Geräten mit Oversight.
 - **IoT-Lab** (eigene Geräte): Inventar (FritzBox/mDNS/SSDP), MQTT-Audit, Zigbee/Z-Wave-Karte, Default-Credential-Check; Kette Red → Yellow → Blue.
@@ -95,6 +100,8 @@ WLAN-Scope (Allowlist), Coverage & Scan (passiv und Königin-Voll-Scan mit rein 
 
 Route `/blue`. 25 Soldaten (Greenbone, Hardening, Watcher, AV/ClamAV, Remediation, Re-Check).
 
+![Blue Queen – Seitenkopf](docs/images/blue-queen.png)
+
 ![Blue Queen](docs/screenshots/shot-heute-blue.jpg)
 
 - **Phasen-Pipeline:** Assess → Watch → Harden → Defend → Remediate → Verify.
@@ -109,6 +116,8 @@ Route `/blue`. 25 Soldaten (Greenbone, Hardening, Watcher, AV/ClamAV, Remediatio
 ## Yellow Queen – Reverse Engineering
 
 Route `/yellow`. 9 RE-Soldaten (triage, pe, dotnet, android, elf, hex, carve, dos, dynamic), Ghidra/ghidra-mcp.
+
+![Yellow Queen – Seitenkopf](docs/images/yellow-queen.png)
 
 ![Yellow Queen](docs/screenshots/shot-heute-yellow.jpg)
 
@@ -128,9 +137,11 @@ Einstieg mit den drei Königinnen-Karten, Live-Status aus der Colony und Rechtsh
 ![Hub](docs/screenshots/shot-hub.jpg)
 
 ### Neuronales Gehirn (`/brain`)
-Das Neuronale Gehirn speichert das Wissen der Plattform und zeigt es als 3D-Ameisenstadt: die Rote Königin auf dem Thron in der Mitte, die Blaue Königin in ihrem Wachviertel, die Gelbe Königin in ihrer Schmiede. Die Namensschilder folgen den echten 3D-Positionen; die Stadt ist drehbar. Dazu Knoten-Panel mit Logs, Zeitraffer und Schwarm-Wiki (WER / WAS / WIE / WO / WARUM). Aliasse: `/red/brain`, `/blue/brain`, `/yellow/brain`.
+Das Neuronale Gehirn speichert das Wissen der Plattform und zeigt es als 3D-Ameisenstadt: die Rote Königin auf dem Thron in der Mitte, die Blaue Königin in ihrem Wachviertel, die Gelbe Königin in ihrer Schmiede. Die Namensschilder folgen den echten 3D-Positionen; die Stadt ist drehbar. Die roten und blauen Soldaten-Schilder stammen live aus `/api/soldiers`, die gelben aus der statischen `YELLOW`-Liste in `antbb/web/static/brain/ants3d.js`. Ohne WebGL zeigt die Ansicht nur einen Text-Hinweis (Text-Fallback). Dazu Knoten-Panel mit Logs, Zeitraffer und Schwarm-Wiki (WER / WAS / WIE / WO / WARUM). Aliasse: `/red/brain`, `/blue/brain`, `/yellow/brain`.
 
 ![Neuronales Gehirn](docs/screenshots/shot-brain.jpg)
+
+![Neuronales Gehirn – Thron der Roten Königin](docs/images/brain-city-capital.png)
 
 ### Historie (`/history`)
 Persistente Run-Historie aller Teams mit Zeitraffer sowie Export-Index (`GET /api/exports`, Download über `/exports/{name}` aus `data/exports/`).
