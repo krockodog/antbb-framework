@@ -38,7 +38,7 @@
       hub.id = "superhirn-hub";
       var a = el("a", null, "← Hub");
       a.href = "/";
-      a.title = "Zurück zum Hub";
+      a.title = window.t("log.back");
       hub.appendChild(a);
       document.body.appendChild(hub);
     }
@@ -59,7 +59,7 @@
     box.appendChild(head);
     var body = el("div", "body");
     body.id = "superhirn-log-body";
-    body.appendChild(el("div", "line", "Warte auf Ereignisse der drei Königinnen…"));
+    body.appendChild(el("div", "line", window.t("log.wait")));
     box.appendChild(body);
     document.body.appendChild(box);
   }

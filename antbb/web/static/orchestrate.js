@@ -38,10 +38,10 @@
     });
     html += "</ul>";
     // Next-Step-Buttons (echte Aktionen mit Oversight-Häkchen)
-    html += "<div class='orch-next'><b>Als Nächstes (klickbar):</b><br>";
+    html += "<div class='orch-next'><b>" + window.t("orch.next") + "</b><br>";
     const next = st.next_steps || [];
     if (!next.length) {
-      html += "<span class='ok'>✅ Alle sinnvollen Schritte ausgeführt – keine offenen Zweifel.</span>";
+      html += "<span class='ok'>✅ " + window.t("orch.done") + "</span>";
     }
     next.forEach((n) => {
       html += "<div class='orch-item'><label class='orch-check'>" +
@@ -71,9 +71,9 @@
 
   async function runStep(action, btn) {
     const box = panel.querySelector(".orch-oversight[data-action='" + action + "']");
-    if (!box || !box.checked) { alert("Oversight-Häkchen setzen – aktive Analyse."); return; }
+    if (!box || !box.checked) { alert(window.t("orch.need")); return; }
     btn.disabled = true;
-    btn.textContent = "läuft…";
+    btn.textContent = window.t("js.running");
     try {
       const r = await fetch(base.replace(/\/state$/, "") + "/step", {
         method: "POST",

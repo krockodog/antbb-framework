@@ -257,7 +257,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
   const selected = ants.find((ant) => ant.id === selectedId) ?? null;
   const summary = selected ? payload?.queens.find((queen) => queen.queen_id === selected.queen) : null;
   const strip =
-    payload?.strip ?? "Rot tut Grenzschau · Blau tut Härtelage · Gelb tut Wegerklärung";
+    payload?.strip ?? t("queen.strip");
 
   return (
     <div className="brain-root" ref={hostRef} data-focus={focus ?? "all"}>
@@ -320,7 +320,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
               <h2 className="font-heading mt-1 text-3xl">{selected.label}</h2>
             </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedId(null)}>
-              Schließen
+              {t("hub.close")}
             </Button>
           </div>
           {selected.soldier ? (
@@ -333,7 +333,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
                 <span className="opacity-60">Playbooks · </span>
                 {selected.soldier.playbook_ids.join(", ")}
               </p>
-              <p>Oversight ist für Läufe nötig.</p>
+              <p>{t("hub.oversight_runs")}</p>
               <Badge variant="outline">{selected.soldier.stub_note}</Badge>
             </div>
           ) : (

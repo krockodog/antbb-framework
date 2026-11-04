@@ -34,7 +34,7 @@
       };
       if (log) log.textContent = "🛡 Blue Queen orchestriert (Tiefe=" + depth + ")…\n";
       const go = form.querySelector(".blue-go");
-      if (go) { go.disabled = true; go.textContent = "läuft…"; }
+      if (go) { go.disabled = true; go.textContent = window.t("js.running"); }
       fetch("/api/blue/run", {
         method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify(body)
@@ -75,14 +75,14 @@
   document.querySelectorAll(".blue-job-run").forEach(btn => {
     btn.addEventListener("click", function () {
       const id = btn.dataset.id;
-      btn.disabled = true; btn.textContent = "läuft…";
+      btn.disabled = true; btn.textContent = window.t("js.running");
       fetch("/api/blue/jobs/" + id + "/run", {method: "POST"})
         .then(r => r.json()).then(d => {
           alert(d.ok
             ? ("OK: " + d.finding_count + " Findings, " + d.closed_count + " geschlossen")
             : ("Fehler: " + (d.error || "?")));
           location.reload();
-        }).catch(e => { alert(e); btn.disabled = false; btn.textContent = "jetzt ausführen"; });
+        }).catch(e => { alert(e); btn.disabled = false; btn.textContent = window.t("blue.job.run"); });
     });
   });
 
@@ -117,7 +117,7 @@
     fetch("/api/runs?colony=blue").then(r => r.json()).then(rows => {
       const list = Array.isArray(rows) ? rows : (rows.runs || []);
       if (!list.length) {
-        host.innerHTML = "<p class='hint'>Noch keine Blue-Queen-Läufe. Starte oben die Kolonie.</p>";
+        host.innerHTML = "<p class='hint'>" + window.t("bluejs.no_runs") + "</p>";
         return;
       }
       let h = "<ul class='blue-run-list'>";
@@ -134,7 +134,7 @@
       h += "</ul>";
       host.innerHTML = h;
     }).catch(() => {
-      host.innerHTML = "<p class='hint'>Läufe konnten nicht geladen werden.</p>";
+      host.innerHTML = "<p class='hint'>" + window.t("bluejs.runs_fail") + "</p>";
     });
   }
 
@@ -148,10 +148,9 @@
     if (!body) return;
     fetch("/api/blue/attacklog?limit=50").then(r => r.json()).then(d => {
       const rows = d.events || [];
-      if (sum) sum.textContent = (d.total != null ? d.total : rows.length) + " Einträge · append-only";
+      if (sum) sum.textContent = window.t("bluejs.entries", {n: (d.total != null ? d.total : rows.length)});
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="6" class="hint">Noch keine Attack-Log-Einträge. '
-          + 'Wächter-Lauf mit Events erzeugt Detections/Diverts/Protects hier.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="hint">' + window.t("bluejs.no_attack") + '</td></tr>';
         return;
       }
       body.innerHTML = rows.map(e => {
@@ -182,11 +181,11 @@
       var s = window.AntbbDepth.suggest(label, label);
       if(s.depth==="intense"){ if(intense) intense.checked=true; } else { if(light) light.checked=true; }
       if(src) src.value="queen";
-      if(reason) reason.textContent = "Königin: " + s.reason + " (manuell überschreibbar)";
+      if(reason) reason.textContent = window.t("bluejs.queen", {reason: s.reason});
     }
     if(sel) sel.addEventListener("change", applyQueen);
     form.querySelectorAll('input[name="depth"]').forEach(function(r){
-      r.addEventListener("change", function(){ if(src) src.value="manual"; if(reason) reason.textContent="Manuell gewählt: " + (r.value==="intense"?"Intensiv":"Leicht"); });
+      r.addEventListener("change", function(){ if(src) src.value="manual"; if(reason) reason.textContent=window.t("bluejs.manual", {depth: r.value==="intense"?window.t("tgt.depth.intense"):window.t("tgt.depth.light")}); });
     });
     applyQueen();
   })();

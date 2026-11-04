@@ -37,8 +37,8 @@
     orig.style.left = "50%";
     orig.style.transform = "translateX(-50%)";
     orig.querySelectorAll(".queen-label").forEach(function (n) { n.remove(); });
-    label(orig, "👑 Rote Königin");
-    [["blue", 32, "🛡 Blaue Königin"], ["yellow", 68, "⚖ Gelbe Königin"]].forEach(function (q) {
+    label(orig, "👑 " + window.t("queen.red.name"));
+    [["blue", 32, "🛡 " + window.t("queen.blue.name")], ["yellow", 68, "⚖ " + window.t("queen.yellow.name")]].forEach(function (q) {
       var el = orig.cloneNode(true);
       el.classList.add("team-" + q[0]);
       el.style.left = q[1] + "%";

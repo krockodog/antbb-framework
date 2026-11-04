@@ -1,6 +1,6 @@
 <!doctype html>
-{# Zufällige Kolonie-Grafik je Seitenaufruf (server-seitig via Jinja |random).
-   Variiert bei jedem Reload und gilt site-weit, weil hier in base.html gesetzt. #}
+{# Colony artwork picked per request (server-side via Jinja |random).
+   It changes on every reload and applies site-wide because it is set in base.html. #}
 {% set _colony_refs = ['ref1_throne', 'ref2_throne2', 'ref3_symmetric', 'ref4_radial', 'ref5_wide'] %}
 {% set _colony_pick = _colony_refs | random %}
 <html lang="{{ current_lang() }}">

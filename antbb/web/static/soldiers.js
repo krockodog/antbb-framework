@@ -117,7 +117,7 @@
       </div>
       <div class="sc-bar"><span data-bar></span></div>
       <div class="sc-pb-strip" data-pb-strip></div>
-      <div class="sc-body" data-body>lädt…</div>
+      <div class="sc-body" data-body>${window.t("common.loading")}</div>
       <div class="sc-files">
         <span class="chip" data-file="todo">todo.md</span>
         <span class="chip" data-file="active">ACTIVE_RESULTS.md</span>
@@ -191,8 +191,7 @@
     const {ovmap} = doneCount(d);
     const pbs = d.soldier.playbooks || [];
     if (!pbs.length) {
-      body.innerHTML = `<p class="hint">Keine Playbooks für <b>${esc(name)}</b> in der Registry —
-        ehrlicher Leerzustand (kein Platzhalter).</p>`;
+      body.innerHTML = `<p class="hint">${window.t("sol.no_pb", {name: esc(name)})}</p>`;
       return;
     }
     let h = `<p class="hint">${pbs.length} Playbooks · Aufgaben abhaken speichert Overrides.</p>`;
@@ -246,12 +245,10 @@
     const ov = (d.overrides||[]).find(o=>o.playbook===""&&o.key==="enabled");
     const enabled = !(ov && ["false","0","no","off"].includes(String(ov.value).toLowerCase()));
     body.innerHTML = `
-      <p class="hint">Soldat für den nächsten Schwarm-Lauf zuweisen. Scope + Oversight
-         bleiben Pflicht; offensive Playbooks laufen nur bei freigeschaltetem Offensiv-Modus.</p>
+      <p class="hint">${window.t("sol.assign")}</p>
       <label class="pb-en"><input type="checkbox" ${enabled?"checked":""} data-soldier-enable>
         Soldat aktiviert (nimmt am Lauf teil)</label>
-      <p class="hint">Zum Starten: oben in der Scan-Sektion „Scan starten" nutzen –
-         die Königin dispatcht alle aktivierten Soldaten.</p>`;
+      <p class="hint">${window.t("sol.to_start")} ${window.t("sol.dispatch")}</p>`;
     body.querySelector("[data-soldier-enable]").onchange = (e) => {
       post("/api/soldiers/"+encodeURIComponent(name)+"/override",
            {playbook:"", key:"enabled", value: e.target.checked?"true":"false"})
@@ -269,7 +266,7 @@
         <button class="vfile" data-file="skill">📄 SKILL.md</button>
         <button class="vfile" data-file="mem">🧠 Mems</button>
       </div>
-      <div class="vault-view" data-vault>Datei wählen…</div>`;
+      <div class="vault-view" data-vault>${window.t("sol.pick_file")}</div>`;
     body.innerHTML = h;
     body.querySelectorAll(".vfile").forEach(b=>{
       b.onclick = () => renderFile(name, b.dataset.file, body, body.querySelector("[data-vault]"));
@@ -336,7 +333,7 @@
   function renderMems(name, tgt) {
     const d = DETAIL[name];
     let h = `<div class="mem-add">
-        <textarea data-mem-text placeholder="Neue Mem/Notiz für ${esc(name)} …"></textarea>
+        <textarea data-mem-text placeholder="${window.t("sol.mem", {name: esc(name)})}"></textarea>
         <button data-mem-save>Mem speichern</button>
       </div><ul class="mem-list">`;
     (d.mems||[]).forEach(m => {
@@ -396,7 +393,7 @@
     h += "</div>";
     const sug = reg.scope_suggestions;
     if (sug) {
-      h += `<p class="hint">📌 Scope-Vorschläge (NICHT automatisch erlaubt — default-deny bleibt): `
+      h += `<p class="hint">📌 ${window.t("sol.scope_sugs")} `
         + (sug.targets||[]).map(esc).join(", ")
         + (sug.separate_engagement?` · separat: ${(sug.separate_engagement||[]).map(esc).join(", ")}`:"")
         + `</p>`;
@@ -413,8 +410,8 @@
                     remediate:"Remediate", verify:"Verify",
         watch: "👁 Watch",};
     const notes = {
-      assess: "Inventar & Lücken lesen",
-      harden: "Härtung prüfen / vorschlagen",
+      assess: window.t("sol.inv"),
+      harden: window.t("sol.harden"),
       defend: "Detection & Decoys",
       remediate: "Finding → Fix-Plan",
       verify: "Vorher/Nachher belegen"
@@ -439,8 +436,7 @@
         <div class="hint">${esc(notes[ph]||"")}</div>
       </div>`;
     }).join("") + "</div>"
-      + '<p class="hint">Verteidigungs-Phasen der Blue Queen. Jeder Soldat trägt seine Playbooks '
-      + 'unter dem Tab <strong>Skills</strong> — Aufgaben sind abhakbar.</p>';
+      + '<p class="hint">' + window.t("sol.blue_phases") + '</p>';
   }
 
   api("/api/soldiers").then(reg => {

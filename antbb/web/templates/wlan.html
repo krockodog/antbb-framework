@@ -1,165 +1,157 @@
 {% extends "base.html" %}
-{% block title %}antbb 🐜 · WLAN{% endblock %}
+{% block title %}{{ t('wlan.title') }}{% endblock %}
 {% block content %}
-<p><a href="/">← zurück zum Scope-Manager</a></p>
-<h2>📡 WLAN <small>Scope · Coverage · Offensiv/Airgorah – klar getrennt</small></h2>
+{% set tr = t %}
+<p><a href="/">← {{ tr('wlan.back') }}</a></p>
+<h2>📡 {{ tr('wlan.heading') }} <small>{{ tr('wlan.sub') }}</small></h2>
 <pre class="notice">{{ notice }}</pre>
 
 <!-- Drei klare Bereiche (nicht verkramt) -->
 <div class="wlan-tabs" id="wlan-tabs" role="tablist">
-  <button type="button" class="wtab active" data-tab="scope">🎯 WLAN-Scope</button>
-  <button type="button" class="wtab" data-tab="coverage">📶 Coverage &amp; Scan</button>
-  <button type="button" class="wtab" data-tab="heatmap">🗺️ Heatmap</button>
-  <button type="button" class="wtab wtab-offensive" data-tab="offensive">🗡️ Offensiv / Airgorah</button>
+  <button type="button" class="wtab active" data-tab="scope">🎯 {{ tr('wlan.tab.scope') }}</button>
+  <button type="button" class="wtab" data-tab="coverage">📶 {{ tr('wlan.tab.coverage') }}</button>
+  <button type="button" class="wtab" data-tab="heatmap">🗺️ {{ tr('wlan.tab.heat') }}</button>
+  <button type="button" class="wtab wtab-offensive" data-tab="offensive">🗡️ {{ tr('wlan.tab.off') }}</button>
 </div>
 
 <!-- (1) WLAN-SCOPE – Allowlist/Engagements, getrennt von Scan & Offensiv -->
 <section class="card wlan-panel" id="wlan-panel-scope" data-panel="scope">
-  <h3>🎯 WLAN-Scope
-    <small>Autorisierungs-Allowlist (default-deny) – getrennt von Coverage und Offensiv</small>
+  <h3>🎯 {{ tr('wlan.tab.scope') }}
+    <small>{{ tr('wlan.scope.sub') }}</small>
   </h3>
-  <p class="hint">Hier legst du fest, <b>welche BSSID/SSID</b> im Zeitfenster angegriffen werden
-    dürfen. Ohne aktives Engagement mit Oversight bleibt jede Offensiv-Aktion gesperrt.
-    Nichts wird automatisch in die Allowlist geschrieben.</p>
-  <div id="wlan-scope-view">lädt…</div>
+  <p class="hint">{{ tr('wlan.scope.hint') }}</p>
+  <div id="wlan-scope-view">{{ tr('common.loading') }}</div>
 </section>
 
-<!-- (2) COVERAGE & SCAN – passiv + Königin-Ein-Klick-Voll-Scan -->
+<!-- coverage + one-click full scan -->
 <section class="card wlan-panel" id="wlan-panel-coverage" data-panel="coverage" hidden>
-  <h3>📶 Coverage &amp; Scan
-    <small>passiv – Umgebungs-Scan, Kanal/Störung, Funklöcher. Keine Angriffe.</small>
+  <h3>📶 {{ tr('wlan.tab.coverage') }}
+    <small>{{ tr('wlan.cov.sub') }}</small>
   </h3>
-  <p class="hint">Scan-first: <b>Scannen</b> → klickbare Liste. Ein Klick wählt das Ziel-WLAN
-    (kein Copy-Paste). Adapter (wlan1 = NetGear bevorzugt). Oder:
-    <b>ein Klick „Voller WLAN-Scan“</b> – die Königin dispatcht alle defensiven Checks
-    (kein Haken-Klicken mehr). honest-empty ohne Tools.</p>
+  <p class="hint">{{ tr('wlan.cov.hint') }}</p>
 
-  <!-- Königin Ein-Klick-Voll-Scan -->
+  <!-- one-click full scan -->
   <div class="wlan-scout-row">
-    <div id="qv-scout" class="qv-slot wlan-scout" aria-label="WLAN-Scout 3D"></div>
+    <div id="qv-scout" class="qv-slot wlan-scout" aria-label="{{ tr('wlan.scout.aria') }}"></div>
   <div class="wlan-queen-box" id="wlan-queen-box">
     <div class="wlan-queen-head">
-      <strong>👑 Königin · Voller WLAN-Scan</strong>
-      <span class="hint">ein Klick · nur defensiv · Oversight-Pflicht</span>
+      <strong>👑 {{ tr('wlan.queen') }}</strong>
+      <span class="hint">{{ tr('wlan.queen.sub') }}</span>
     </div>
     <div class="wlan-queen-checks" id="wlan-queen-checks">
-      <!-- gefüllt von wlan.js -->
+      <!-- filled by wlan.js -->
     </div>
     <div class="wlan-queen-actions">
-      <button type="button" id="wlan-sel-all" class="wlan-ghost">Alle auswählen</button>
-      <button type="button" id="wlan-sel-none" class="wlan-ghost">Alle abwählen</button>
+      <button type="button" id="wlan-sel-all" class="wlan-ghost">{{ tr('wlan.sel.all') }}</button>
+      <button type="button" id="wlan-sel-none" class="wlan-ghost">{{ tr('wlan.sel.none') }}</button>
       <label class="wlan-field wlan-check" title="Human Oversight">
         <input type="checkbox" id="wlan-full-oversight">
-        Oversight bestätigen (Pflicht für Voll-Scan)
+        {{ tr('wlan.full.ack') }}
       </label>
       <button type="button" id="wlan-full-scan-btn" class="wlan-primary wlan-queen-btn">
-        👑 Voller WLAN-Scan
+        👑 {{ tr('wlan.full.btn') }}
       </button>
     </div>
-    <div id="wlan-full-status" class="wlan-status">Bereit – Oversight setzen, dann ein Klick.</div>
+    <div id="wlan-full-status" class="wlan-status">{{ tr('wlan.ready') }}</div>
   </div>
 
   </div><!-- /wlan-scout-row -->
 
-  <div id="wlan-view">lädt…</div>
+  <div id="wlan-view">{{ tr('common.loading') }}</div>
 
   <!-- EIN-KLICK Client-Enumeration (passiv, Monitor-Mode automatisch an/aus) -->
   <div class="wlan-queen-box" id="wlan-clients-box">
     <div class="wlan-queen-head">
-      <strong>📱 WLAN-Clients abfragen</strong>
-      <span class="hint">ein Klick · nur passiv (Mithören) · kein Deauth/Injection</span>
+      <strong>📱 {{ tr('wlan.clients') }}</strong>
+      <span class="hint">{{ tr('wlan.clients.sub') }}</span>
     </div>
     <div class="wlan-queen-actions">
       <label class="wlan-field wlan-check" title="Human Oversight">
         <input type="checkbox" id="clients-oversight">
-        Oversight bestätigen (Pflicht – Monitor-Mode ist eine aktive Aktion)
+        {{ tr('wlan.clients.ack') }}
       </label>
       <button type="button" id="btn-clients" class="wlan-primary wlan-queen-btn">
-        📱 Clients abfragen
+        📱 {{ tr('wlan.clients.btn') }}
       </button>
     </div>
-    <div id="clients-status" class="wlan-status">Bereit – Oversight setzen, dann ein Klick.</div>
+    <div id="clients-status" class="wlan-status">{{ tr('wlan.ready') }}</div>
     <table id="clients-table" class="clients-table"></table>
   </div>
 
   <!-- EIN-KLICK Geraete-Erkennung (nmap, read-only): Router/Repeater/Mesh/IoT -->
   <div class="wlan-queen-box" id="wlan-devices-box">
     <div class="wlan-queen-head">
-      <strong>🔎 Geräte-Scan (nmap)</strong>
-      <span class="hint">lokales Subnetz · read-only · erkennt FritzBox, Repeater/Mesh, IoT + Firmware-Hinweise</span>
+      <strong>🔎 {{ tr('wlan.devices') }}</strong>
+      <span class="hint">{{ tr('wlan.devices.sub') }}</span>
     </div>
     <div class="wlan-queen-actions">
       <label class="wlan-field wlan-check" title="Human Oversight">
         <input type="checkbox" id="devices-oversight">
-        Oversight bestätigen (Pflicht – aktiver Scan im eigenen Netz)
+        {{ tr('wlan.devices.ack') }}
       </label>
       <button type="button" id="btn-devices" class="wlan-primary wlan-queen-btn">
-        🔎 Geräte im Netz finden
+        🔎 {{ tr('wlan.devices.btn') }}
       </button>
     </div>
-    <div id="devices-status" class="wlan-status">Bereit – Oversight setzen, dann ein Klick.</div>
+    <div id="devices-status" class="wlan-status">{{ tr('wlan.ready') }}</div>
     <table id="devices-table" class="clients-table"></table>
   </div>
 </section>
 
 <!-- (2b) HEATMAP – WLAN-Coverage-Karte (passiv, verortete RSSI) -->
 <section class="card wlan-panel" id="wlan-panel-heatmap" data-panel="heatmap" hidden>
-  <h3>🗺️ WLAN-Coverage-Heatmap
-    <small>passiv – Signalstärke pro Raum als Karte. Nur eigene Umgebung. Keine Angriffe.</small>
+  <h3>🗺️ {{ tr('wlan.heat') }}
+    <small>{{ tr('wlan.heat.sub') }}</small>
   </h3>
-  <p class="hint">So misst du: optional einen <b>Grundriss hochladen</b> (sonst Raster). Dann
-    pro Standort <b>„📡 Hier messen“</b> → der vorhandene passive Scan liest die echte
-    Signalstärke (RSSI) je AP, du setzt die Position per <b>Klick auf die Karte</b>. Die
-    Ameisen tragen die Messung in den Bau. Gut = grün 🐜, schlecht = rot. Nichts erfunden –
-    ohne Scan (Rechte/Adapter) ein ehrlicher Hinweis statt Fake-Werte.</p>
+  <p class="hint">{{ tr('wlan.heat.hint') }}</p>
 
   <div class="wlan-heat-toolbar">
-    <label class="wlan-field">AP/SSID:
-      <select id="heat-ap"><option value="__best__">Bestes Signal (aggregiert)</option></select>
+    <label class="wlan-field">{{ tr('wlan.heat.ap') }}
+      <select id="heat-ap"><option value="__best__">{{ tr('wlan.heat.best') }}</option></select>
     </label>
-    <label class="wlan-field wlan-check" title="Interpolierte Fläche (IDW) ein/aus">
-      <input type="checkbox" id="heat-interp" checked> Interpolation
+    <label class="wlan-field wlan-check" title="{{ tr('wlan.heat.interp.title') }}">
+      <input type="checkbox" id="heat-interp" checked> {{ tr('wlan.heat.interp') }}
     </label>
-    <label class="wlan-field wlan-check" title="Ameisen entlang der Pheromonspur">
-      <input type="checkbox" id="heat-ants" checked> Ameisen 🐜
+    <label class="wlan-field wlan-check" title="{{ tr('wlan.heat.ants.title') }}">
+      <input type="checkbox" id="heat-ants" checked> {{ tr('wlan.heat.ants') }}
     </label>
     <span class="wlan-heat-spacer"></span>
-    <label class="wlan-field wlan-file">📐 Grundriss
+    <label class="wlan-field wlan-file">📐 {{ tr('wlan.floor') }}
       <input type="file" id="heat-floorplan" accept="image/*" hidden>
     </label>
-    <button type="button" id="heat-floorplan-clear" class="wlan-ghost">Grundriss entfernen</button>
+    <button type="button" id="heat-floorplan-clear" class="wlan-ghost">{{ tr('wlan.floor.clear') }}</button>
   </div>
 
   <div class="wlan-heat-toolbar">
-    <button type="button" id="heat-measure" class="wlan-primary">📡 Hier messen (passiver Scan)</button>
-    <label class="wlan-field">Ort/Raum:
-      <input type="text" id="heat-ort" placeholder="z.B. Wohnzimmer" maxlength="60">
+    <button type="button" id="heat-measure" class="wlan-primary">📡 {{ tr('wlan.measure') }}</button>
+    <label class="wlan-field">{{ tr('wlan.place.label') }}
+      <input type="text" id="heat-ort" placeholder="{{ tr('wlan.place.ph') }}" maxlength="60">
     </label>
-    <label class="wlan-check" title="Platzierung per Klick">
-      <input type="checkbox" id="heat-place" disabled> Position per Klick setzen
+    <label class="wlan-check" title="{{ tr('wlan.place.title') }}">
+      <input type="checkbox" id="heat-place" disabled> {{ tr('wlan.place') }}
     </label>
-    <button type="button" id="heat-clear" class="wlan-ghost">Alle Messpunkte löschen</button>
+    <button type="button" id="heat-clear" class="wlan-ghost">{{ tr('wlan.heat.clear') }}</button>
   </div>
 
-  <div id="heat-status" class="wlan-status">Bereit. „📡 Hier messen“ startet einen passiven Scan.</div>
+  <div id="heat-status" class="wlan-status">{{ tr('wlan.heat.ready') }}</div>
 
-  <!-- Grundriss aus WLAN schätzen (wird direkt auf der Heatmap-Karte gezeichnet) -->
+  <!-- floor plan estimate drawn on the heatmap -->
   <div class="wlan-heat-toolbar">
-    <button type="button" id="btn-estimate-floorplan" class="wlan-primary">🏠 Grundriss aus WLAN schätzen</button>
-    <span class="hint">wird auf der Karte im Heatmap-Stil gezeichnet – Upload nur optional</span>
+    <button type="button" id="btn-estimate-floorplan" class="wlan-primary">🏠 {{ tr('wlan.estimate') }}</button>
+    <span class="hint">{{ tr('wlan.estimate.hint') }}</span>
   </div>
   <div id="floorplan-estimate-note" class="hint"></div>
 
   <div class="wlan-heat-stage">
     <canvas id="heat-canvas" width="900" height="560"
-            aria-label="WLAN-Coverage-Heatmap"></canvas>
+            aria-label="{{ tr('wlan.heat.aria') }}"></canvas>
   </div>
 
   <div class="wlan-heat-legend" id="heat-legend">
-    <span class="wlan-heat-leg wlan-heat-gut">gut (≥ -55 dBm)</span>
-    <span class="wlan-heat-leg wlan-heat-ok">ok (-56..-67)</span>
-    <span class="wlan-heat-leg wlan-heat-schwach">schwach (-68..-75)</span>
-    <span class="wlan-heat-leg wlan-heat-funkloch">Funkloch (&lt; -75)</span>
+    <span class="wlan-heat-leg wlan-heat-gut">{{ tr('wlan.leg.good') }}</span>
+    <span class="wlan-heat-leg wlan-heat-ok">{{ tr('wlan.leg.ok') }}</span>
+    <span class="wlan-heat-leg wlan-heat-schwach">{{ tr('wlan.leg.weak') }}</span>
+    <span class="wlan-heat-leg wlan-heat-funkloch">{{ tr('wlan.leg.dead') }}</span>
     <span class="wlan-heat-count" id="heat-count"></span>
   </div>
 </section>
@@ -167,11 +159,11 @@
 <!-- (3) OFFENSIV / AIRGORAH – Gate + Airgorah-Workflow -->
 <section class="card wlan-panel wlan-offensive-panel blocked-border" id="wlan-panel-offensive"
          data-panel="offensive" hidden>
-  <h3>🗡️ Offensiv / Airgorah
-    <small>AUTORISIERT – Engagement-Gate + Oversight · Feature-Umfang wie Airgorah (MIT)</small>
+  <h3>🗡️ {{ tr('wlan.off') }}
+    <small>{{ tr('wlan.off.sub') }}</small>
   </h3>
-  <pre class="notice" id="wlan-legal-notice">{{ t('wlan.legal') }}</pre>
-  <div id="wlan-offensive-view">lädt…</div>
+  <pre class="notice" id="wlan-legal-notice">{{ tr('wlan.legal') }}</pre>
+  <div id="wlan-offensive-view">{{ tr('common.loading') }}</div>
 </section>
 
 <script>window.ANTBB_TARGET_ID = {{ target_id if target_id is not none else "null" }};</script>

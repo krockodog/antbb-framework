@@ -108,7 +108,7 @@
     busy = true;
     const status = qs("wlan-scan-status");
     if (status) {
-      status.textContent = "Scan läuft… (nmcli/iw, kann ein paar Sekunden dauern)";
+      status.textContent = window.t("wlan.scanning");
       status.className = "wlan-status busy";
     }
     const iface = currentIface();
@@ -133,11 +133,11 @@
         if (n) {
           status.textContent = n + " AP(s) · tool=" + (LAST_SCAN.tool || "?") +
             (LAST_SCAN.iface ? (" · " + LAST_SCAN.iface) : "") +
-            " – Zeile anklicken = Ziel wählen";
+            window.t("wlan.click_row");
           status.className = "wlan-status ok";
         } else {
           status.textContent = LAST_SCAN.reason ||
-            "Keine APs gefunden (ehrlich leer). Adapter/WLAN prüfen.";
+            window.t("wlan.no_aps");
           status.className = "wlan-status warn";
         }
       }
@@ -197,9 +197,9 @@
           </label>
           <button type="button" id="wlan-scan-btn" class="wlan-primary">🛰️ Scannen</button>
         </div>
-        <div id="wlan-scan-status" class="wlan-status">Bereit – Scannen startet die Umgebungsaufnahme. Klick auf eine Zeile wählt das Ziel-WLAN.</div>
+        <div id="wlan-scan-status" class="wlan-status">${window.t("wlan.scan_ready")}</div>
       </div>
-      <div id="wlan-selection" class="wlan-selection empty">Kein WLAN ausgewählt – auf eine Zeile in der Liste klicken.</div>
+      <div id="wlan-selection" class="wlan-selection empty">${window.t("wlan.none_selected")}</div>
       <div id="wlan-ap-table-wrap"></div>
       <div id="wlan-analysis"></div>
       <div id="wlan-points"></div>`;
@@ -214,7 +214,7 @@
     const ap = window.ANTBB_WLAN_SELECTED;
     if (!ap) {
       el.className = "wlan-selection empty";
-      el.innerHTML = "Kein WLAN ausgewählt – auf eine Zeile in der Liste klicken (kein Copy-Paste nötig).";
+      el.innerHTML = window.t("wlan.none_selected");
       return;
     }
     el.className = "wlan-selection active";
@@ -229,8 +229,8 @@
         <span class="badge">${esc(ap.encryption || "?")}</span>
       </div>
       <div class="wlan-sel-actions">
-        <button type="button" id="wlan-use-engagement" title="SSID/BSSID ins Offensiv-Engagement übernehmen">→ Offensiv / Engagement</button>
-        <button type="button" id="wlan-clear-sel" class="wlan-ghost">Auswahl löschen</button>
+        <button type="button" id="wlan-use-engagement" title="${window.t("wlan.take_off")}">→ ${window.t("wlan.to_engagement")}</button>
+        <button type="button" id="wlan-clear-sel" class="wlan-ghost">${window.t("wlan.clear_sel")}</button>
       </div>`;
     const clr = qs("wlan-clear-sel");
     if (clr) clr.onclick = () => selectAp(null);
@@ -253,7 +253,7 @@
         : ""
     } · nach Signal sortiert)</small></h4>`;
     if (!aps.length) {
-      h += `<p class="hint">${esc(LAST_SCAN.reason || "Noch kein Scan – Button „Scannen“ drücken.")}</p>`;
+      h += `<p class="hint">${esc(LAST_SCAN.reason || window.t("wlan.no_scan_yet"))}</p>`;
       wrap.innerHTML = h;
       return;
     }
@@ -266,7 +266,7 @@
     aps.forEach(a => {
       const sel = selB && a.bssid === selB ? " selected" : "";
       const conn = a.connected ? " connected" : "";
-      h += `<tr class="wlan-ap-row${sel}${conn}" data-bssid="${esc(a.bssid)}" tabindex="0" title="Klicken zum Auswählen">
+      h += `<tr class="wlan-ap-row${sel}${conn}" data-bssid="${esc(a.bssid)}" tabindex="0" title="${window.t("wlan.click_select")}">
         <td>${a.connected ? '<span class="wlan-dot-conn" title="verbunden"></span>' : ""}</td>
         <td class="wlan-ssid">${esc(a.ssid || "(versteckt)")}</td>
         <td><code>${esc(a.bssid)}</code></td>
@@ -274,7 +274,7 @@
         <td><span class="badge" style="border-color:${BANDCOL[a.band] || "#8a92a6"};color:${BANDCOL[a.band] || "#8a92a6"};">${esc(a.band || "?")} GHz</span></td>
         <td class="wlan-sig">${signalBars(a.rssi)} <span style="color:${rssiColor(a.rssi)};">${a.rssi ?? "?"} dBm</span></td>
         <td><span class="badge wlan-sec-${esc((a.encryption || "").toLowerCase())}">${esc(a.encryption || "?")}</span></td>
-        <td><button type="button" class="wlan-pick" data-bssid="${esc(a.bssid)}">wählen</button></td>
+        <td><button type="button" class="wlan-pick" data-bssid="${esc(a.bssid)}">${window.t("wlan.pick")}</button></td>
       </tr>`;
     });
     h += `</tbody></table></div>
@@ -311,7 +311,7 @@
       h += `</div></div>`;
     });
     if (!h) return `<p class="hint">Keine Kanal-Daten (noch kein Scan).</p>`;
-    h += `<p class="hint">2,4 GHz überlappungsfrei nur auf 1 / 6 / 11.</p>`;
+    h += `<p class="hint">${window.t("wlan.overlap")}</p>`;
     return h;
   }
 
@@ -323,21 +323,21 @@
     const cov = s.coverage || {};
     const rec = s.recommendations || {};
     let h = "";
-    h += `<h4>Kanal-Belegung &amp; Störung</h4>`;
+    h += `<h4>${window.t("wlan.channel_title")}</h4>`;
     h += renderChannelBars(ca);
     const si = ca.self_interference || [];
     if (si.length) {
-      h += `<div class="wlan-warn"><strong>⚠ Selbst-Störung eigener APs (${si.length}):</strong><ul>`;
+      h += `<div class="wlan-warn"><strong>${window.t("wlan.self_interf", {n: si.length})}</strong><ul>`;
       si.forEach(c => { h += `<li>[${esc(c.severity)}] ${esc(c.note)}</li>`; });
       h += `</ul></div>`;
     } else if ((ca.own_ap_count || 0) >= 2) {
-      h += `<p class="hint ok">✅ Keine Selbst-Störung zwischen den getaggten eigenen APs.</p>`;
+      h += `<p class="hint ok">${window.t("wlan.no_self")}</p>`;
     }
 
-    h += `<h4>Abdeckung (${cov.measured_count || 0} Messpunkt(e), Funklöcher: ${cov.dead_zone_count || 0})</h4>`;
+    h += `<h4>${window.t("wlan.coverage_title", {n: cov.measured_count || 0, dead: cov.dead_zone_count || 0})}</h4>`;
     const pts = cov.points || [];
     if (!pts.length) {
-      h += `<p class="hint">Noch keine Messpunkte. Unten aus dem Scan übernehmen.</p>`;
+      h += `<p class="hint">${window.t("wlan.no_points")}</p>`;
     } else {
       h += `<div class="wlan-coverage">`;
       pts.forEach(p => {
@@ -373,14 +373,14 @@
       ? `${ap.bssid}=${ap.rssi != null ? ap.rssi : -70}`
       : "aa:bb:cc:dd:ee:ff=-58";
     el.innerHTML = `
-      <h4>Messpunkt hinzufügen</h4>
+      <h4>${window.t("wlan.add_point")}</h4>
       <div class="row" style="gap:.4rem;flex-wrap:wrap;align-items:flex-end;">
         <label>Standort<br><input type="text" id="wlan-label" placeholder="z.B. Wohnzimmer"></label>
         <label>Samples (BSSID=RSSI)<br>
           <input type="text" id="wlan-samples" placeholder="${esc(sampleHint)}" style="min-width:280px;"></label>
         <label>eigene BSSIDs (optional)<br>
           <input type="text" id="wlan-own" placeholder="aus Auswahl" style="min-width:180px;"></label>
-        <button type="button" id="wlan-fill-from-sel" ${ap ? "" : "disabled"}>aus Auswahl füllen</button>
+        <button type="button" id="wlan-fill-from-sel" ${ap ? "" : "disabled"}>${window.t("wlan.fill_sel")}</button>
         <button type="button" id="wlan-addpoint">Speichern</button>
       </div>
       <div id="wlan-msg" class="hint"></div>`;
@@ -409,7 +409,7 @@
         if (b && r != null && r.trim() !== "") samples[b.trim().toLowerCase()] = parseInt(r, 10);
       });
       if (!label || !Object.keys(samples).length) {
-        qs("wlan-msg").textContent = "Standort + mind. ein BSSID=RSSI nötig (oder „aus Auswahl füllen“).";
+        qs("wlan-msg").textContent = window.t("wlan.need_sample");
         return;
       }
       const body = { label, samples, own_bssids: own };
@@ -456,9 +456,9 @@
   // ---- Königin: Ein-Klick-Voll-Scan (defensiv) ----
   const CHECK_DEFAULTS = [
     {id:"scan", label:"Umgebungs-Scan (APs/Beacons)"},
-    {id:"konfig", label:"Verschlüsselungs-/Konfig-Check"},
+    {id:"konfig", label:window.t("wlan.enc")},
     {id:"optim", label:"Kanal-/Band-Optimierung"},
-    {id:"coverage", label:"Coverage / Selbst-Störung / Funklöcher"}
+    {id:"coverage", label:window.t("wlan.cov_checks")}
   ];
 
   async function loadFullChecks() {
@@ -494,14 +494,14 @@
       const ov = qs("wlan-full-oversight");
       const checks = selectedChecks();
       if (!checks.length) {
-        if (status) { status.textContent = "Keine Checks gewählt – „Alle auswählen“ oder Haken setzen."; status.className = "wlan-status warn"; }
+        if (status) { status.textContent = window.t("wlan.no_checks"); status.className = "wlan-status warn"; }
         return;
       }
       if (!ov || !ov.checked) {
-        if (status) { status.textContent = "BLOCKIERT: Oversight-Häkchen setzen – Königin dispatcht sonst nichts."; status.className = "wlan-status err"; }
+        if (status) { status.textContent = window.t("wlan.blocked_oversight"); status.className = "wlan-status err"; }
         return;
       }
-      if (status) { status.textContent = "👑 Königin dispatcht WLAN-Voll-Scan…"; status.className = "wlan-status busy"; }
+      if (status) { status.textContent = "👑 " + window.t("wlan.queen_running"); status.className = "wlan-status busy"; }
       btn.disabled = true;
       try {
         const body = {
@@ -539,8 +539,8 @@
           const n = (LAST_SCAN.aps || []).length;
           const issues = (j.konfig || []).length;
           if (status) {
-            status.textContent = "✅ " + (j.reason || "fertig") +
-              ` · ${n} AP(s) · ${issues} Konfig-Hinweis(e) · checks=[${(j.checks_run||[]).join(",")}]`;
+            status.textContent = "✅ " + (j.reason || window.t("map.done")) +
+              " · " + window.t("wlan.full_done", {n: n, issues: issues, checks: (j.checks_run||[]).join(",")});
             status.className = "wlan-status ok";
           }
         }
@@ -553,7 +553,7 @@
 
   // Boot
   (async function boot() {
-    root.innerHTML = "<p class='hint'>WLAN-Menü wird geladen…</p>";
+    root.innerHTML = "<p class='hint'>" + window.t("wlan.menu_loading") + "</p>";
     await loadAdapters();
     await loadSurveyOnly();
     await loadFullChecks();

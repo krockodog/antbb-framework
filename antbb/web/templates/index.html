@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% block title %}🔴 Red Queen · Offensiv-Kolonie · antbb{% endblock %}
+{% block title %}{{ t('idx.title') }}{% endblock %}
 {% block body_class %}red-body{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/red_cards.css?v=2026102501">
+{% set tr = t %}
 <section class="rq-hero" aria-label="Red Queen">
   <div class="rq-hero-glow" aria-hidden="true"></div>
   <div class="rq-hero-ants" aria-hidden="true">
@@ -12,264 +13,255 @@
   </div>
   <div class="rq-hero-inner">
     <div class="rq-crest" aria-hidden="true">🎯</div>
-    <div id="qv-red" class="qv-slot rq-qv" aria-label="Rote Königin 3D"></div>
+    <div id="qv-red" class="qv-slot rq-qv" aria-label="{{ tr('idx.aria') }}"></div>
     <div class="rq-hero-copy">
-      <p class="rq-kicker">Offensiv-Kolonie · eigenständige Ansicht</p>
-      <h2>Red Queen <span class="rq-sub">die Rote Königin</span></h2>
-      <p class="rq-lede">
-        Sie führt die <strong>offensiven Ameisen</strong> — Bug Bounty und Pentest im engen Scope.
-        Phasen: <em>Recon → Vulnerability Assessment → Exploitation → Post-Exploitation → Reporting</em>.
-        Standard: rein lesend. Aktive Schritte nur mit Scope-Allowlist und Human Oversight.
-      </p>
-      <p class="rq-motto">„Verifiziert“ gilt erst mit Proof-Gate — alles andere bleibt Verdacht.</p>
+      <p class="rq-kicker">{{ tr('idx.kicker') }}</p>
+      <h2>Red Queen <span class="rq-sub">{{ tr('idx.sub') }}</span></h2>
+      <p class="rq-lede">{{ tr('idx.lede') }}</p>
+      <p class="rq-motto">{{ tr('idx.motto') }}</p>
     </div>
     <div class="rq-hero-stats">
-      <div class="rstat"><b id="rst-soldiers">…</b><span>Soldaten</span></div>
-      <div class="rstat"><b id="rst-playbooks">…</b><span>Playbooks</span></div>
-      <div class="rstat"><b id="rst-tasks">…</b><span>Aufgaben</span></div>
-      <div class="rstat"><b id="rst-findings">…</b><span>Findings</span></div>
-      <div class="rstat"><b>{{ targets|length }}</b><span>Ziele</span></div>
-      <div class="rstat"><b>{{ targets|sum(attribute="scope_count") }}</b><span>Scope-Einträge</span></div>
+      <div class="rstat"><b id="rst-soldiers">…</b><span>{{ tr('idx.soldiers') }}</span></div>
+      <div class="rstat"><b id="rst-playbooks">…</b><span>{{ tr('idx.playbooks') }}</span></div>
+      <div class="rstat"><b id="rst-tasks">…</b><span>{{ tr('idx.tasks') }}</span></div>
+      <div class="rstat"><b id="rst-findings">…</b><span>{{ tr('idx.findings') }}</span></div>
+      <div class="rstat"><b>{{ targets|length }}</b><span>{{ tr('idx.targets') }}</span></div>
+      <div class="rstat"><b>{{ targets|sum(attribute="scope_count") }}</b><span>{{ tr('idx.scope_entries') }}</span></div>
     </div>
   </div>
 </section>
 
-<nav class="rq-jump" aria-label="Red Queen Abschnitte">
-  <a href="#rq-phases">Phasen</a>
-  <a href="#rq-launch">Kolonie starten</a>
-  <a href="#rq-soldiers">Soldaten &amp; Playbooks</a>
-  <a href="#rq-targets">Ziele &amp; Scope</a>
-  <a href="#rq-findings">Findings</a>
-  <a href="#rq-runs">Läufe</a>
-  <a href="#rq-remote">Fernzugriff</a>
+<nav class="rq-jump" aria-label="{{ tr('idx.jump') }}">
+  <a href="#rq-phases">{{ tr('idx.jump.phases') }}</a>
+  <a href="#rq-launch">{{ tr('idx.jump.launch') }}</a>
+  <a href="#rq-soldiers">{{ tr('idx.jump.soldiers') }}</a>
+  <a href="#rq-targets">{{ tr('idx.jump.targets') }}</a>
+  <a href="#rq-findings">{{ tr('idx.findings') }}</a>
+  <a href="#rq-runs">{{ tr('idx.runs.title') }}</a>
+  <a href="#rq-remote">{{ tr('idx.jump.remote') }}</a>
 </nav>
 
 <section class="card rq-card" id="rq-phases">
-  <h3>⬡ Phasen-Pipeline <small>jeder Soldat kennt seinen Abschnitt</small></h3>
+  <h3>⬡ {{ tr('idx.phases.title') }} <small>{{ tr('idx.phases.sub') }}</small></h3>
   <ol class="rq-pipe" id="rq-pipeline">
-    <li class="hint">Phasen werden aus der Registry gelesen…</li>
+    <li class="hint">{{ tr('idx.phases.loading') }}</li>
   </ol>
 </section>
 
 <section class="card rq-card" id="rq-launch">
-  <h3>🐜🎯 Kolonie starten <small>lesend per Default · scope-gebunden · Scan-Tiefe wählbar</small></h3>
+  <h3>🐜🎯 {{ tr('idx.launch.title') }} <small>{{ tr('idx.launch.sub') }}</small></h3>
   <form id="rq-run-form" class="rq-form">
-    <label class="rq-field">Ziel (Scope)
+    <label class="rq-field">{{ tr('idx.field.target') }}
       <select name="target_id" required>
-        <option value="">— wählen —</option>
-        {% for t in targets %}
-        <option value="{{ t.id }}">{{ t.name }} (#{{ t.id }}{% if t.scope_count %} · {{ t.scope_count }} Scope{% endif %})</option>
+        <option value="">{{ tr('idx.choose') }}</option>
+        {% for tgt in targets %}
+        <option value="{{ tgt.id }}">{{ tgt.name }} (#{{ tgt.id }}{% if tgt.scope_count %} · {{ tgt.scope_count }} Scope{% endif %})</option>
         {% endfor %}
       </select>
     </label>
-    <label class="rq-field">Scan-Tiefe
+    <label class="rq-field">{{ tr('idx.field.depth') }}
       <select name="depth">
-        <option value="light" selected>Leicht (recon · scan · report)</option>
-        <option value="intense">Intensiv (alle Phasen)</option>
+        <option value="light" selected>{{ tr('idx.depth.light') }}</option>
+        <option value="intense">{{ tr('idx.depth.intense') }}</option>
       </select>
     </label>
     <label class="rq-check">
       <input type="checkbox" name="active" id="rq-active" value="1">
-      Aktive / offensive Schritte (Oversight)
+      {{ tr('idx.active') }}
     </label>
     <label class="rq-check rq-ack" id="rq-ack-wrap" style="display:none">
       <input type="checkbox" name="oversight_ack" id="rq-ack" value="1">
       {{ t('oversight.active_steps') }}
     </label>
-    <button type="submit" class="rq-go">🐜🎯 Kolonie starten</button>
+    <button type="submit" class="rq-go">🐜🎯 {{ tr('idx.go') }}</button>
   </form>
   <pre id="rq-run-log" class="feed rq-feed" aria-live="polite"></pre>
 </section>
 
 <section class="card rq-card" id="rq-actions" hidden>
-  <h3>🎛 Red-Team-Menü <small>erscheint nach Ziel-Auswahl · jeder Klick legt einen echten Lauf an</small></h3>
-  <p class="hint" id="rq-actions-scope">Ziel wählen im Block „Kolonie starten" — das Menü folgt dem Scope (default-deny).</p>
+  <h3>🎛 {{ tr('idx.menu.title') }} <small>{{ tr('idx.menu.sub') }}</small></h3>
+  <p class="hint" id="rq-actions-scope">{{ tr('idx.menu.hint') }}</p>
   <div class="rq-menu" id="rq-menu">
     <div class="rq-mi" data-phases="recon">
       <span class="rq-mi-ico">🔍</span>
-      <div><b>Recon &amp; OSINT</b><small>Angriffsfläche kartieren · Subdomains, Dienste, Technologie-Stack · immer lesend</small></div>
-      <button type="button" class="rq-skill-btn rq-run" data-label="Recon &amp; OSINT">▶ Start</button>
+      <div><b>{{ tr('idx.recon') }}</b><small>{{ tr('idx.recon.sub') }}</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="{{ tr('idx.recon') }}">▶ {{ tr('idx.start') }}</button>
     </div>
     <div class="rq-mi" data-phases="scan">
       <span class="rq-mi-ico">🌐</span>
-      <div><b>Schwachstellen-Scan</b><small>nuclei, Versions-Matching, Fehlkonfigurationen · immer lesend</small></div>
-      <button type="button" class="rq-skill-btn rq-run" data-label="Schwachstellen-Scan">▶ Start</button>
+      <div><b>{{ tr('idx.scan') }}</b><small>{{ tr('idx.scan.sub') }}</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="{{ tr('idx.scan') }}">▶ {{ tr('idx.start') }}</button>
     </div>
     <div class="rq-mi rq-mi-gated" data-phases="verify">
       <span class="rq-mi-ico">⚡</span>
-      <div><b>Aktive Verifikation</b><small>Fund → reproduzierbarer Nachweis (Proof-Gate) · 🔒 nur mit Oversight</small></div>
-      <button type="button" class="rq-skill-btn rq-run" data-label="Aktive Verifikation" disabled title="nur mit Human Oversight">🔒 Start</button>
+      <div><b>{{ tr('idx.verify') }}</b><small>{{ tr('idx.verify.sub') }}</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="{{ tr('idx.verify') }}" disabled title="{{ tr('idx.start.locked') }}">🔒 {{ tr('idx.start') }}</button>
     </div>
     <div class="rq-mi rq-mi-gated" data-phases="verify analyze">
       <span class="rq-mi-ico">💥</span>
-      <div><b>PoC aus Evidence</b><small>Proof-of-Concept gegen eigene Ziele · 🔒 Oversight + Scope</small></div>
-      <button type="button" class="rq-skill-btn rq-run" data-label="PoC aus Evidence" disabled title="nur mit Human Oversight">🔒 Start</button>
+      <div><b>{{ tr('idx.poc') }}</b><small>{{ tr('idx.poc.sub') }}</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="{{ tr('idx.poc') }}" disabled title="{{ tr('idx.start.locked') }}">🔒 {{ tr('idx.start') }}</button>
     </div>
     <div class="rq-mi" data-phases="scan" data-note="llmsec">
       <span class="rq-mi-ico">🤖</span>
-      <div><b>LLM-Security</b><small>Prompt-Injection-Lage, LLM-Endpunkte · lesend (aktive Teile 🔒)</small></div>
-      <button type="button" class="rq-skill-btn rq-run" data-label="LLM-Security">▶ Start</button>
+      <div><b>{{ tr('idx.llm') }}</b><small>{{ tr('idx.llm.sub') }}</small></div>
+      <button type="button" class="rq-skill-btn rq-run" data-label="{{ tr('idx.llm') }}">▶ {{ tr('idx.start') }}</button>
     </div>
     <div class="rq-mi rq-mi-link" id="rq-report-row">
       <span class="rq-mi-ico">📄</span>
-      <div><b>Reporting</b><small>Berichte, Addenda, Revisionen — auf der Ziel-Seite</small></div>
-      <a class="rq-skill-btn" id="rq-report-link" href="#" style="text-decoration:none">öffnen →</a>
+      <div><b>{{ tr('idx.report') }}</b><small>{{ tr('idx.report.sub') }}</small></div>
+      <a class="rq-skill-btn" id="rq-report-link" href="#" style="text-decoration:none">{{ tr('idx.open') }} →</a>
     </div>
   </div>
 </section>
 
 <section class="card rq-card" id="rq-soldiers">
-  <h3>🎯 Red-Soldaten · Playbooks &amp; Checklisten
-    <small id="rq-soldier-summary">Soldaten, Playbooks und Aufgaben werden aus der Registry gelesen</small>
+  <h3>🎯 {{ tr('idx.soldiers.title') }}
+    <small id="rq-soldier-summary">{{ tr('idx.soldiers.sub') }}</small>
   </h3>
-  <p class="hint">Jede Karte zeigt ihre Playbooks mit der vollständigen Aufgaben-Checkliste —
-     ohne Tabs, ohne Klick. Haken speichern als Override. 🔒 = nur mit Human Oversight.</p>
+  <p class="hint">{{ tr('idx.soldiers.hint') }}</p>
   <div class="rq-toolbar">
     <input type="search" id="rq-soldier-filter" class="rq-filter"
-           placeholder="Soldaten / Playbooks / Aufgaben durchsuchen…" autocomplete="off">
+           placeholder="{{ tr('idx.filter.ph') }}" autocomplete="off">
   </div>
   <div id="rq-soldier-cards" class="rq-grid">
-    <p class="hint">Soldaten werden gelesen…</p>
+    <p class="hint">{{ tr('idx.soldiers.loading') }}</p>
   </div>
-  <p class="hint rq-empty" id="rq-empty" hidden>Kein Soldat passt zum Filter.</p>
+  <p class="hint rq-empty" id="rq-empty" hidden>{{ tr('idx.soldiers.empty') }}</p>
 </section>
 
 <dialog id="rq-skill-dialog" class="rq-dialog">
   <form method="dialog" class="rq-dialog-bar"><strong id="rq-skill-title">SKILL.md</strong>
-    <button class="rq-close" aria-label="schließen">✕</button></form>
+    <button class="rq-close" aria-label="{{ tr('idx.close') }}">✕</button></form>
   <div id="rq-skill-body" class="rq-skill-body"></div>
 </dialog>
 
 <section class="card rq-card" id="rq-targets">
-  <h3>🧭 Ziele &amp; Scope-Manager
-    <small><a href="/trash" title="Archivierte Targets (Soft-Delete)">🗑 Papierkorb{% if archived_count %} ({{ archived_count }}){% endif %}</a></small>
+  <h3>🧭 {{ tr('idx.targets.title') }}
+    <small><a href="/trash" title="{{ tr('idx.trash.title') }}">🗑 {{ tr('idx.trash') }}{% if archived_count %} ({{ archived_count }}){% endif %}</a></small>
   </h3>
-  <p class="hint">Offensiv nur bei Scope + Oversight (mode_policy=auto/offensive). Archivieren verschiebt ein Ziel
-     in den Papierkorb (wiederherstellbar) — die Königin behält Findings, Registry und Erinnerungen.</p>
+  <p class="hint">{{ tr('idx.targets.hint') }}</p>
   <div class="rq-wrap">
     <table class="rq-table">
-      <thead><tr><th>ID</th><th>Name</th><th>Scope</th><th>Oversight</th><th>Modus</th><th></th></tr></thead>
+      <thead><tr><th>ID</th><th>{{ tr('idx.th.name') }}</th><th>Scope</th><th>{{ tr('idx.th.oversight') }}</th><th>{{ tr('idx.th.mode') }}</th><th></th></tr></thead>
       <tbody>
-      {% for t in targets %}
+      {% for tgt in targets %}
         <tr>
-          <td>{{ t.id }}</td>
-          <td>{{ t.name }}</td>
-          <td>{{ t.scope_count }}</td>
-          <td>{% if t.confirmed %}<span class="ok">✔ bestätigt</span>{% else %}<span class="blocked">✘ offen</span>{% endif %}</td>
+          <td>{{ tgt.id }}</td>
+          <td>{{ tgt.name }}</td>
+          <td>{{ tgt.scope_count }}</td>
+          <td>{% if tgt.confirmed %}<span class="ok">✔ {{ tr('idx.confirmed') }}</span>{% else %}<span class="blocked">✘ {{ tr('idx.open_status') }}</span>{% endif %}</td>
           <td>
-            <span class="badge">{{ t.mode.mode_policy }}</span>
-            {% if t.mode.effective_mode == "offensive" %}
-              <span class="ok">offensiv</span>
+            <span class="badge">{{ tgt.mode.mode_policy }}</span>
+            {% if tgt.mode.effective_mode == "offensive" %}
+              <span class="ok">{{ tr('idx.offensive') }}</span>
             {% else %}
-              <span class="blocked">defensiv</span>
+              <span class="blocked">{{ tr('idx.defensive') }}</span>
             {% endif %}
           </td>
           <td>
-            <a href="/target/{{ t.id }}">öffnen →</a>
-            <form method="post" action="/target/{{ t.id }}/archive" style="display:inline"
-                  onsubmit="return confirm('Target „{{ t.name }}“ in den Papierkorb verschieben? Es wird nur ausgeblendet – alle Daten bleiben erhalten.');">
-              <button type="submit" class="rq-skill-btn" title="In den Papierkorb (Soft-Delete, wiederherstellbar)">🗑 Archivieren</button>
+            <a href="/target/{{ tgt.id }}">{{ tr('idx.open') }} →</a>
+            <form method="post" action="/target/{{ tgt.id }}/archive" style="display:inline"
+                  onsubmit='return confirm(window.t("idx.archive.confirm", {name: {{ tgt.name|tojson }}}));'>
+              <button type="submit" class="rq-skill-btn" title="{{ tr('idx.archive.title') }}">🗑 {{ tr('idx.archive') }}</button>
             </form>
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="6" class="hint">Noch keine Ziele — unten eines anlegen.</td></tr>
+        <tr><td colspan="6" class="hint">{{ tr('idx.targets.empty') }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-  <h4>Neues Ziel</h4>
+  <h4>{{ tr('idx.new') }}</h4>
   <form method="post" action="/target/add" class="rq-form">
-    <label class="rq-field">Name <input name="name" required placeholder="z.B. 127.0.0.1-lab" class="rq-field-input"></label>
-    <label class="rq-field">Beschreibung <input name="description" placeholder="optional" class="rq-field-input"></label>
+    <label class="rq-field">{{ tr('idx.th.name') }} <input name="name" required placeholder="{{ tr('idx.name.ph') }}" class="rq-field-input"></label>
+    <label class="rq-field">{{ tr('idx.desc') }} <input name="description" placeholder="{{ tr('idx.optional') }}" class="rq-field-input"></label>
     <label class="rq-field">mode_policy
       <select name="mode_policy">
-        <option value="auto" selected>auto (Offensiv nur bei Scope+Oversight)</option>
-        <option value="defensive">defensive (nur defensiv)</option>
-        <option value="offensive">offensive (Offensiv erlaubt bei Scope+Oversight)</option>
+        <option value="auto" selected>{{ tr('idx.policy.auto') }}</option>
+        <option value="defensive">{{ tr('idx.policy.def') }}</option>
+        <option value="offensive">{{ tr('idx.policy.off') }}</option>
       </select>
     </label>
-    <button type="submit" class="rq-go">Anlegen</button>
+    <button type="submit" class="rq-go">{{ tr('idx.create') }}</button>
   </form>
 </section>
 
 <section class="card rq-card" id="rq-findings">
-  <h3>🕷 Findings <small>aggregiert über alle Ziele · nach Schwere sortiert</small></h3>
-  <p class="hint">Jeder Befund lässt sich als Fix-Aufgabe an die Blaue Königin übergeben —
-     die Fix-Brücke legt einen echten Remediate-Job in <code>/blue</code> an.</p>
+  <h3>🕷 {{ tr('idx.findings.title') }} <small>{{ tr('idx.findings.sub') }}</small></h3>
+  <p class="hint">{{ tr('idx.findings.hint') }}</p>
   <div class="rq-wrap">
     <table class="rq-table">
-      <thead><tr><th>Severity</th><th>Befund</th><th>Ziel</th><th>Kategorie</th><th></th></tr></thead>
+      <thead><tr><th>{{ tr('idx.th.severity') }}</th><th>{{ tr('idx.th.finding') }}</th><th>{{ tr('idx.th.target') }}</th><th>{{ tr('idx.th.category') }}</th><th></th></tr></thead>
       <tbody id="rq-findings-body">
-        <tr><td colspan="5" class="hint">Findings werden gelesen…</td></tr>
+        <tr><td colspan="5" class="hint">{{ tr('idx.findings.loading') }}</td></tr>
       </tbody>
     </table>
   </div>
 </section>
 
 <section class="card rq-card" id="rq-runs">
-  <h3>🗂 Läufe <small>persistente Historie · ohne Blue-Queen-Läufe</small></h3>
-  <div id="rq-runs-list">lädt…</div>
+  <h3>🗂 {{ tr('idx.runs.title') }} <small>{{ tr('idx.runs.sub') }}</small></h3>
+  <div id="rq-runs-list">{{ tr('common.loading') }}</div>
 </section>
 
 <section class="card rq-card" id="rq-remote">
-  <h3>🔐 Fernzugriff <small>Du entscheidest, ob und wie die GUI aus der Ferne erreichbar ist</small></h3>
-  <p class="hint">Standardmäßig läuft antbb <strong>nur lokal</strong> ({{ remote.local_url }}).
-     Es wird nichts ins Internet exportiert; den jeweiligen Transport fährst du anhand der Schritte unten selbst hoch.</p>
+  <h3>🔐 {{ tr('idx.remote.title') }} <small>{{ tr('idx.remote.sub') }}</small></h3>
+  <p class="hint">{{ tr('idx.remote.hint', url=remote.local_url) }}</p>
   <form method="post" action="/remote/set" class="rq-form">
     <label class="rq-check">
       <input type="radio" name="mode" value="off" {% if remote.mode == "off" %}checked{% endif %}>
-      Aus (nur lokal) — sicherste Einstellung, nichts exponiert.
+      {{ tr('idx.remote.off') }}
     </label>
     <label class="rq-check">
       <input type="radio" name="mode" value="tailscale" {% if remote.mode == "tailscale" %}checked{% endif %}>
-      Tailscale — privates Mesh-VPN (Tailnet), nicht öffentlich.
+      {{ tr('idx.remote.ts') }}
       {% if remote.tailscale.installed %}
         {% if remote.tailscale.running and remote.tailscale.ip %}
-          <span class="ok">● aktiv · {{ remote.tailscale.ip }}</span>
+          <span class="ok">● {{ tr('idx.remote.active') }} · {{ remote.tailscale.ip }}</span>
         {% else %}
-          <span class="hint">○ installiert, läuft nicht</span>
+          <span class="hint">○ {{ tr('idx.remote.installed_idle') }}</span>
         {% endif %}
       {% else %}
-        <span class="hint">○ nicht installiert</span>
+        <span class="hint">○ {{ tr('idx.remote.missing') }}</span>
       {% endif %}
     </label>
     <label class="rq-check">
       <input type="radio" name="mode" value="cloudflare" {% if remote.mode == "cloudflare" %}checked{% endif %}>
-      Cloudflare-Tunnel — über das öffentliche Internet (nur mit eigener Auth).
+      {{ tr('idx.remote.cf') }}
       {% if remote.cloudflare.installed %}
-        <span class="ok">● installiert{% if remote.cloudflare.version %} · {{ remote.cloudflare.version }}{% endif %}</span>
+        <span class="ok">● {{ tr('idx.remote.installed') }}{% if remote.cloudflare.version %} · {{ remote.cloudflare.version }}{% endif %}</span>
       {% else %}
-        <span class="hint">○ nicht installiert</span>
+        <span class="hint">○ {{ tr('idx.remote.missing') }}</span>
       {% endif %}
     </label>
-    <button type="submit" class="rq-go">Modus speichern</button>
+    <button type="submit" class="rq-go">{{ tr('idx.remote.save') }}</button>
     <span class="hint">
-      {% if remote.mode == "off" %}<span class="badge">Aus (nur lokal)</span>
+      {% if remote.mode == "off" %}<span class="badge">{{ tr('idx.remote.off.badge') }}</span>
       {% elif remote.mode == "tailscale" %}<span class="badge">Tailscale</span>
       {% else %}<span class="badge">Cloudflare</span>{% endif %}
-      {% if remote.active_url %} · erreichbar unter <code>{{ remote.active_url }}</code>{% endif %}
+      {% if remote.active_url %} · {{ tr('idx.remote.reachable') }} <code>{{ remote.active_url }}</code>{% endif %}
     </span>
   </form>
   <details class="hint">
-    <summary>Setup-Schritte für „{{ remote.mode }}“ anzeigen</summary>
+    <summary>{{ tr('idx.remote.steps', mode=remote.mode) }}</summary>
     <ol>{% for step in remote_steps %}<li>{{ step }}</li>{% endfor %}</ol>
-    <p>Der Tunnel benötigt ein Token zur Laufzeit aus der Umgebungsvariable
-       <code>{{ remote.token_env_name }}</code> — niemals ins Git committen.</p>
+    <p>{{ tr('idx.remote.token', env=remote.token_env_name) }}</p>
   </details>
   <div class="rq-form" style="margin-top:.6rem">
     <label class="rq-check rq-ack">
-      <input type="checkbox" id="cf-oversight"> Oversight: Tunnelstart bewusst freigegeben
+      <input type="checkbox" id="cf-oversight"> {{ tr('idx.remote.oversight') }}
     </label>
     <label class="rq-check">
-      <input type="checkbox" id="cf-named"> Benannter Tunnel (Token aus <code>{{ remote.token_env_name }}</code>) statt trycloudflare
+      <input type="checkbox" id="cf-named"> {{ tr('idx.remote.named', env=remote.token_env_name) }}
     </label>
-    <button type="button" class="rq-skill-btn" onclick="cfTunnel('start')">Tunnel starten</button>
-    <button type="button" class="rq-skill-btn" onclick="cfTunnel('stop')">Tunnel stoppen</button>
+    <button type="button" class="rq-skill-btn" onclick="cfTunnel('start')">{{ tr('idx.remote.start') }}</button>
+    <button type="button" class="rq-skill-btn" onclick="cfTunnel('stop')">{{ tr('idx.remote.stop') }}</button>
     <span id="cf-state" class="hint" style="margin-left:.5rem">
       {% if remote.cloudflare.tunnel and remote.cloudflare.tunnel.running %}
-        ● läuft{% if remote.cloudflare.tunnel.url %} · <code>{{ remote.cloudflare.tunnel.url }}</code>{% endif %}
-      {% else %}● aus{% endif %}
+        ● {{ tr('idx.remote.running') }}{% if remote.cloudflare.tunnel.url %} · <code>{{ remote.cloudflare.tunnel.url }}</code>{% endif %}
+      {% else %}● {{ tr('idx.remote.down') }}{% endif %}
     </span>
     <div id="cf-msg" class="hint" style="margin-top:.4rem"></div>
   </div>
@@ -277,23 +269,24 @@
   async function cfTunnel(action){
     const msg=document.getElementById('cf-msg');
     const st=document.getElementById('cf-state');
+    const T=window.t;
     try{
       let res;
       if(action==='start'){
         const confirm=document.getElementById('cf-oversight').checked;
         const named=document.getElementById('cf-named').checked;
-        if(!confirm){ msg.textContent='Bitte zuerst die Oversight-Bestätigung ankreuzen.'; return; }
-        msg.textContent='Starte Tunnel…';
+        if(!confirm){ msg.textContent=T('idx.cf.need'); return; }
+        msg.textContent=T('idx.cf.starting');
         res=await fetch('/api/remote/tunnel/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:true,named:named})});
       } else {
-        msg.textContent='Stoppe Tunnel…';
+        msg.textContent=T('idx.cf.stopping');
         res=await fetch('/api/remote/tunnel/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
       }
       const d=await res.json();
       msg.textContent=(d.reason||'')+(d.url?(' → '+d.url):'');
-      if(d.running){ st.innerHTML='● läuft'+(d.url?(' · <code>'+d.url+'</code>'):''); }
-      else { st.textContent='● aus'; }
-    }catch(e){ msg.textContent='Fehler: '+e; }
+      if(d.running){ st.textContent='● '+T('idx.remote.running')+(d.url?(' · '+d.url):''); }
+      else { st.textContent='● '+T('idx.remote.down'); }
+    }catch(e){ msg.textContent=T('idx.cf.error',{error:e}); }
   }
   </script>
 </section>

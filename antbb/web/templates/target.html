@@ -1,186 +1,185 @@
 {% extends "base.html" %}
 {% block content %}
-<p><a href="/">← zurück</a></p>
+{% set tr = t %}
+<p><a href="/">← {{ tr('tgt.back') }}</a></p>
 <h2>{{ target.name }} <small>#{{ target.id }}</small></h2>
-<pre class="notice">{{ notice }}</pre>
+<pre class="notice">{{ tr('tgt.notice', name=target.name) }}</pre>
 
 <!-- ======================= LEBENDIGE AMEISEN-KARTE ======================= -->
 <section class="card antmap-card" id="antmap-card">
-  <h3>Lebende Schwarm-Karte 🐜
-    <small>Nest-Querschnitt · Königin im Thron · Agenten-Kammern · Ziel-Ausgrabung</small>
+  <h3>{{ tr('tgt.map') }} 🐜
+    <small>{{ tr('tgt.map.sub') }}</small>
   </h3>
   <div id="antmap-wrap">
     <canvas id="antmap-3d"></canvas>
     <canvas id="antmap"></canvas>
     <div id="antmap-tip" class="antmap-tip" hidden></div>
 
-    <!-- Königin-Kammer (klappt aus dem Hügel auf) -->
+    <!-- Queen chamber opens from the hill -->
     <div id="queen-chamber" class="queen-chamber" aria-hidden="true">
       <div class="chamber-head">
-        <span>👑 Königin-Kammer</span>
-        <button type="button" id="chamber-close" class="chamber-x" title="schließen">✕</button>
+        <span>👑 {{ tr('tgt.chamber') }}</span>
+        <button type="button" id="chamber-close" class="chamber-x" title="{{ tr('idx.close') }}">✕</button>
       </div>
       <div class="chamber-tabs">
-        <button type="button" class="ctab active" data-tab="brain">🧠 Neuronales Gehirn</button>
-        <button type="button" class="ctab" data-tab="memgraph">🕸️ Memgraph</button>
-        <button type="button" class="ctab" data-tab="memories">📚 Memories</button>
+        <button type="button" class="ctab active" data-tab="brain">🧠 {{ tr('tgt.brain') }}</button>
+        <button type="button" class="ctab" data-tab="memgraph">🕸️ {{ tr('tgt.memgraph') }}</button>
+        <button type="button" class="ctab" data-tab="memories">📚 {{ tr('tgt.memories') }}</button>
       </div>
-      <div id="chamber-body" class="chamber-body">lädt…</div>
+      <div id="chamber-body" class="chamber-body">{{ tr('common.loading') }}</div>
     </div>
   </div>
   <div class="antmap-legend">
     <span><i class="dot idle"></i>idle</span>
-    <span><i class="dot running"></i>läuft</span>
-    <span><i class="dot done"></i>fertig</span>
-    <span><i class="dot blocked"></i>geblockt / out-of-scope</span>
-    <span class="hint">Hover (PC) / Tap (Handy) auf einen Node = Status · Tap auf 👑 = Kammer</span>
+    <span><i class="dot running"></i>{{ tr('tgt.legend.running') }}</span>
+    <span><i class="dot done"></i>{{ tr('tgt.legend.done') }}</span>
+    <span><i class="dot blocked"></i>{{ tr('tgt.legend.blocked') }}</span>
+    <span class="hint">{{ tr('tgt.legend.hint') }}</span>
   </div>
   <p class="hint" id="map-mode-line"></p>
 </section>
 
 <!-- ======================= SOLDATEN-KARTEN (Octogents-Stil) ======================= -->
 <section class="card" id="soldier-section">
-  <h3>🐜 Soldaten · Skills &amp; Playbooks
-    <small id="soldier-summary">lädt…</small>
+  <h3>🐜 {{ tr('tgt.soldiers') }}
+    <small id="soldier-summary">{{ tr('common.loading') }}</small>
   </h3>
-  <input type="text" id="soldier-filter" placeholder="Soldaten / Skills / Aufgaben durchsuchen…"
+  <input type="text" id="soldier-filter" placeholder="{{ tr('tgt.filter.ph') }}"
          style="max-width:420px;margin:.3rem 0;">
   <div id="octogent-phases"></div>
-  <div id="soldier-cards">lädt…</div>
+  <div id="soldier-cards">{{ tr('common.loading') }}</div>
 </section>
 
 <!-- ======================= GESAMT-SICHERHEITSBEWERTUNG + HEATMAP ======================= -->
 <section class="card" id="rating-section">
-  <h3>🛡️ Gesamt-Sicherheitsbewertung <small>neutral, aus verifizierten Befunden abgeleitet</small></h3>
-  <div id="rating-view">lädt…</div>
-  <h4 style="margin-top:1rem;">Risiko-Heatmap (Kategorie × Severity)</h4>
-  <div id="heatmap-view">lädt…</div>
+  <h3>🛡️ {{ tr('tgt.rating') }} <small>{{ tr('tgt.rating.sub') }}</small></h3>
+  <div id="rating-view">{{ tr('common.loading') }}</div>
+  <h4 style="margin-top:1rem;">{{ tr('tgt.heatmap') }}</h4>
+  <div id="heatmap-view">{{ tr('common.loading') }}</div>
 </section>
 
 <!-- ======================= PASSIVE WLAN-ABDECKUNG / SITE-SURVEY ======================= -->
 <section class="card" id="wlan-section">
-  <h3>📡 WLAN-Abdeckung &amp; Optimierung <small>passiv – Kanal/Störung/Funklöcher, keine Angriffe</small></h3>
-  <div id="wlan-view">lädt…</div>
+  <h3>📡 {{ tr('tgt.wlan') }} <small>{{ tr('tgt.wlan.sub') }}</small></h3>
+  <div id="wlan-view">{{ tr('common.loading') }}</div>
 </section>
 
 <!-- ======================= AUTORISIERTES WLAN-OFFENSIV-MODUL ======================= -->
 <section class="card" id="wlan-offensive-section">
-  <h3>🗡️ WLAN-Offensiv <small>AUTORISIERT – Engagement-Gate + Oversight, default-deny</small></h3>
-  <div id="wlan-offensive-view">lädt…</div>
+  <h3>🗡️ {{ tr('tgt.wlan.off') }} <small>{{ tr('tgt.wlan.off.sub') }}</small></h3>
+  <div id="wlan-offensive-view">{{ tr('common.loading') }}</div>
 </section>
 
 <section class="card mode-card">
-  <h3>Modus 🛡️</h3>
+  <h3>{{ tr('tgt.mode') }} 🛡️</h3>
   <p>
-    <strong>Policy:</strong>
+    <strong>{{ tr('tgt.policy') }}</strong>
     <span class="badge">{{ mode.mode_policy }}</span>
-    · <strong>Effektiv:</strong>
+    · <strong>{{ tr('tgt.effective') }}</strong>
     {% if mode.effective_mode == "offensive" %}
-      <span class="ok">offensiv</span>
+      <span class="ok">{{ tr('idx.offensive') }}</span>
     {% else %}
-      <span class="blocked">defensiv</span>
+      <span class="blocked">{{ tr('idx.defensive') }}</span>
     {% endif %}
   </p>
   <p class="hint">{{ mode.reason }}</p>
-  <p class="hint">In-Scope: {{ mode.in_scope_count }} · Oversight:
+  <p class="hint">{{ tr('tgt.inscope', n=mode.in_scope_count) }}
     {% if mode.oversight %}<span class="ok">✔</span>{% else %}<span class="blocked">✘</span>{% endif %}
   </p>
   <form method="post" action="/target/{{ target.id }}/mode" class="inline">
     <label>mode_policy
       <select name="mode_policy">
-        <option value="defensive" {% if mode.mode_policy=="defensive" %}selected{% endif %}>defensive (Offensiv gesperrt)</option>
-        <option value="auto" {% if mode.mode_policy=="auto" %}selected{% endif %}>auto (Offensiv nur bei Scope+Oversight)</option>
-        <option value="offensive" {% if mode.mode_policy=="offensive" %}selected{% endif %}>offensive (Offensiv erlaubt bei Scope+Oversight)</option>
+        <option value="defensive" {% if mode.mode_policy=="defensive" %}selected{% endif %}>{{ tr('tgt.policy.def') }}</option>
+        <option value="auto" {% if mode.mode_policy=="auto" %}selected{% endif %}>{{ tr('idx.policy.auto') }}</option>
+        <option value="offensive" {% if mode.mode_policy=="offensive" %}selected{% endif %}>{{ tr('idx.policy.off') }}</option>
       </select>
     </label>
-    <button type="submit">Policy speichern</button>
+    <button type="submit">{{ tr('tgt.policy.save') }}</button>
   </form>
 </section>
 
 <section class="card {% if confirmed %}ok-border{% else %}blocked-border{% endif %}">
-  <h3>Human-Oversight (Pflicht-Gate)</h3>
-  <p>Status:
-    {% if confirmed %}<span class="ok">✔ bestätigt von {{ oversight.confirmed_by }}</span>
-    {% else %}<span class="blocked">✘ NICHT bestätigt – Scan &amp; Export sind blockiert</span>{% endif %}
+  <h3>{{ tr('tgt.oversight') }}</h3>
+  <p>{{ tr('tgt.oversight.status') }}
+    {% if confirmed %}<span class="ok">✔ {{ tr('tgt.oversight.by', who=oversight.confirmed_by) }}</span>
+    {% else %}<span class="blocked">✘ {{ tr('tgt.oversight.blocked') }}</span>{% endif %}
   </p>
   <form method="post" action="/target/{{ target.id }}/oversight">
     <label><input type="checkbox" name="confirm" value="on" {% if confirmed %}checked{% endif %}>
-      {{ oversight_prompt }}</label>
+      {{ tr('oversight.confirm') }}</label>
     <input type="hidden" name="by" value="web-user">
-    <button type="submit">Speichern</button>
+    <button type="submit">{{ tr('tgt.save') }}</button>
   </form>
 </section>
 
 <section class="card">
-  <h3>Scope / Allowlist <small>(default-deny)</small></h3>
+  <h3>{{ tr('tgt.scope') }} <small>(default-deny)</small></h3>
   <table>
-    <thead><tr><th>ID</th><th>Typ</th><th>Wert</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>ID</th><th>{{ tr('tgt.th.type') }}</th><th>{{ tr('tgt.th.value') }}</th><th>{{ tr('blue.th.status') }}</th><th></th></tr></thead>
     <tbody>
     {% for s in scopes %}
       <tr><td>{{ s.id }}</td><td>{{ s.kind }}</td><td><code>{{ s.value }}</code></td>
       <td>{% if s.allowed %}<span class="ok">in-scope</span>{% else %}<span class="blocked">out-of-scope</span>{% endif %}</td>
       <td>
         <form method="post" action="/target/{{ target.id }}/scope/{{ s.id }}/delete" style="display:inline">
-          <button type="submit" class="btn-danger">entfernen</button>
+          <button type="submit" class="btn-danger">{{ tr('tgt.remove') }}</button>
         </form>
       </td></tr>
     {% else %}
-      <tr><td colspan="5">Kein Scope. Ohne In-Scope-Eintrag blockiert jeder Check (default-deny).</td></tr>
+      <tr><td colspan="5">{{ tr('tgt.scope.empty') }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
   <form method="post" action="/target/{{ target.id }}/scope/add" class="inline">
     <select name="kind"><option>domain</option><option>ip</option><option>path</option><option>url</option></select>
-    <input name="value" required placeholder="127.0.0.1 oder example.com">
+    <input name="value" required placeholder="{{ tr('tgt.scope.ph') }}">
     <label><input type="checkbox" name="allowed" value="on" checked> in-scope</label>
-    <button type="submit">+ hinzufügen</button>
+    <button type="submit">+ {{ tr('tgt.add') }}</button>
   </form>
 </section>
 
 <section class="card" id="swarm">
-  <h3>Swarm-Control 👑 <small>(on-device, kein CLI nötig)</small></h3>
+  <h3>{{ tr('tgt.swarm') }} 👑 <small>({{ tr('tgt.swarm.sub') }})</small></h3>
   <form method="post" action="/target/{{ target.id }}/scan" id="scan-form">
     <label style="display:block;margin:.5rem 0;font-weight:bold">
       <input type="checkbox" name="offensive" value="on"
         {% if mode.offensive_allowed %}checked{% else %}disabled{% endif %}>
-      🗡️ Offensiv-Modus ENGAGIEREN (autorisiert) — führt die aktiven Angriffs-Playbooks
-      + Fuzzing aus (kein read-only Fallback). Benötigt Scope + Oversight + policy auto/offensive.
+      🗡️ {{ tr('tgt.engage') }}
     </label>
-    <p class="hint">Fein­steuerung (optional, wird vom Offensiv-Häkchen ohnehin aktiviert):</p>
+    <p class="hint">{{ tr('tgt.fine') }}</p>
     <label style="display:block;margin:.5rem 0">
       <input type="checkbox" name="active" value="on"
         {% if not mode.offensive_allowed %}disabled{% endif %}>
-      🔬 Aktive Verifikation (autorisiert) — XSS/SQLi/Redirect/Traversal/Artefakte/CORS/Missing-Auth.
+      🔬 {{ tr('tgt.active') }}
     </label>
     <label style="display:block;margin:.5rem 0">
       <input type="checkbox" name="fuzz" value="on"
         {% if not mode.offensive_allowed %}disabled{% endif %}>
-      🔬 Offensives Fuzzing (autorisiert) — GET Content-Discovery mit Catch-all-Baseline.
+      🔬 {{ tr('tgt.fuzz') }}
     </label>
     {% if not mode.offensive_allowed %}
-      <p class="blocked">Offensiv-Checkboxen deaktiviert: {{ mode.reason }}</p>
+      <p class="blocked">{{ tr('tgt.off.locked', reason=mode.reason) }}</p>
     {% endif %}
     <!-- Konsistentes Human-Oversight-Gate fuer AKTIVE/OFFENSIVE Ausloeser -->
     <div class="card active-oversight-gate blocked-border" id="active-oversight-gate"
          style="margin:.6rem 0;" hidden>
-      <pre class="notice">⚖ {{ active_legal_notice }}</pre>
+      <pre class="notice">⚖ {{ tr('oversight.active_legal') }}</pre>
       <label style="display:block;margin:.3rem 0;font-weight:bold">
         <input type="checkbox" name="oversight_active" value="on" id="oversight-active">
-        ✅ {{ active_oversight_prompt }}
+        ✅ {{ tr('oversight.active_steps') }}
       </label>
-      <p class="hint">Default-deny: ohne dieses Human-Oversight-Häkchen wird jede
-        aktive/offensive Aktion serverseitig verweigert – es wird nichts gestartet.</p>
+      <p class="hint">{{ tr('tgt.gate.hint') }}</p>
     </div>
     
     <fieldset id="scan-depth-box" style="margin:.6rem 0;padding:.55rem .7rem;border:1px solid rgba(240,180,90,.4);border-radius:10px">
-      <legend style="padding:0 .35rem;color:#f0b45a;font-size:.8rem">Scan-Tiefe · Königin-Vorschlag</legend>
-      <p class="hint" id="scan-depth-reason">Die Königin empfiehlt eine Tiefe – überschreibbar.</p>
-      <label style="margin-right:1rem"><input type="radio" name="depth" value="light" id="scan-depth-light"> Leicht</label>
-      <label><input type="radio" name="depth" value="intense" id="scan-depth-intense" checked> Intensiv</label>
+      <legend style="padding:0 .35rem;color:#f0b45a;font-size:.8rem">{{ tr('tgt.depth') }}</legend>
+      <p class="hint" id="scan-depth-reason">{{ tr('tgt.depth.reason') }}</p>
+      <label style="margin-right:1rem"><input type="radio" name="depth" value="light" id="scan-depth-light"> {{ tr('tgt.depth.light') }}</label>
+      <label><input type="radio" name="depth" value="intense" id="scan-depth-intense" checked> {{ tr('tgt.depth.intense') }}</label>
     </fieldset>
 
-    <button type="submit" {% if not confirmed %}disabled title="Oversight fehlt"{% endif %}>
-      🐜 Schwarm starten (asynchron · Live-Feed unten)</button>
+    <button type="submit" {% if not confirmed %}disabled title="{{ tr('tgt.oversight.missing') }}"{% endif %}>
+      🐜 {{ tr('tgt.start') }}</button>
   </form>
   <script>
   (function(){
@@ -192,7 +191,7 @@
     function sync(){
       var on=anyActive();
       gate.hidden=!on;
-      // Default-deny im UI UND serverseitig: Start nur mit Häkchen bei aktiv/offensiv.
+      // Default-deny in the UI and on the server: start only with the tick when active/offensive.
       if(on && ack && !ack.checked){gate.classList.add("blocked-border");}
     }
     boxes.forEach(function(b){if(b)b.addEventListener("change",sync);});
@@ -201,14 +200,13 @@
       if(anyActive() && ack && !ack.checked){
         e.preventDefault();
         gate.hidden=false;
-        alert("Human-Oversight-Freigabe erforderlich: Bitte das Häkchen für die "+
-              "aktive/offensive Durchführung bestätigen (§202a-c).");
+        alert(window.t("tgt.need.ack"));
       }
     });
     sync();
   })();
   </script>
-  {% if not confirmed %}<p class="blocked">Button deaktiviert: erst Oversight bestätigen.</p>{% endif %}
+  {% if not confirmed %}<p class="blocked">{{ tr('tgt.disabled') }}</p>{% endif %}
 
 <script src="/static/scan-depth.js?v=1"></script>
 <script>
@@ -220,10 +218,10 @@
   var scopeText = (document.body.innerText||"").slice(0,800);
   var s=window.AntbbDepth.suggest(scopeText, document.title||"");
   if(s.depth==="intense"){ if(intense) intense.checked=true; } else { if(light) light.checked=true; }
-  if(reason) reason.textContent="Königin: "+s.reason+" (manuell überschreibbar)";
+  if(reason) reason.textContent=window.t("tgt.queen.reason", {reason:s.reason});
   form.querySelectorAll('input[name="depth"]').forEach(function(r){
     r.addEventListener("change", function(){
-      if(reason) reason.textContent="Manuell gewählt: "+(r.value==="intense"?"Intensiv":"Leicht");
+      if(reason) reason.textContent=window.t("tgt.manual", {depth:r.value==="intense"?window.t("tgt.depth.intense"):window.t("tgt.depth.light")});
     });
   });
 })();
@@ -232,22 +230,22 @@
 </section>
 
 <section class="card" id="live">
-  <h3>Live-Status
+  <h3>{{ tr('tgt.live') }}
     <span id="scan-badge" class="badge">{{ scan_state.status }}</span>
   </h3>
-  <pre id="live-feed" class="live-feed">Warte auf Events…</pre>
-  <p class="hint">Echter WebSocket-Live-Feed (<code>/ws/feed</code>) · automatischer Fallback auf Polling (<code>/api/feed</code>) · nur lokale on-device-Ausführung (kein Fernzugriff).</p>
+  <pre id="live-feed" class="live-feed">{{ tr('tgt.live.wait') }}</pre>
+  <p class="hint">{{ tr('tgt.live.hint') }}</p>
 </section>
 
 <section class="card">
-  <h3>Findings ({{ findings|length }}) <small>nach Severity</small></h3>
+  <h3>{{ tr('tgt.findings', n=findings|length) }} <small>{{ tr('tgt.findings.sub') }}</small></h3>
   <table>
-    <thead><tr><th>Schwere</th><th>Titel</th><th>Asset</th><th>Agent</th><th>Blau</th></tr></thead>
+    <thead><tr><th>{{ tr('tgt.th.sev') }}</th><th>{{ tr('tgt.th.title') }}</th><th>{{ tr('tgt.th.asset') }}</th><th>{{ tr('tgt.th.agent') }}</th><th>{{ tr('tgt.th.blue') }}</th></tr></thead>
     <tbody id="findings-body">
     {% for f in findings %}
-      <tr class="sev-{{ f.severity }}"><td>{{ f.severity }}</td><td>{{ f.title }}</td><td>{{ f.asset }}</td><td>{{ f.agent }}</td><td><button type="button" class="btn-to-blue" data-fid="{{ f.id }}" data-title="{{ f.title|e }}">In Blau reparieren</button></td></tr>
+      <tr class="sev-{{ f.severity }}"><td>{{ f.severity }}</td><td>{{ f.title }}</td><td>{{ f.asset }}</td><td>{{ f.agent }}</td><td><button type="button" class="btn-to-blue" data-fid="{{ f.id }}" data-title="{{ f.title|e }}">{{ tr('tgt.to.blue') }}</button></td></tr>
     {% else %}
-      <tr><td colspan="5">Noch keine Findings.</td></tr>
+      <tr><td colspan="5">{{ tr('tgt.findings.empty') }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -263,9 +261,9 @@
           body: JSON.stringify({target_id: {{ target.id }}, title: btn.dataset.title||""})
         });
         var d=await r.json();
-        if(!r.ok || d.ok===false){ alert(d.detail||d.error||"Fehler"); btn.disabled=false; btn.textContent=old; return; }
+        if(!r.ok || d.ok===false){ alert(d.detail||d.error||window.t("tgt.toblue.err")); btn.disabled=false; btn.textContent=old; return; }
         btn.textContent="✓ Blue #"+d.job_id;
-        if(confirm("Finding als Blue-Remediate-Job #"+d.job_id+" angelegt. Zur Blue Queen?")){
+        if(confirm(window.t("tgt.toblue.ask", {id:d.job_id}))){
           location.href="/blue#blue-runs";
         }
       }catch(e){ alert(String(e)); btn.disabled=false; btn.textContent=old; }
@@ -277,32 +275,30 @@
 </section>
 
 <section class="card" id="report-download">
-  <h3>📄 Professioneller Pentest-Report</h3>
-  <p class="hint">Gebrandeter Bericht mit Deckblatt, Management Summary, Methodik,
-    Findings (Proof-Gate), Zählübersicht und Anhang – nur echte Store-Daten.</p>
+  <h3>📄 {{ tr('tgt.report') }}</h3>
+  <p class="hint">{{ tr('tgt.report.hint') }}</p>
   <div class="row" style="gap:.6rem;flex-wrap:wrap;align-items:center">
     <a class="btn" href="/target/{{ target.id }}/report.pdf"
        style="display:inline-flex;align-items:center;gap:.4rem;background:var(--accent,#1f6feb);color:#fff;
               padding:.55rem .95rem;border-radius:8px;text-decoration:none;font-weight:600">
-      📄 PDF herunterladen</a>
+      📄 {{ tr('tgt.pdf') }}</a>
     <a class="btn" href="/target/{{ target.id }}/report/print" target="_blank"
        style="display:inline-flex;align-items:center;gap:.4rem;background:#2d333b;color:#fff;
               padding:.55rem .95rem;border-radius:8px;text-decoration:none;font-weight:600">
-      🖨 Drucken</a>
-    <a href="/target/{{ target.id }}/branded-report" target="_blank">👀 Vorschau (HTML)</a>
+      🖨 {{ tr('tgt.print') }}</a>
+    <a href="/target/{{ target.id }}/branded-report" target="_blank">👀 {{ tr('tgt.preview') }}</a>
     <a id="profi-link-md" href="/target/{{ target.id }}/report/professional" target="_blank">
-      🧾 Markdown-Bericht</a>
+      🧾 {{ tr('tgt.md') }}</a>
   </div>
-  <p class="hint" style="margin-top:.5rem">PDF benötigt weasyprint oder wkhtmltopdf auf dem Server.
-    Fehlt die Engine: ehrlicher Hinweis + druckfertiges HTML (Browser: Drucken → Als PDF speichern).</p>
+  <p class="hint" style="margin-top:.5rem">{{ tr('tgt.pdf.hint') }}</p>
 </section>
 
 <section class="card">
-  <h3>Report-Builder (8-Schritt-Evidence-Kette)</h3>
+  <h3>{{ tr('tgt.builder') }}</h3>
   <div class="row" style="align-items:flex-end;gap:.5rem;margin-bottom:.5rem">
-    <label style="flex:1">Auto-Vorbefüllung aus Finding
+    <label style="flex:1">{{ tr('tgt.prefill') }}
       <select id="prefill-finding">
-        <option value="">— Finding wählen —</option>
+        <option value="">{{ tr('tgt.pick.finding') }}</option>
         {% for f in findings %}
           {% if f.category not in ["report-summary","proofgate-validation","llm-report","analysis-cvss","correlation","llm-analysis","poc"] %}
           <option value="{{ f.id }}">[{{ f.severity }}] {{ f.title }} ({{ f.asset }})</option>
@@ -310,19 +306,19 @@
         {% endfor %}
       </select>
     </label>
-    <button type="button" id="prefill-btn">↧ Vorbefüllen</button>
+    <button type="button" id="prefill-btn">↧ {{ tr('tgt.prefill.btn') }}</button>
     <a id="profi-link" href="/target/{{ target.id }}/report/professional" target="_blank">
-      🧾 Voller Profi-Bericht (Code + Remediation)</a>
+      🧾 {{ tr('tgt.pro') }}</a>
   </div>
-  <p class="hint" id="prefill-note">Nur echte Finding-Daten; leere Schritte zeigen einen Hinweis.</p>
+  <p class="hint" id="prefill-note">{{ tr('tgt.prefill.note') }}</p>
   <form method="post" action="/target/{{ target.id }}/report/add" id="report-form">
-    <label>Titel <input name="title" id="rb-title" required></label>
+    <label>{{ tr('tgt.field.title') }} <input name="title" id="rb-title" required></label>
     <div class="row">
-      <label>CVSS-Score <input name="cvss" id="rb-cvss" type="number" step="0.1" min="0" max="10"></label>
-      <label>CVSS-Vektor <input name="vector" id="rb-vector" placeholder="CVSS:3.1/AV:N/..."></label>
+      <label>{{ tr('tgt.cvss.score') }} <input name="cvss" id="rb-cvss" type="number" step="0.1" min="0" max="10"></label>
+      <label>{{ tr('tgt.cvss.vector') }} <input name="vector" id="rb-vector" placeholder="CVSS:3.1/AV:N/..."></label>
     </div>
     <details class="card" id="cvss-calc" style="margin:.4rem 0">
-      <summary>🧮 CVSS-v3.1-Rechner (Metriken wählen → Score + Vektor automatisch)</summary>
+      <summary>🧮 {{ tr('tgt.cvss.calc') }}</summary>
       <div class="row" style="flex-wrap:wrap;gap:.5rem;margin-top:.5rem">
         <label>AV <select data-cvss="AV">
           <option value="N">Network</option><option value="A">Adjacent</option>
@@ -350,51 +346,51 @@
         <strong>Base-Score:</strong> <span id="cvss-score" class="badge">—</span>
         <strong>Severity:</strong> <span id="cvss-sev" class="badge">—</span>
         <code id="cvss-vector-out"></code>
-        <button type="button" id="cvss-apply">↧ In Report übernehmen</button>
+        <button type="button" id="cvss-apply">↧ {{ tr('tgt.cvss.apply') }}</button>
       </p>
-      <p class="hint">Rechnet lokal über <code>/api/cvss</code> nach offizieller CVSS-3.1-Formel.</p>
+      <p class="hint">{{ tr('tgt.cvss.hint') }}</p>
     </details>
     {% for key, label in chain_steps %}
-      <label>{{ label }}<textarea name="chain_{{ key }}" id="rb-chain-{{ key }}" rows="2"></textarea></label>
+      <label>{{ tr('chain.' ~ key) }}<textarea name="chain_{{ key }}" id="rb-chain-{{ key }}" rows="2"></textarea></label>
     {% endfor %}
-    <button type="submit">Report speichern</button>
+    <button type="submit">{{ tr('tgt.report.save') }}</button>
   </form>
 </section>
 
 <section class="card">
-  <h3>Reports ({{ reports|length }})</h3>
+  <h3>{{ tr('tgt.reports', n=reports|length) }}</h3>
   <ul>
   {% for r in reports %}
     <li>#{{ r.id }} {{ r.title }} — CVSS {{ r.cvss_score }} ({{ r.severity }})
-      · <a href="/report/{{ r.id }}/view" target="_blank">ansehen</a>
+      · <a href="/report/{{ r.id }}/view" target="_blank">{{ tr('tgt.view') }}</a>
       · <a href="/report/{{ r.id }}/export?format=md" target="_blank">export md</a>
       · <a href="/report/{{ r.id }}/export?format=json" target="_blank">export json</a>
-      {% if r.addenda %}<br><small>📎 {{ r.addenda|length }} Nachtrag/Nachträge:
+      {% if r.addenda %}<br><small>📎 {{ tr('tgt.addenda', n=r.addenda|length) }}
         {% for a in r.addenda %}<em>{{ a.author }}: {{ a.text }}</em>{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}
-      {% if r.revisions %}<br><small>🔁 {{ r.revisions|length }} Revision(en):
+      {% if r.revisions %}<br><small>🔁 {{ tr('tgt.revisions', n=r.revisions|length) }}
         {% for rev in r.revisions %}<a href="/report/revision/{{ rev.id }}" target="_blank">v{{ rev.revision }}</a> ({{ rev.instruction }}){% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}
       <details style="margin:.3rem 0">
-        <summary>Nachtrag anfügen</summary>
+        <summary>{{ tr('tgt.addendum') }}</summary>
         <form method="post" action="/report/{{ r.id }}/addendum" class="inline">
-          <input name="text" required placeholder="Nachtrag-Text">
+          <input name="text" required placeholder="{{ tr('tgt.addendum.ph') }}">
           <input name="author" value="web-user" style="width:8rem">
-          <button type="submit">+ Nachtrag</button>
+          <button type="submit">+ {{ tr('tgt.addendum.btn') }}</button>
         </form>
       </details>
       <details style="margin:.3rem 0">
-        <summary>Neu-Anweisung (regeneriert als neue Revision)</summary>
+        <summary>{{ tr('tgt.reinstruct') }}</summary>
         <form method="post" action="/report/{{ r.id }}/reinstruct" class="inline">
-          <input name="reanweisung" required placeholder="z.B. Fokus auf kritische Funde, Remediation vertiefen">
+          <input name="reanweisung" required placeholder="{{ tr('tgt.reinstruct.ph') }}">
           <input name="author" value="web-user" style="width:8rem">
-          <button type="submit">🔁 Regenerieren</button>
+          <button type="submit">🔁 {{ tr('tgt.regen') }}</button>
         </form>
       </details>
     </li>
   {% else %}
-    <li>Keine Reports.</li>
+    <li>{{ tr('tgt.reports.empty') }}</li>
   {% endfor %}
   </ul>
-  <p class="hint">Export ist durch das Oversight-Gate geschützt.</p>
+  <p class="hint">{{ tr('tgt.export.hint') }}</p>
 </section>
 
 <script>
@@ -440,7 +436,7 @@ window.ANTBB = {
 
   function applyData(data, opts) {
     opts = opts || {};
-    if (data.backlog) {                 // vollständiger Anfangszustand (WS)
+    if (data.backlog) {                 // full initial state (websocket)
       feedEl.textContent = "Warte auf Events…";
     }
     if (data.events && data.events.length) appendLines(data.events);
@@ -494,7 +490,7 @@ window.ANTBB = {
         // in der Zwischenzeit Polling, damit nichts verloren geht
         startPolling();
       } else {
-        startPolling();               // dauerhaft auf Polling zurückfallen
+        startPolling();               // stay on polling
       }
     };
     ws.onerror = function () { try { ws.close(); } catch (e) {} };
@@ -517,11 +513,11 @@ window.ANTBB = {
       (sel.value ? "?finding_id=" + encodeURIComponent(sel.value) : "");
   });
   async function prefill() {
-    if (!sel || !sel.value) { note.textContent = "Bitte zuerst ein Finding wählen."; return; }
-    note.textContent = "lädt…";
+    if (!sel || !sel.value) { note.textContent = window.t("prefill.pick"); return; }
+    note.textContent = window.t("common.loading");
     try {
       const r = await fetch("/target/{{ target.id }}/report/prefill?finding_id=" + encodeURIComponent(sel.value));
-      if (!r.ok) { note.textContent = "Prefill fehlgeschlagen."; return; }
+      if (!r.ok) { note.textContent = window.t("prefill.fail"); return; }
       const d = await r.json();
       document.getElementById("rb-title").value = d.title || "";
       document.getElementById("rb-cvss").value = (d.cvss_score != null ? d.cvss_score : "");
@@ -530,9 +526,8 @@ window.ANTBB = {
         const el = document.getElementById("rb-chain-" + k);
         if (el) el.value = (d.chain && d.chain[k]) ? d.chain[k] : "";
       });
-      note.textContent = (d.cvss_note || "Vorbefüllt aus Finding #" + sel.value) +
-        " — leere Schritte sind klar als Hinweis markiert.";
-    } catch (e) { note.textContent = "Prefill-Fehler: " + e; }
+      note.textContent = window.t("prefill.note", {note: d.cvss_note || window.t("prefill.filled", {id: sel.value})});
+    } catch (e) { note.textContent = window.t("js.error", {error: e}); }
   }
   if (btn) btn.addEventListener("click", prefill);
 })();
@@ -551,13 +546,13 @@ window.ANTBB = {
     selects.forEach(s => params.set(s.dataset.cvss, s.value));
     try {
       const r = await fetch("/api/cvss?" + params.toString());
-      if (!r.ok) { scoreEl.textContent = "Fehler"; return; }
+      if (!r.ok) { scoreEl.textContent = window.t("js.error_plain"); return; }
       const d = await r.json();
       last = d;
       scoreEl.textContent = d.base_score;
       sevEl.textContent = d.severity;
       vecEl.textContent = d.vector;
-    } catch (e) { scoreEl.textContent = "Fehler"; }
+    } catch (e) { scoreEl.textContent = window.t("js.error_plain"); }
   }
   selects.forEach(s => s.addEventListener("change", recompute));
   const applyBtn = document.getElementById("cvss-apply");

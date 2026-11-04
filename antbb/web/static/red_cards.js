@@ -17,7 +17,7 @@
     const host = document.getElementById("rq-pipeline");
     if (!host) return;
     if (!phases || !phases.length) {
-      host.innerHTML = "<li class='hint'>Keine Phasen in der Registry — /api/capabilities prüfen.</li>";
+      host.innerHTML = "<li class='hint'>" + window.t("red.no_phases") + "</li>";
       return;
     }
     host.innerHTML = phases.map((ph, i) => {
@@ -157,12 +157,12 @@
     const show = () => {
       const s = ((CAP && CAP.soldiers) || []).find(x => x.name === b.dataset.skill);
       title.textContent = "SKILL.md · " + b.dataset.skill;
-      body.innerHTML = s && s.skill ? mdLite(s.skill.skill_md) : "<p class='hint'>Nicht gefunden.</p>";
+      body.innerHTML = s && s.skill ? mdLite(s.skill.skill_md) : "<p class='hint'>" + window.t("js.not_found") + "</p>";
       if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     };
     if (CAP) return show();
     fetch("/api/capabilities").then(r => r.json()).then(d => { CAP = d; show(); })
-      .catch(() => { title.textContent = "SKILL.md"; body.innerHTML = "<p class='hint'>Konnte nicht geladen werden.</p>"; });
+      .catch(() => { title.textContent = "SKILL.md"; body.innerHTML = "<p class='hint'>" + window.t("js.load_fail") + "</p>"; });
   });
   if (dlg) dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
 
@@ -172,7 +172,7 @@
     const host = document.getElementById("rq-findings-body");
     if (!host) return;
     if (!rows.length) {
-      host.innerHTML = "<tr><td colspan='5' class='hint'>Noch keine Findings — Kolonie starten oder Ziel öffnen.</td></tr>";
+      host.innerHTML = "<tr><td colspan='5' class='hint'>" + window.t("red.no_findings") + "</td></tr>";
       return;
     }
     host.innerHTML = rows.map(r =>
@@ -267,7 +267,7 @@
     actions.hidden = !tid;
     if (!tid) return;
     const name = targetSel.options[targetSel.selectedIndex].textContent || ("#" + tid);
-    if (scopeHint) scopeHint.textContent = "Ziel: " + name.trim() + " — Standard: lesend. 🔒-Aktionen brauchen das Oversight-Häkchen im Block „Kolonie starten".";
+    if (scopeHint) scopeHint.textContent = window.t("red.scope_line", {name: name.trim()});
     if (reportLink) reportLink.href = "/target/" + tid;
     const acked = Boolean(ackBoxMenu && ackBoxMenu.checked);
     document.querySelectorAll(".rq-mi-gated .rq-run").forEach(b => {
@@ -305,7 +305,7 @@
     form.addEventListener("submit", ev => {
       ev.preventDefault();
       const targetId = form.target_id.value;
-      if (!targetId) { log.textContent = "Ziel wählen — ohne Scope kein Lauf (default-deny)."; return; }
+      if (!targetId) { log.textContent = window.t("red.need_target"); return; }
       startRun(targetId, {
         depth: form.depth.value === "intense" ? "intense" : "light",
         active: Boolean(activeBox && activeBox.checked),

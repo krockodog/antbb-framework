@@ -4,7 +4,7 @@
     document.querySelectorAll("a").forEach(function(a){
       var t=(a.textContent||"").replace(/\s+/g," ").trim();
       if(/^Gelbe\s+(Läufe|Laeufe|Fälle|Faelle)/i.test(t)){
-        a.textContent = window.t ? window.t("hub.yellow_cases") : "Gelbe Fälle";
+        a.textContent = window.t("hub.yellow_cases");
         a.setAttribute("href","/yellow");
       }
     });

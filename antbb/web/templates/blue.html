@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% block title %}🛡 Blue Queen · Verteidigungs-Kolonie · antbb{% endblock %}
+{% block title %}{{ t('blue.title') }}{% endblock %}
 {% block body_class %}blue-body{% endblock %}
 {% block content %}
+{% set tr = t %}
 <link rel="stylesheet" href="/static/blue_cards.css">
 <section class="blue-hero" aria-label="Blue Queen">
   <div class="blue-hero-glow" aria-hidden="true"></div>
@@ -12,55 +13,50 @@
   </div>
   <div class="blue-hero-inner">
     <div class="blue-crest" aria-hidden="true">🛡</div>
-    <div id="qv-blue" class="qv-slot" aria-label="Blaue Königin 3D"></div>
+    <div id="qv-blue" class="qv-slot" aria-label="{{ tr('blue.aria') }}"></div>
     <div class="blue-hero-copy">
-      <p class="blue-kicker">Verteidigungs-Kolonie · eigenständige Ansicht</p>
-      <h2>Blue Queen <span class="blue-sub">die Blaue Königin</span></h2>
-      <p class="blue-lede">
-        Sie führt die <strong>defensiven Ameisen</strong> — getrennt vom neuronalen Gehirn der
-        offensiven Kolonie. Phasen: <em>Assess → Watch → Harden → Defend → Remediate → Verify</em>.
-        Standard: rein lesend. Aktive Fixes und Honeypots nur mit Human Oversight.
-      </p>
-      <p class="blue-motto">„Nachweislich geschlossen" gilt erst mit Vorher/Nachher-Evidence.</p>
+      <p class="blue-kicker">{{ tr('blue.kicker') }}</p>
+      <h2>Blue Queen <span class="blue-sub">{{ tr('blue.sub') }}</span></h2>
+      <p class="blue-lede">{{ tr('blue.lede') }}</p>
+      <p class="blue-motto">{{ tr('blue.motto') }}</p>
     </div>
     <div class="blue-hero-stats" id="blue-stats">
-      <div class="bstat"><b id="bst-soldiers">{{ blue_stats.soldiers }}</b><span>Soldaten</span></div>
-      <div class="bstat"><b id="bst-playbooks">{{ blue_stats.playbooks }}</b><span>Playbooks</span></div>
-      <div class="bstat"><b id="bst-tasks">{{ blue_stats.tasks }}</b><span>Aufgaben</span></div>
-      <div class="bstat"><b id="bst-jobs">{{ blue_stats.jobs }}</b><span>Jobs</span></div>
-      <div class="bstat bstat-open"><b id="bst-open">{{ blue_stats.open }}</b><span>offene Lücken</span></div>
-      <div class="bstat bstat-closed"><b id="bst-closed">{{ blue_stats.closed }}</b><span>nachweislich geschlossen</span></div>
+      <div class="bstat"><b id="bst-soldiers">{{ blue_stats.soldiers }}</b><span>{{ tr('idx.soldiers') }}</span></div>
+      <div class="bstat"><b id="bst-playbooks">{{ blue_stats.playbooks }}</b><span>{{ tr('idx.playbooks') }}</span></div>
+      <div class="bstat"><b id="bst-tasks">{{ blue_stats.tasks }}</b><span>{{ tr('idx.tasks') }}</span></div>
+      <div class="bstat"><b id="bst-jobs">{{ blue_stats.jobs }}</b><span>{{ tr('blue.jobs') }}</span></div>
+      <div class="bstat bstat-open"><b id="bst-open">{{ blue_stats.open }}</b><span>{{ tr('blue.open_gaps') }}</span></div>
+      <div class="bstat bstat-closed"><b id="bst-closed">{{ blue_stats.closed }}</b><span>{{ tr('blue.closed') }}</span></div>
     </div>
   </div>
   {% if not blue_stats.tracked %}
-  <p class="hint blue-firstrun">Noch kein Lauf im Ledger – <a href="#blue-launch">Kolonie starten</a>:
-    „offene Lücken“ und „geschlossen“ füllen sich ausschließlich aus echten, read-only Belegen.</p>
+  <p class="hint blue-firstrun">{{ tr('blue.firstrun') }} <a href="#blue-launch">{{ tr('idx.go') }}</a></p>
   {% endif %}
 </section>
 
-<nav class="blue-jump" aria-label="Blue Queen Abschnitte">
-  <a href="#blue-phases">Phasen</a>
-  <a href="#blue-launch">Kolonie starten</a>
-  <a href="#soldier-section">Soldaten &amp; Playbooks</a>
-  <a href="#blue-greenbone">Greenbone</a>
-  <a href="#blue-jobs">Jobs</a>
-  <a href="#blue-ledger">Ledger</a>
-  <a href="#blue-attacklog">Attack-Log</a>
-  <a href="#blue-posture">Posture / SIEM</a>
-  <a href="#blue-runs">Läufe</a>
+<nav class="blue-jump" aria-label="{{ tr('blue.jump') }}">
+  <a href="#blue-phases">{{ tr('idx.jump.phases') }}</a>
+  <a href="#blue-launch">{{ tr('idx.go') }}</a>
+  <a href="#soldier-section">{{ tr('idx.jump.soldiers') }}</a>
+  <a href="#blue-greenbone">{{ tr('blue.jump.greenbone') }}</a>
+  <a href="#blue-jobs">{{ tr('blue.jobs') }}</a>
+  <a href="#blue-ledger">{{ tr('blue.jump.ledger') }}</a>
+  <a href="#blue-attacklog">{{ tr('blue.jump.attack') }}</a>
+  <a href="#blue-posture">{{ tr('blue.jump.posture') }}</a>
+  <a href="#blue-runs">{{ tr('idx.runs.title') }}</a>
 </nav>
 
 <section class="card blue-card" id="blue-phases">
-  <h3>⬡ Phasen-Pipeline <small>jeder Soldat kennt seinen Abschnitt</small></h3>
+  <h3>⬡ {{ tr('idx.phases.title') }} <small>{{ tr('idx.phases.sub') }}</small></h3>
   <ol class="bq-pipe" id="bq-pipeline">
   {% for ph in blue_phases %}
     <li class="bq-phase" data-phase="{{ ph.key }}" style="--i: {{ loop.index0 }}">
       <button type="button" class="bq-phase-btn" data-filter-phase="{{ ph.key }}"
-              title="Soldaten dieser Phase filtern">
+              title="{{ tr('blue.phase.filter') }}">
         <span class="bq-phase-no">{{ loop.index }}</span>
         <span class="bq-phase-name">{{ ph.label }}</span>
         <span class="bq-phase-note">{{ ph.note }}</span>
-        <span class="bq-phase-count">{{ ph.soldiers|length }} Soldaten</span>
+        <span class="bq-phase-count">{{ tr('blue.phase.count', n=ph.soldiers|length) }}</span>
       </button>
       <ul class="bq-phase-sol">
         {% for s in ph.soldiers %}<li>{{ s.specialty or s.name }}</li>{% endfor %}
@@ -71,40 +67,39 @@
 </section>
 
 <section class="card blue-card blue-launch" id="blue-launch">
-  <h3>🐜🛡 Kolonie starten <small>read-only Default · scope-gebunden</small></h3>
+  <h3>🐜🛡 {{ tr('idx.go') }} <small>{{ tr('blue.launch.sub') }}</small></h3>
   <form id="blue-run-form" class="blue-form">
-    <label class="blue-field">Ziel (optional)
+    <label class="blue-field">{{ tr('blue.field.target') }}
       <select name="target_id" id="blue-target">
-        <option value="">localhost (lokales System)</option>
-        {% for t in targets %}
-        <option value="{{ t.id }}">{{ t.name }} (#{{ t.id }})</option>
+        <option value="">{{ tr('blue.localhost') }}</option>
+        {% for tgt in targets %}
+        <option value="{{ tgt.id }}">{{ tgt.name }} (#{{ tgt.id }})</option>
         {% endfor %}
       </select>
     </label>
     <label class="blue-check">
       <input type="checkbox" name="apply_fixes" id="blue-apply" value="1">
-      Aktive Fixes / Honeypot-Start (Oversight)
+      {{ tr('blue.apply') }}
     </label>
     <label class="blue-check blue-ack" id="blue-ack-wrap" style="display:none">
       <input type="checkbox" name="oversight_ack" id="blue-ack" value="1">
       {{ t('oversight.active_steps') }}
     </label>
-    <button type="submit" class="blue-go">🐜🛡 Kolonie starten</button>
+    <button type="submit" class="blue-go">🐜🛡 {{ tr('idx.go') }}</button>
   </form>
   <pre id="blue-run-log" class="feed blue-feed" aria-live="polite"></pre>
 </section>
 
 <section class="card blue-card" id="soldier-section">
-  <h3>🛡 Blue-Soldaten · Playbooks &amp; Checklisten
-    <small id="soldier-summary">{{ blue_stats.soldiers }} Soldaten · {{ blue_stats.playbooks }} Playbooks · {{ blue_stats.tasks }} Aufgaben</small>
+  <h3>🛡 {{ tr('blue.soldiers.title') }}
+    <small id="soldier-summary">{{ tr('blue.summary', soldiers=blue_stats.soldiers, playbooks=blue_stats.playbooks, tasks=blue_stats.tasks) }}</small>
   </h3>
-  <p class="hint">Jede Karte zeigt ihre Playbooks mit der vollständigen Aufgaben-Checkliste —
-     ohne Tabs, ohne Klick. Haken speichern als Override. 🔒 = nur mit Human Oversight.</p>
+  <p class="hint">{{ tr('idx.soldiers.hint') }}</p>
   <div class="bq-toolbar">
     <input type="search" id="soldier-filter" class="blue-filter"
-           placeholder="Soldaten / Playbooks / Aufgaben durchsuchen…" autocomplete="off">
+           placeholder="{{ tr('idx.filter.ph') }}" autocomplete="off">
     <div class="bq-chips" id="bq-phase-chips">
-      <button type="button" class="bq-chip active" data-filter-phase="">alle</button>
+      <button type="button" class="bq-chip active" data-filter-phase="">{{ tr('blue.all') }}</button>
       {% for ph in blue_phases %}<button type="button" class="bq-chip" data-filter-phase="{{ ph.key }}">{{ ph.label }}</button>{% endfor %}
     </div>
   </div>
@@ -119,7 +114,7 @@
           <h4>{{ s.specialty or s.name }}</h4>
           <code>{{ s.name }}</code>
         </div>
-        <span class="bq-prog" data-prog title="erledigte Aufgaben">{{ s.progress.done }}/{{ s.progress.total }}</span>
+        <span class="bq-prog" data-prog title="{{ tr('blue.done.title') }}">{{ s.progress.done }}/{{ s.progress.total }}</span>
       </div>
       <p class="bq-role">{{ s.role }}</p>
       <div class="bq-phases">{% for ph in (s.blue_phases or []) %}<span class="bq-ph bq-ph-{{ ph }}">{{ ph }}</span>{% endfor %}</div>
@@ -131,12 +126,12 @@
           <div class="bq-pb-head">
             <h5>{{ pb.name }}</h5>
             <span class="bq-mode {{ 'bq-mode-active' if is_active else 'bq-mode-def' }}"
-                  title="{{ 'aktiv: verändert Systeme – nur mit Human Oversight' if is_active else 'defensiv: rein lesend, immer erlaubt' }}">{{ 'aktiv' if is_active else 'defensiv' }}</span>
-            {% if pb.oversight_required %}<span class="bq-lock" title="nur mit Human Oversight">🔒 Oversight</span>{% endif %}
-            <span class="bq-pb-count">{{ pb.task_items|length }} Schritte</span>
+                  title="{{ tr('blue.mode.active.title') if is_active else tr('blue.mode.def.title') }}">{{ tr('blue.mode.active') if is_active else tr('blue.mode.def') }}</span>
+            {% if pb.oversight_required %}<span class="bq-lock" title="{{ tr('blue.lock.title') }}">🔒 Oversight</span>{% endif %}
+            <span class="bq-pb-count">{{ tr('blue.steps', n=pb.task_items|length) }}</span>
           </div>
           {% if pb.description %}<p class="bq-pb-desc">{{ pb.description }}</p>{% endif %}
-          {% if pb.tools %}<p class="bq-pb-tools"><span>Checks</span>{% for t in pb.tools %}<code>{{ t }}</code>{% endfor %}</p>{% endif %}
+          {% if pb.tools %}<p class="bq-pb-tools"><span>{{ tr('blue.checks') }}</span>{% for tool in pb.tools %}<code>{{ tool }}</code>{% endfor %}</p>{% endif %}
           <ul class="bq-tasks">
           {% for ti in pb.task_items %}
             <li><label><input type="checkbox" data-pb="{{ pb.name }}" data-task="{{ ti.task }}"{{ ' checked' if ti.checked }}> <span>{{ ti.task }}</span></label></li>
@@ -144,93 +139,89 @@
           </ul>
         </section>
       {% else %}
-        <p class="hint">Dieser Soldat führt aktuell keine Playbooks.</p>
+        <p class="hint">{{ tr('blue.no_playbooks') }}</p>
       {% endfor %}
       </div>
       <div class="bq-foot">
-        <span>{{ s.playbooks|length }} Playbooks · {{ s.skill.task_count }} Aufgaben</span>
-        <button type="button" class="bq-skill-btn" data-skill="{{ s.name }}">📖 SKILL.md lesen</button>
+        <span>{{ tr('blue.foot', playbooks=s.playbooks|length, tasks=s.skill.task_count) }}</span>
+        <button type="button" class="bq-skill-btn" data-skill="{{ s.name }}">📖 {{ tr('blue.read_skill') }}</button>
       </div>
     </article>
   {% else %}
-    <p class="hint">Keine Blue-Soldaten in der Registry gefunden.</p>
+    <p class="hint">{{ tr('blue.no_soldiers') }}</p>
   {% endfor %}
   </div>
-  <p class="hint bq-empty" id="bq-empty" hidden>Kein Soldat passt zum Filter.</p>
+  <p class="hint bq-empty" id="bq-empty" hidden>{{ tr('idx.soldiers.empty') }}</p>
 </section>
 
 <dialog id="bq-skill-dialog" class="bq-dialog">
   <form method="dialog" class="bq-dialog-bar"><strong id="bq-skill-title">SKILL.md</strong>
-    <button class="bq-close" aria-label="schließen">✕</button></form>
+    <button class="bq-close" aria-label="{{ tr('idx.close') }}">✕</button></form>
   <div id="bq-skill-body" class="bq-skill-body"></div>
 </dialog>
 
 <section class="card blue-card" id="blue-greenbone">
-  <h3>🌿 Greenbone / OpenVAS <small>Import → Härtung · Scan nur mit Oversight</small>
+  <h3>🌿 Greenbone / OpenVAS <small>{{ tr('blue.gb.sub') }}</small>
     <span id="gb-badge" class="gb-badge {{ 'gb-ok' if gb_status.available else 'gb-off' }}">
-      {{ 'Greenbone vorhanden – prüfe…' if gb_status.available else 'Greenbone nicht verfügbar' }}</span></h3>
+      {{ tr('blue.gb.ok') if gb_status.available else tr('blue.gb.off') }}</span></h3>
   <p class="hint" id="gb-status-msg">{{ gb_status.message or gb_status.error }}</p>
   <div class="gb-grid">
     <form id="gb-import-form" class="blue-form gb-box" enctype="multipart/form-data">
-      <h4>📥 Report importieren <small>defensiv · kein Oversight nötig</small></h4>
-      <p class="hint">Greenbone-Export (<code>.xml</code>, <code>.csv</code>, <code>.json</code>) – wird nur gelesen,
-         es entsteht kein Netzwerkverkehr. Mit Ziel werden nur In-Scope-Hosts übernommen.</p>
+      <h4>📥 {{ tr('blue.gb.import') }} <small>{{ tr('blue.gb.import.sub') }}</small></h4>
+      <p class="hint">{{ tr('blue.gb.import.hint') }}</p>
       <input type="file" name="file" accept=".xml,.csv,.json" required class="blue-field-input">
-      <label class="blue-field">Ziel (optional, Scope-Filter + Speicherung)
-        <select name="target_id"><option value="">ohne Ziel (nur Analyse)</option>
-          {% for t in targets %}<option value="{{ t.id }}">{{ t.name }} (#{{ t.id }})</option>{% endfor %}
+      <label class="blue-field">{{ tr('blue.gb.target') }}
+        <select name="target_id"><option value="">{{ tr('blue.gb.no_target') }}</option>
+          {% for tgt in targets %}<option value="{{ tgt.id }}">{{ tgt.name }} (#{{ tgt.id }})</option>{% endfor %}
         </select></label>
-      <button type="submit" id="gb-import-go">Importieren</button>
+      <button type="submit" id="gb-import-go">{{ tr('blue.gb.import.btn') }}</button>
     </form>
     <form id="gb-scan-form" class="blue-form gb-box">
-      <h4>🔒 Scoped Scan <small>aktiv · Oversight Pflicht</small></h4>
-      <p class="hint">Genau ein In-Scope-Host, nicht-destruktive Scan-Config, ein Scan gleichzeitig.
-         Ohne laufendes GVM + Zugangsdaten (<code>GVM_USERNAME</code>/<code>GVM_PASSWORD</code> in der Umgebung)
-         wird ehrlich nichts gestartet.</p>
-      <label class="blue-field">Ziel (Scope)
-        <select name="target_id" required><option value="">— wählen —</option>
-          {% for t in targets %}<option value="{{ t.id }}">{{ t.name }} (#{{ t.id }})</option>{% endfor %}
+      <h4>🔒 {{ tr('blue.gb.scan') }} <small>{{ tr('blue.gb.scan.sub') }}</small></h4>
+      <p class="hint">{{ tr('blue.gb.scan.hint') }}</p>
+      <label class="blue-field">{{ tr('idx.field.target') }}
+        <select name="target_id" required><option value="">{{ tr('idx.choose') }}</option>
+          {% for tgt in targets %}<option value="{{ tgt.id }}">{{ tgt.name }} (#{{ tgt.id }})</option>{% endfor %}
         </select></label>
-      <input name="host" required placeholder="Host/IP, z. B. 192.0.2.1" class="blue-field-input"
+      <input name="host" required placeholder="{{ tr('blue.gb.host.ph') }}" class="blue-field-input"
              pattern="[A-Za-z0-9.:\-]+" autocomplete="off">
       <label class="blue-check blue-ack">
         <input type="checkbox" name="oversight_ack" id="gb-ack" value="1">
-        {{ t('oversight.active_steps') }}
+        {{ tr('oversight.active_steps') }}
       </label>
-      <button type="submit" id="gb-scan-go" disabled>Scan starten</button>
+      <button type="submit" id="gb-scan-go" disabled>{{ tr('blue.gb.scan.btn') }}</button>
     </form>
   </div>
   <div id="gb-result" class="gb-result" aria-live="polite" hidden></div>
 </section>
 
 <section class="card blue-card" id="blue-jobs">
-  <h3>⏱ Wiederholbare Jobs <small>nightly · weekly · on-demand</small></h3>
-  <p class="hint">Automatisch wiederkehrende Checks (Software-Scan, Hardening-Audit,
-     Remediation-Verify, voller Colony-Lauf). Non-destruktiv; aktive Fixes bleiben gated.</p>
+  <h3>⏱ {{ tr('blue.jobs.title') }} <small>{{ tr('blue.jobs.sub') }}</small></h3>
+  <p class="hint">{{ tr('blue.jobs.hint') }}</p>
   <form id="blue-job-form" class="blue-form blue-job-form">
-    <input name="name" required placeholder="Name (z.B. nightly-swscan)" class="blue-field-input">
+    <input name="name" required placeholder="{{ tr('blue.job.name.ph') }}" class="blue-field-input">
     <select name="kind">
-      <option value="swscan">Software-/Versions-Scan</option>
-      <option value="hardening">Hardening-Audit</option>
-      <option value="remediate">Remediation-Verify</option>
-      <option value="colony">Voller Colony-Lauf</option>
-      <option value="patching">Patch-Management</option>
-      <option value="firewall">Firewall-Audit</option>
-      <option value="identity">Identity-Hygiene</option>
-      <option value="tls">TLS-Posture</option>
-      <option value="logs">Log-Integrität</option>
-      <option value="backup">Backup-Verify</option>
-      <option value="watcher">Wächter-Check</option>
-      <option value="attacklog">Attack-Log Review</option>
-      <option value="greenbone">Greenbone-Import (neuester Report)</option>
+      <option value="swscan">{{ tr('blue.job.swscan') }}</option>
+      <option value="hardening">{{ tr('blue.job.hardening') }}</option>
+      <option value="remediate">{{ tr('blue.job.remediate') }}</option>
+      <option value="colony">{{ tr('blue.job.colony') }}</option>
+      <option value="patching">{{ tr('blue.job.patching') }}</option>
+      <option value="firewall">{{ tr('blue.job.firewall') }}</option>
+      <option value="identity">{{ tr('blue.job.identity') }}</option>
+      <option value="tls">{{ tr('blue.job.tls') }}</option>
+      <option value="logs">{{ tr('blue.job.logs') }}</option>
+      <option value="backup">{{ tr('blue.job.backup') }}</option>
+      <option value="watcher">{{ tr('blue.job.watcher') }}</option>
+      <option value="attacklog">{{ tr('blue.job.attacklog') }}</option>
+      <option value="greenbone">{{ tr('blue.job.greenbone') }}</option>
     </select>
-    <input name="interval_sec" type="number" value="86400" title="Intervall in Sekunden"
+    <input name="interval_sec" type="number" value="86400" title="{{ tr('blue.job.interval') }}"
            class="blue-field-input blue-interval">
-    <button type="submit">+ Job anlegen</button>
+    <button type="submit">+ {{ tr('blue.job.add') }}</button>
   </form>
   <div class="blue-jobs-wrap">
     <table id="blue-jobs-table" class="blue-table">
-      <thead><tr><th>ID</th><th>Name</th><th>Art</th><th>Intervall</th><th>Zuletzt</th><th></th></tr></thead>
+      <thead><tr><th>ID</th><th>{{ tr('idx.th.name') }}</th><th>{{ tr('blue.th.kind') }}</th><th>{{ tr('blue.th.interval') }}</th><th>{{ tr('blue.th.last') }}</th><th></th></tr></thead>
       <tbody>
       {% for j in jobs %}
         <tr data-id="{{ j.id }}">
@@ -240,42 +231,40 @@
           <td>{{ j.interval_sec }}s</td>
           <td>{{ j.last_run_label }}</td>
           <td>
-            <button type="button" class="blue-job-run" data-id="{{ j.id }}">jetzt ausführen</button>
+            <button type="button" class="blue-job-run" data-id="{{ j.id }}">{{ tr('blue.job.run') }}</button>
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="6" class="hint">Noch keine Jobs — lege oben den ersten an
-            (z.B. <code>nightly-swscan</code>).</td></tr>
+        <tr><td colspan="6" class="hint">{{ tr('blue.jobs.empty') }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-  <h4>Letzte Job-Läufe</h4>
+  <h4>{{ tr('blue.job.runs') }}</h4>
   <ul id="blue-job-runs" class="blue-run-list">
   {% for r in job_runs %}
     <li><span class="br-pill">#{{ r.job_id }}</span>
         <span class="br-status">{{ r.status }}</span>
-        findings={{ r.finding_count }} · geschlossen={{ r.closed_count }}
+        {{ tr('blue.job.counts', findings=r.finding_count, closed=r.closed_count) }}
         · <code>{{ r.run_id }}</code></li>
   {% else %}
-    <li class="hint">Noch keine Job-Läufe.</li>
+    <li class="hint">{{ tr('blue.job.runs.empty') }}</li>
   {% endfor %}
   </ul>
 </section>
 
 <section class="card blue-card" id="blue-ledger">
-  <h3>🧾 Posture-Ledger <small>Vorher/Nachher über Läufe
-    {% if blue_stats.updated %}· Stand {{ blue_stats.updated }}{% endif %}</small></h3>
+  <h3>🧾 {{ tr('blue.ledger.title') }} <small>{{ tr('blue.ledger.sub') }}
+    {% if blue_stats.updated %}· {{ tr('blue.ledger.asof', when=blue_stats.updated) }}{% endif %}</small></h3>
   {% if ledger_rows %}
-  <p class="hint">{{ blue_stats.tracked }} Checks verfolgt · {{ blue_stats.open }} offen ·
-     {{ blue_stats.closed }}× nachweislich geschlossen (fail → pass mit Re-Check).</p>
+  <p class="hint">{{ tr('blue.ledger.summary', tracked=blue_stats.tracked, open=blue_stats.open, closed=blue_stats.closed) }}</p>
   <div class="blue-jobs-wrap">
   <table class="blue-table" id="blue-ledger-table">
-    <thead><tr><th>Status</th><th>Severity</th><th>Check</th><th>Befund</th><th>seit</th><th>geschl.</th></tr></thead>
+    <thead><tr><th>{{ tr('blue.th.status') }}</th><th>Severity</th><th>{{ tr('blue.th.check') }}</th><th>{{ tr('idx.th.finding') }}</th><th>{{ tr('blue.th.since') }}</th><th>{{ tr('blue.th.closed') }}</th></tr></thead>
     <tbody>
     {% for r in ledger_rows %}
       <tr class="lg-{{ r.status }}">
-        <td><span class="lg-pill lg-{{ r.status }}">{{ 'OFFEN' if r.status == 'fail' else 'OK' }}</span></td>
+        <td><span class="lg-pill lg-{{ r.status }}">{{ tr('blue.ledger.open') if r.status == 'fail' else tr('blue.ledger.ok') }}</span></td>
         <td>{{ r.severity }}</td>
         <td>{{ r.title }}<br><code>{{ r.check_id }}</code></td>
         <td class="hint">{{ r.detail }}</td>
@@ -287,66 +276,61 @@
   </table>
   </div>
   {% else %}
-  <p class="hint">Noch kein Lauf gebucht. Starte oben die Kolonie – danach stehen hier alle
-     geprüften Checks mit Status; Lücken, die du behebst, erscheinen beim nächsten Lauf als
-     <strong>nachweislich geschlossen</strong>.</p>
+  <p class="hint">{{ tr('blue.ledger.empty') }}</p>
   {% endif %}
 </section>
 
 
 <section class="card blue-card" id="blue-attacklog">
-  <h3>🕷 Permanenter Attack-Log <small>append-only · Angreifer + Gegenmaßnahme</small></h3>
-  <p class="hint">Lückenlose Dokumentation von Detection, Honeypot-Umleitung, Sofortschutz
-     und Rückverfolgung. Kein Truncate/Delete über die normale API.
-     <span id="alog-summary" class="br-pill">lädt…</span></p>
+  <h3>🕷 {{ tr('blue.attack.title') }} <small>{{ tr('blue.attack.sub') }}</small></h3>
+  <p class="hint">{{ tr('blue.attack.hint') }}
+     <span id="alog-summary" class="br-pill">{{ tr('common.loading') }}</span></p>
   <div class="blue-jobs-wrap">
     <table class="blue-table" id="blue-attacklog-table">
-      <thead><tr><th>Zeit</th><th>Typ</th><th>Quelle</th><th>Aktion</th><th>Gegenmaßnahme</th><th>Outcome</th></tr></thead>
-      <tbody id="alog-body"><tr><td colspan="6" class="hint">lädt…</td></tr></tbody>
+      <thead><tr><th>{{ tr('blue.th.time') }}</th><th>{{ tr('blue.th.type') }}</th><th>{{ tr('blue.th.source') }}</th><th>{{ tr('blue.th.action') }}</th><th>{{ tr('blue.th.counter') }}</th><th>{{ tr('blue.th.outcome') }}</th></tr></thead>
+      <tbody id="alog-body"><tr><td colspan="6" class="hint">{{ tr('common.loading') }}</td></tr></tbody>
     </table>
   </div>
 </section>
 
 <section class="card blue-card" id="blue-posture">
-  <h3>📡 Posture · Splunk (free/green)</h3>
+  <h3>📡 {{ tr('blue.posture') }}</h3>
   <div class="blue-posture-grid">
     <div class="blue-posture-tile">
-      <div class="bpt-label">SIEM / HEC</div>
+      <div class="bpt-label">{{ tr('blue.siem') }}</div>
       {% if splunk.configured %}
-      <div class="bpt-ok">● konfiguriert</div>
+      <div class="bpt-ok">● {{ tr('blue.configured') }}</div>
       <p class="hint">Index: {{ splunk.index or '—' }} · sourcetype: {{ splunk.sourcetype }}</p>
       {% else %}
-      <div class="bpt-idle">○ nicht konfiguriert</div>
-      <p class="hint">Weiterleitung wird sauber übersprungen.
-         Setze <code>ANTBB_SPLUNK_HEC_URL</code> und <code>ANTBB_SPLUNK_HEC_TOKEN</code> (ENV),
-         optional <code>ANTBB_SPLUNK_INDEX</code> / <code>ANTBB_SPLUNK_SOURCETYPE</code>.</p>
+      <div class="bpt-idle">○ {{ tr('blue.not_configured') }}</div>
+      <p class="hint">{{ tr('blue.splunk.hint') }}</p>
       {% endif %}
     </div>
     <div class="blue-posture-tile">
-      <div class="bpt-label">Leitplanken</div>
+      <div class="bpt-label">{{ tr('blue.rails') }}</div>
       <ul class="blue-pillars">
-        <li>default-deny Scope</li>
-        <li>Human Oversight für aktive Schritte</li>
-        <li>Proof-Gate (Vorher/Nachher)</li>
-        <li>keine Secrets/PII in Findings</li>
+        <li>{{ tr('blue.rail.scope') }}</li>
+        <li>{{ tr('blue.rail.oversight') }}</li>
+        <li>{{ tr('blue.rail.proof') }}</li>
+        <li>{{ tr('blue.rail.secrets') }}</li>
       </ul>
     </div>
     <div class="blue-posture-tile">
-      <div class="bpt-label">Trennung</div>
-      <p class="hint">Blue-Läufe und Blue-Soldaten leben ausschließlich hier unter <code>/blue</code> – eigene Kolonie, eigene Läufe, eigenes Ledger.</p>
+      <div class="bpt-label">{{ tr('blue.split') }}</div>
+      <p class="hint">{{ tr('blue.split.body') }}</p>
     </div>
   </div>
 </section>
 
 <section class="card blue-card" id="blue-remediation">
-  <h3>🛠 Blue-Remediation <small>Human Oversight · jedes Apply bestätigen</small></h3>
-  <p class="hint">Findings mit prüfbarem Fix werden hier angeboten. Backups mit <code>.bak-antbb-&lt;ts&gt;</code>, nach jedem Apply IST-Re-Check – geschlossen nur bei <code>closed:true</code>.</p>
-  <div id="blue-remediation-list" class="blue-remediation-list">lädt…</div>
+  <h3>🛠 {{ tr('blue.rem.title') }} <small>{{ tr('blue.rem.sub') }}</small></h3>
+  <p class="hint">{{ tr('blue.rem.hint') }}</p>
+  <div id="blue-remediation-list" class="blue-remediation-list">{{ tr('common.loading') }}</div>
 </section>
 
 <section class="card blue-card" id="blue-runs">
-  <h3>🗂 Blue-Läufe <small>nur colony=blue</small></h3>
-  <div id="blue-runs-list" class="blue-runs-list">lädt…</div>
+  <h3>🗂 {{ tr('blue.runs.title') }} <small>{{ tr('blue.runs.sub') }}</small></h3>
+  <div id="blue-runs-list" class="blue-runs-list">{{ tr('common.loading') }}</div>
 </section>
 
 <script>window.ANTBB_COLONY = "blue";</script>

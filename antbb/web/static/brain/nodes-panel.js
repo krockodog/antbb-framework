@@ -9,8 +9,8 @@
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const TYPE_LABEL = { target: "🎯 Ziele", run: "🌀 Läufe", finding: "🐞 Funde",
-    soldier: "🐜 Soldaten" };
+  const TYPE_LABEL = { target: "🎯 " + window.t("np.type_targets"), run: "🌀 " + window.t("np.type_runs"), finding: "🐞 " + window.t("np.type_findings"),
+    soldier: "🐜 " + window.t("idx.soldiers") };
   const TYPE_ORDER = ["run", "target", "soldier", "finding"];
 
   // Blue Queen hat eigene Ansicht (/blue) — nie im Brain-Panel listen.
@@ -25,8 +25,7 @@
   // Menschliche Bestätigung inkl. Backup-Hinweis.
   function humanConfirm(msg) {
     return window.confirm(
-      msg + "\n\nWirklich fortfahren? Es wird automatisch ein DB-Backup angelegt." +
-      "\n(Nur ein Mensch darf dies auslösen — Agenten/Königin nicht.)");
+      msg + "\n\n" + window.t("np.human_only"));
   }
 
   async function api(url, opts) {
@@ -41,7 +40,7 @@
   let GRAPH = null;
   async function loadNodes() {
     const res = await api("/api/brain/nodes");
-    if (!res.ok) { $("bp-nodes").textContent = "Fehler beim Laden."; return; }
+    if (!res.ok) { $("bp-nodes").textContent = window.t("np.load_fail"); return; }
     GRAPH = res.body;
     renderCounts(GRAPH.counts, GRAPH.stuck_runs);
     renderNodes(GRAPH.nodes);
@@ -51,7 +50,7 @@
     const el = $("bp-counts");
     el.innerHTML = "";
     const chips = [
-      ["Ziele", c.targets], ["Läufe", c.runs], ["Funde", c.findings],
+      [window.t("np.type_targets"), c.targets], [window.t("np.type_runs"), c.runs], [window.t("np.type_findings"), c.findings],
       ["Logs", c.logs],
     ];
     chips.forEach(([k, v]) => {
@@ -60,7 +59,7 @@
     });
     if (c.stuck_runs > 0) {
       const s = document.createElement("span");
-      s.className = "bp-chip warn"; s.textContent = `⚠ hängt/läuft: ${c.stuck_runs}`;
+      s.className = "bp-chip warn"; s.textContent = "⚠ " + window.t("np.stuck", {n: c.stuck_runs});
       el.appendChild(s);
     }
   }
@@ -103,7 +102,7 @@
       if (n.running) {
         const rb = document.createElement("button");
         rb.className = "bp-reset"; rb.textContent = "⟲ reset";
-        rb.title = "Lauf zurücksetzen (human-only)";
+        rb.title = window.t("np.reset_run");
         rb.onclick = (e) => { e.stopPropagation(); resetRun(n); };
         row.appendChild(rb);
       }
@@ -118,7 +117,7 @@
       }
       const rb = document.createElement("button");
       rb.className = "bp-reset"; rb.textContent = "⟲";
-      rb.title = "Soldat-Anzeige zurücksetzen (human-only)";
+      rb.title = window.t("np.reset_soldier");
       rb.onclick = (e) => { e.stopPropagation(); resetAgent(n); };
       row.appendChild(rb);
     } else if (n.severity) {
@@ -136,7 +135,7 @@
     const rid = rest.join(":");
     const res = await api(`/api/brain/node/${encodeURIComponent(type)}/${encodeURIComponent(rid)}`);
     const body = $("bp-detail-body");
-    if (!res.ok) { body.innerHTML = "<p>Nicht gefunden.</p>"; }
+    if (!res.ok) { body.innerHTML = "<p>" + window.t("np.not_found") + "</p>"; }
     else { body.innerHTML = detailHtml(res.body, n); }
     $("bp-detail").style.display = "flex";
     $("bp-detail").classList.toggle("sol-wide", !!(res.body && res.body.type === "soldier"));
@@ -153,9 +152,9 @@
       let h = `<h3>🎯 ${esc(t.name)}</h3><table>
         <tr><td class="bp-kv">Status</td><td>${t.archived_at ? "archiviert" : "aktiv"}</td></tr>
         <tr><td class="bp-kv">Funde</td><td>${d.finding_count}</td></tr>
-        <tr><td class="bp-kv">Läufe</td><td>${d.runs.length}</td></tr></table>`;
-      h += `<p><button class="btn-danger" data-act="del-target" data-id="${t.id}">🗑 Ziel hart löschen (Purge)</button>
-        <span class="bp-hint">Nicht der Papierkorb — endgültig. Königin-Wissen bleibt.</span></p>`;
+        <tr><td class="bp-kv">${window.t("np.type_runs")}</td><td>${d.runs.length}</td></tr></table>`;
+      h += `<p><button class="btn-danger" data-act="del-target" data-id="${t.id}">${window.t("np.purge_btn")}</button>
+        <span class="bp-hint">${window.t("np.not_trash")}</span></p>`;
       if (d.findings.length) {
         h += "<h4>Funde</h4><table>";
         d.findings.forEach((f) => { h += `<tr><td class="bp-kv">[${esc(f.severity)}]</td>
@@ -170,9 +169,9 @@
         <tr><td class="bp-kv">Status</td><td>${esc(d.status_label)} (${esc(r.status)})</td></tr>
         <tr><td class="bp-kv">Log-Zeilen</td><td>${d.log_count}</td></tr></table>`;
       if (d.running) {
-        h += `<p><button class="bp-reset" data-act="reset-run" data-id="${esc(r.run_id)}">⟲ Lauf zurücksetzen</button></p>`;
+        h += `<p><button class="bp-reset" data-act="reset-run" data-id="${esc(r.run_id)}">${window.t("np.reset_btn")}</button></p>`;
       }
-      h += `<p><button class="btn-danger" data-act="del-run" data-id="${esc(r.run_id)}">🗑 Lauf + Logs löschen</button></p>`;
+      h += `<p><button class="btn-danger" data-act="del-run" data-id="${esc(r.run_id)}">${window.t("np.del_run")}</button></p>`;
       h += logsHtml(d.logs);
       return h;
     }
@@ -184,7 +183,7 @@
         <tr><td class="bp-kv">Soldat</td><td>${esc(f.agent)}</td></tr>
         <tr><td class="bp-kv">Asset</td><td>${esc(f.asset)}</td></tr>
         <tr><td class="bp-kv">Zeit</td><td>${esc(f.created_fmt)}</td></tr></table>`;
-      h += `<p><button class="btn-danger" data-act="del-finding" data-id="${f.id}">🗑 Fund löschen</button></p>`;
+      h += `<p><button class="btn-danger" data-act="del-finding" data-id="${f.id}">${window.t("np.del_finding")}</button></p>`;
       h += logsHtml(d.logs);
       return h;
     }
@@ -308,7 +307,7 @@
     }
     h += `</div>
       <div data-sol-pane="skill" style="display:none">
-        <div class="skill-md">${skillMd ? mdLite(skillMd) : "<p class='bp-hint'>Kein SKILL.md für diesen Soldaten hinterlegt.</p>"}</div>
+        <div class="skill-md">${skillMd ? mdLite(skillMd) : "<p class='bp-hint'>" + window.t("np.no_skill_body") + "</p>"}</div>
       </div>
       <div data-sol-pane="findings" style="display:none">`;
     if (!(d.findings || []).length) {
@@ -322,7 +321,7 @@
     }
     h += `</div>
       <p class="sol-actions">
-        <button class="bp-reset" data-act="reset-agent" data-id="${esc(d.name)}">⟲ Anzeige zurücksetzen</button>
+        <button class="bp-reset" data-act="reset-agent" data-id="${esc(d.name)}">${window.t("np.reset_view")}</button>
       </p>
     </div>`;
     return h;
@@ -359,19 +358,19 @@
         const act = btn.getAttribute("data-act");
         const id = btn.getAttribute("data-id");
         if (act === "del-target") {
-          if (!humanConfirm(`Ziel #${id} ENDGÜLTIG löschen (Purge inkl. Funde/Läufe)?`)) return;
+          if (!humanConfirm(window.t("np.purge_target", {id: id}))) return;
           await doWrite(hc(`/api/brain/target/${id}`), "DELETE");
         } else if (act === "del-finding") {
-          if (!humanConfirm(`Fund #${id} löschen?`)) return;
+          if (!humanConfirm(window.t("np.del_finding_ask", {id: id}))) return;
           await doWrite(hc(`/api/brain/finding/${id}`), "DELETE");
         } else if (act === "del-run") {
-          if (!humanConfirm(`Lauf ${id} inkl. Logs löschen?`)) return;
+          if (!humanConfirm(window.t("np.del_run_ask", {id: id}))) return;
           await doWrite(hc(`/api/brain/run/${encodeURIComponent(id)}`), "DELETE");
         } else if (act === "reset-run") {
-          if (!humanConfirm(`Lauf ${id} zurücksetzen (Teil-Artefakte verwerfen)?`)) return;
+          if (!humanConfirm(window.t("np.reset_run_ask", {id: id}))) return;
           await doWrite(hc(`/api/brain/run/${encodeURIComponent(id)}/reset`), "POST");
         } else if (act === "reset-agent") {
-          if (!humanConfirm(`Soldat ${id} zurücksetzen?`)) return;
+          if (!humanConfirm(window.t("np.reset_soldier_ask", {id: id}))) return;
           await doWrite(hc(`/api/brain/agent/${encodeURIComponent(id)}/reset`), "POST");
         }
         closeDetail(); loadNodes();
@@ -390,12 +389,12 @@
 
   function resetRun(n) {
     const rid = n.id.split(":").slice(1).join(":");
-    if (!humanConfirm(`Lauf ${rid} zurücksetzen?`)) return;
+    if (!humanConfirm(window.t("np.reset_run_short", {id: rid}))) return;
     doWrite(hc(`/api/brain/run/${encodeURIComponent(rid)}/reset`), "POST").then(loadNodes);
   }
   function resetAgent(n) {
     const name = n.id.split(":").slice(1).join(":");
-    if (!humanConfirm(`Soldat ${name} zurücksetzen?`)) return;
+    if (!humanConfirm(window.t("np.reset_named", {name: name}))) return;
     doWrite(hc(`/api/brain/agent/${encodeURIComponent(name)}/reset`), "POST").then(loadNodes);
   }
   function closeDetail() { $("bp-detail").style.display = "none"; }
@@ -425,7 +424,7 @@
     if (r) { q.push("run_id=" + encodeURIComponent(r)); scopeTxt = "Lauf " + r; }
     if (t) { q.push("target_id=" + encodeURIComponent(t)); scopeTxt = (scopeTxt ? scopeTxt + " / " : "") + "Target " + t; }
     if (!q.length) { q.push("all=true"); scopeTxt = "ALLE Logs"; }
-    if (!humanConfirm(`${scopeTxt} löschen?`)) return;
+    if (!humanConfirm(window.t("np.delete_named", {name: scopeTxt}))) return;
     url += "?" + q.join("&") + "&human_confirm=true";
     await doWrite(url, "DELETE");
     loadLogs();
@@ -433,8 +432,8 @@
 
   // --------------------------- Alles löschen ---------------------------
   async function deleteAll() {
-    if (!humanConfirm("ALLE operativen Daten löschen (Ziele, Funde, Läufe, Logs)?")) return;
-    if (!humanConfirm("Zweite Bestätigung: Das kann nicht rückgängig gemacht werden (außer via Backup).")) return;
+    if (!humanConfirm(window.t("np.purge_all"))) return;
+    if (!humanConfirm(window.t("np.purge_all2"))) return;
     await doWrite(hc("/api/brain/all"), "DELETE");
     loadNodes();
   }

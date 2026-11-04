@@ -19,7 +19,7 @@
 
   function refreshStatus() {
     fetch("/api/blue/greenbone/status").then(r => r.json()).then(st => {
-      let cls = "gb-off", txt = "Greenbone nicht verfügbar";
+      let cls = "gb-off", txt = window.t("blue.gb.off");
       if (st.available) {
         cls = st.can_scan ? "gb-ok" : "gb-warn";
         txt = "Greenbone erreichbar" + (st.version ? " · GMP " + st.version : "")
@@ -47,17 +47,16 @@
       + ["critical", "high", "medium", "low"].map(k =>
           '<span class="gb-sev gb-sev-' + k + '">' + k + " " + (sev[k] || 0) + "</span>").join(" ")
       + "</p>";
-    if (d.out_of_scope_skipped) h += "<p class='hint'>" + esc(d.out_of_scope_skipped)
-      + " Ergebnis(se) außerhalb des Scopes verworfen (default-deny).</p>";
+    if (d.out_of_scope_skipped) h += "<p class='hint'>" + window.t("gb.out_of_scope", {n: esc(d.out_of_scope_skipped)}) + "</p>";
     if (d.persisted) h += "<p class='hint'>" + esc(d.persisted) + " Finding(s) beim Ziel gespeichert.</p>";
     const hints = d.hints || [];
-    h += "<h5>🎫 Härtungs-/Ticket-Hinweise (High/Critical)</h5>";
-    if (!hints.length) h += "<p class='hint'>Keine High/Critical-Funde – nichts zu härten.</p>";
+    h += "<h5>🎫 " + window.t("gb.tickets") + "</h5>";
+    if (!hints.length) h += "<p class='hint'>" + window.t("gb.none_high") + "</p>";
     else h += "<ul>" + hints.slice(0, 25).map(x =>
       '<li><span class="gb-sev gb-sev-' + esc(x.severity) + '">' + esc(x.severity) + "</span> <code>"
       + esc(x.ticket_id) + "</code> " + esc(x.title) + " → <strong>" + esc(x.route_to) + "</strong> ("
       + esc(x.host_count) + " Host(s)" + (x.cves && x.cves.length ? ", " + esc(x.cves.slice(0, 3).join(", ")) : "")
-      + ")<br><span class='hint'>Lösung laut Greenbone (" + esc(x.solution_type || "k. A.") + "): "
+      + ")<br><span class='hint'>" + window.t("gb.solution", {n: esc(x.solution_type || window.t("gb.na"))}) + ": "
       + esc(x.solution) + "</span></li>").join("") + "</ul>";
     const f = d.findings || [];
     if (f.length) h += "<details><summary>" + f.length + " Finding(s)</summary><ul>" + f.slice(0, 100).map(x =>

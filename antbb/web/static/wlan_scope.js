@@ -20,7 +20,7 @@
     const sel = window.ANTBB_WLAN_SELECTED;
     const selHint = sel
       ? (`Auswahl aus Coverage: <strong>${esc(sel.ssid||"(versteckt)")}</strong> <code>${esc(sel.bssid)}</code>`)
-      : "Noch kein WLAN gewählt – im Tab Coverage scannen und Zeile anklicken.";
+      : window.t("wlan.scope_none");
     const now = Date.now()/1000;
     const active = ENGS.filter(e => !e.revoked && e.oversight && e.start_ts<=now && now<=e.end_ts);
 
@@ -42,7 +42,7 @@
         <label class="wlan-field">Ort<input id="sc-loc" placeholder="optional"></label>
         <label class="wlan-field">Dauer (h)<input id="sc-hours" type="number" value="8" style="width:5rem;"></label>
         <label class="wlan-field wlan-check" title="${esc(STATUS.oversight_prompt||'')}">
-          <input type="checkbox" id="sc-ov"> Human Oversight bestätigen</label>
+          <input type="checkbox" id="sc-ov"> ${window.t("wlan.scope_ov")}</label>
         <button type="button" id="sc-from-sel" ${sel?"":"disabled"}>aus Coverage-Auswahl</button>
         <button type="button" id="sc-create" class="wlan-primary">+ Engagement anlegen</button>
       </div>
@@ -65,14 +65,13 @@
         <div class="wlan-eng-actions">
           <button type="button" data-ov="${e.id}" data-val="${e.oversight?0:1}">
             ${e.oversight?"Oversight aus":"Oversight an"}</button>
-          <button type="button" data-revoke="${e.id}">widerrufen</button>
+          <button type="button" data-revoke="${e.id}">${window.t("wlan.revoke")}</button>
         </div>
       </div>`;
     });
     h += `</div>`;
 
-    h += `<p class="hint">Tipp: Nach dem Anlegen → Tab „Offensiv / Airgorah“ für Handshake/Deauth/Crack
-      (nur gegen diese Allowlist, weiterhin Oversight-pflichtig).</p>`;
+    h += `<p class="hint">${window.t("wlan.scope_tip")}</p>`;
 
     root.innerHTML = h;
     wire();
@@ -100,7 +99,7 @@
       const name=val("sc-name");
       const bssids=list("sc-bssid"), ssids=list("sc-ssid");
       if (!name || (!bssids.length && !ssids.length)) {
-        alert("Name + mind. eine BSSID oder SSID nötig."); return;
+        alert(window.t("wlan.scope_need")); return;
       }
       await j("/api/wlan/engagements", {method:"POST",
         headers:{"Content-Type":"application/json"},

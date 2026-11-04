@@ -87,7 +87,7 @@ export function Laeufe() {
               {openId === run.run_id && dossier ? (
                 <div className="mt-4 space-y-3 border-t border-white/10 pt-4 text-sm">
                   <p>
-                    Königin {dossier.queen_id} · Soldatin {dossier.soldier_name} · Playbook {dossier.playbook_title}
+                    {t("laeufe.line", { queen: dossier.queen_id, soldier: dossier.soldier_name, playbook: dossier.playbook_title })}
                   </p>
                   <p>{dossier.stub_note}</p>
                   <p>Ziele: {dossier.targets.join(", ") || "keine"}</p>
@@ -103,7 +103,7 @@ export function Laeufe() {
                       ))}
                     </ol>
                   ) : (
-                    <p>Dieser Lauf trägt keinen Klassifikationsplan.</p>
+                    <p>{t("laeufe.no_plan")}</p>
                   )}
                 </div>
               ) : null}

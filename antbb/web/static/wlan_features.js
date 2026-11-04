@@ -18,7 +18,7 @@
 
   async function estimateFloorplan(useLastScan) {
     const note = qs("floorplan-estimate-note");
-    if (note) note.textContent = "Schätze Grundriss aus WLAN …";
+    if (note) note.textContent = window.t("wlan.estimating");
     try {
       const r = await fetch("/api/wlan/floorplan", {
         method: "POST",
@@ -27,13 +27,13 @@
       });
       const d = await r.json();
       if (!d.ok) {
-        if (note) note.textContent = "⚠ " + (d.error || "Schätzung fehlgeschlagen.");
+        if (note) note.textContent = "⚠ " + (d.error || window.t("wlan.est_fail"));
         return;
       }
       announceEstimate(d);
       if (note) note.textContent = (d.note || "") + " – Karte oben aktualisiert.";
     } catch (e) {
-      if (note) note.textContent = "⚠ Schätzung fehlgeschlagen: " + e;
+      if (note) note.textContent = window.t("wlan.estimate_fail", {error: e});
     }
   }
 
@@ -70,11 +70,11 @@
     const oversight = qs("clients-oversight");
     if (btn) btn.disabled = true;
     if (!oversight || !oversight.checked) {
-      if (st) st.textContent = "⚠ Oversight-Häkchen setzen – Monitor-Mode ist eine aktive Aktion.";
+      if (st) st.textContent = window.t("wlan.need_monitor");
       if (btn) btn.disabled = false;
       return;
     }
-    if (st) st.textContent = "Monitor-Mode an → scanne ~20 s passiv → stelle zurück …";
+    if (st) st.textContent = window.t("wlan.clients_running");
     try {
       const r = await fetch("/api/wlan/clients", {
         method: "POST",
@@ -97,7 +97,7 @@
 
   // ---- Geraete-Erkennung (nmap, read-only) -----------------------------------
   const KIND_LABELS = {
-    router: "Router/FritzBox", repeater: "Repeater/Mesh", iot: "IoT-Gerät",
+    router: "Router/FritzBox", repeater: "Repeater/Mesh", iot: window.t("wlan.iot_device"),
     unknown: "unbekannt",
   };
 
@@ -105,7 +105,7 @@
     const tbl = qs("devices-table");
     if (!tbl) return;
     if (!devices || !devices.length) {
-      tbl.innerHTML = "<tbody><tr><td>Keine Geräte gefunden (ehrlich leer).</td></tr></tbody>";
+      tbl.innerHTML = "<tbody><tr><td>" + window.t("wlan.no_devices") + "</td></tr></tbody>";
       return;
     }
     const order = { router: 0, repeater: 1, iot: 2, unknown: 3 };
@@ -118,7 +118,7 @@
       const hints = (d.firmware_hints || []);
       const fwCell = hints.length
         ? '<span class="dev-fw-old">' + esc(hints.join("; ")) + "</span>"
-        : '<span class="dev-fw-ok">kein Hinweis</span>';
+        : '<span class="dev-fw-ok">' + window.t("wlan.no_fw") + '</span>';
       return "<tr>" +
         '<td><span class="dev-kind dev-kind-' + esc(d.classification) + '">' +
           esc(KIND_LABELS[d.classification] || d.classification) + "</span></td>" +
@@ -129,7 +129,7 @@
         "<td>" + esc(ports || "–") + "</td>" +
         "<td>" + fwCell + "</td></tr>";
     });
-    tbl.innerHTML = "<thead><tr><th>Gerät</th><th>IP</th><th>MAC</th><th>Hersteller</th>" +
+    tbl.innerHTML = "<thead><tr><th>" + window.t("wlan.th.device") + "</th><th>IP</th><th>MAC</th><th>" + window.t("wlan.th.vendor") + "</th>" +
       "<th>Hostname</th><th>Offene Dienste</th><th>Firmware</th></tr></thead><tbody>" +
       rows.join("") + "</tbody>";
   }
@@ -140,7 +140,7 @@
     const oversight = qs("devices-oversight");
     if (btn) btn.disabled = true;
     if (!oversight || !oversight.checked) {
-      if (st) st.textContent = "⚠ Oversight-Häkchen setzen – aktiver Scan im eigenen Netz.";
+      if (st) st.textContent = window.t("wlan.need_active");
       if (btn) btn.disabled = false;
       return;
     }
@@ -153,12 +153,12 @@
       });
       const d = await r.json();
       if (!d.ok) {
-        if (st) st.textContent = "⚠ " + (d.error || "Geräte-Scan fehlgeschlagen.");
+        if (st) st.textContent = "⚠ " + (d.error || window.t("wlan.dev_fail"));
         return;
       }
       const old = (d.devices || []).filter((x) => (x.firmware_hints || []).length).length;
-      if (st) st.textContent = d.count + " Gerät(e) in " + (d.subnet || "?") +
-        " – " + old + " mit Firmware-Hinweis. " + (d.note || "");
+      if (st) st.textContent = window.t("wlan.devices_found", {n: d.count, net: d.subnet || "?"}) +
+        " – " + old + " " + window.t("wlan.fw_note") + " " + (d.note || "");
       renderDevices(d.devices);
     } catch (e) {
       if (st) st.textContent = "Fehler: " + e;
@@ -174,7 +174,7 @@
       if (d.ok && d.devices) {
         renderDevices(d.devices);
         const st = qs("devices-status");
-        if (st) st.textContent = d.count + " Gerät(e) – letzter Stand vom Server.";
+        if (st) st.textContent = window.t("wlan.devices_cached", {n: d.count});
       }
     } catch (e) { /* ehrlich leer lassen */ }
   }

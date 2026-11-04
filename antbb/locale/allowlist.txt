@@ -1,0 +1,13 @@
+# Lines that stay German on purpose. A source line is ignored when its path
+# ends with the file name and the line contains the marker.
+#
+# hub-real.js: matcher for a legacy static button ("Gelbe Fälle"). The pattern
+# is not shown; the replacement label comes from the catalog.
+hub-real.js:Gelbe
+#
+# soldiers.js: vault status tokens compared with file contents
+# (VERIFIZIERT, ZU BESTÄTIGEN). Machine values, not chrome.
+soldiers.js:VERIFIZIERT
+#
+# antmap_colony.js: console.info log line. Log lines stay untranslated.
+antmap_colony.js:Bühne

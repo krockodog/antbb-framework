@@ -251,7 +251,7 @@
 
   // ---- Messen (passiver Scan) + Platzieren ------------------------------
   async function measureHere() {
-    setStatus("Passiver Scan läuft… (iw/nmcli)", "busy");
+    setStatus(window.t("wlan.heat_scanning"), "busy");
     let scan;
     try {
       const r = await fetch("/api/wlan/scan");
@@ -260,8 +260,8 @@
     const aps = (scan && scan.aps) || [];
     if (!aps.length) {
       setStatus(scan && scan.reason
-        ? ("Kein Scan möglich: " + scan.reason + " – keine Fake-Daten.")
-        : "Keine APs gefunden (ehrlich leer). Adapter/Rechte prüfen.", "warn");
+        ? window.t("wlan.no_scan_fake", {reason: scan.reason})
+        : window.t("wlan.heat_no_aps"), "warn");
       return;
     }
     const samples = {}, ap_meta = {};
@@ -332,7 +332,7 @@
   }
 
   async function clearAll() {
-    if (!confirm("Alle Messpunkte dieser Heatmap löschen?")) return;
+    if (!confirm(window.t("wlan.heat_clear_ask"))) return;
     try { await fetch("/api/wlan/heatmap?" + tq("?"), { method: "DELETE" }); } catch (e) {}
     await loadData();
   }

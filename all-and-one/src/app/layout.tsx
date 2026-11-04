@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s · All and One - RED-BLUE-Yellow-Ant-Team",
   },
   description:
-    "Orchestrierte Ameisenfarmen — die vom Bug Bounty und Pentest über Reverse Engineering bis zum Schutz und Hardening helfen.",
+    "Orchestrated security framework: bug bounty and pentest, protection and hardening, reverse engineering. Orchestriertes Security-Framework: Bug Bounty und Pentest, Schutz und Hardening, Reverse Engineering.",
 };
 
 export default function RootLayout({
