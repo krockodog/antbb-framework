@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useI18n } from "@/i18n/language";
 import { LegalNote } from "@/components/legal-note";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ const ROLE: Record<QueenId, string> = {
 };
 
 export function ColonyRoom({ queen }: { queen: QueenId }) {
+  const { t } = useI18n();
   const [detail, setDetail] = useState<QueenDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
@@ -77,17 +79,17 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
   const needsProbe = Boolean(playbook?.needs_probe);
 
   const blockReason = useMemo(() => {
-    if (!detail) return "Die Kolonie wird gelesen.";
-    if (!detail.oversight) return "Oversight fehlt. Aktive Arbeit bleibt aus.";
-    if (detail.scope.length === 0) return "Scope ist leer. Default-deny lässt keinen Lauf zu.";
-    if (!soldier || !playbook) return "Wähle eine Soldatin und ein Playbook.";
+    if (!detail) return t("colony.reading");
+    if (!detail.oversight) return t("colony.no_oversight");
+    if (detail.scope.length === 0) return t("colony.empty_scope");
+    if (!soldier || !playbook) return t("colony.pick_pair");
     if (!soldier.playbook_ids.includes(playbook.playbook_id)) {
-      return "Diese Soldatin führt das Playbook nicht.";
+      return t("colony.wrong_soldier");
     }
-    if (picked.length === 0) return "Wähle mindestens ein Ziel aus der Allowlist.";
-    if (needsProbe && !probeName.trim()) return "Für diesen Lauf brauche ich einen Probenamen.";
+    if (picked.length === 0) return t("colony.pick_target");
+    if (needsProbe && !probeName.trim()) return t("colony.need_probe");
     return null;
-  }, [detail, needsProbe, picked.length, playbook, probeName, soldier]);
+  }, [detail, needsProbe, picked.length, playbook, probeName, soldier, t]);
 
   async function saveScope() {
     setBusy(true);
@@ -122,7 +124,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
       });
       await load();
     } catch (reason) {
-      setBanner(reason instanceof Error ? reason.message : "Oversight ließ sich nicht setzen.");
+      setBanner(reason instanceof Error ? reason.message : t("colony.oversight_fail"));
     } finally {
       setBusy(false);
     }
@@ -186,10 +188,10 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
         <SiteHeader />
         <header className="mt-10 max-w-3xl">
           <p className="text-[0.72rem] tracking-[0.22em] uppercase opacity-70">
-            Königin · {WORD[queen]} · {detail?.kicker ?? ROLE[queen]}
+            {t("brain.queen")} · {queen} · {detail?.kicker ?? ROLE[queen]}
           </p>
           <h1 className="font-heading mt-3 text-5xl md:text-6xl">
-            {detail?.name ?? (queen === "red" ? "Rote Königin" : queen === "blue" ? "Blaue Königin" : "Gelbe Königin")}
+            {t(`queen.${queen}.name`)}
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-foreground/80">
             {detail?.summary ?? "Die Kolonie wird gelesen."}

@@ -237,21 +237,22 @@ def _fail_login(request: Request, *, status: int, detail: str, nxt: str = "/"):
 
 
 def _attempt_login(store, request: Request, username: str, password: str, nxt: str):
+    from .i18n import t
     if request.headers.get("origin") and not csrf_ok(request, via_bearer=False):
-        return _fail_login(request, status=403, detail="Cross-site login was rejected.", nxt=nxt)
+        return _fail_login(request, status=403, detail=t("login.error_csrf"), nxt=nxt)
     key = _client_key(request, username)
     limited = webauth.login_rate_limited(key)
     row = webauth.authenticate(store, username, password)
     if limited:
         return _fail_login(
             request, status=429,
-            detail="Too many sign-in attempts. Wait and try again.", nxt=nxt,
+            detail=t("login.error_limited"), nxt=nxt,
         )
     if not row:
         webauth.note_login_failure(key)
         return _fail_login(
             request, status=401,
-            detail="Unknown username or password.", nxt=nxt,
+            detail=t("login.error_bad"), nxt=nxt,
         )
     webauth.clear_login_failures(key)
     token = webauth.start_session(store, row)
@@ -295,6 +296,14 @@ def install(app: FastAPI, store_getter: Optional[Callable] = None) -> None:
             raise
         if created and serving:
             print(f"[antbb.auth] admin '{created}' synced from the environment.", flush=True)
+
+    @app.middleware("http")
+    async def _language(request: Request, call_next):
+        from .i18n import activate_request, stamp_lang_cookie
+
+        activate_request(request)
+        response = await call_next(request)
+        return stamp_lang_cookie(response, request)
 
     @app.middleware("http")
     async def _guard(request: Request, call_next):
@@ -352,7 +361,14 @@ def install(app: FastAPI, store_getter: Optional[Callable] = None) -> None:
     if "/login" not in existing:
         @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
         def login_page(request: Request, next: str = "/", error: str = ""):
-            return HTMLResponse(_login_html(error, safe_next(next)))
+            from .i18n import activate_request
+            from .web.app import templates
+
+            activate_request(request)
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"next": safe_next(next), "error": error},
+            )
 
         @app.post("/login", include_in_schema=False)
         def login_submit(

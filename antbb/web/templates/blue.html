@@ -87,7 +87,7 @@
     </label>
     <label class="blue-check blue-ack" id="blue-ack-wrap" style="display:none">
       <input type="checkbox" name="oversight_ack" id="blue-ack" value="1">
-      ✅ Human Oversight: ich bestätige die Freigabe aktiver Verteidigungs-Aktionen
+      {{ t('oversight.active_steps') }}
     </label>
     <button type="submit" class="blue-go">🐜🛡 Kolonie starten</button>
   </form>
@@ -195,7 +195,7 @@
              pattern="[A-Za-z0-9.:\-]+" autocomplete="off">
       <label class="blue-check blue-ack">
         <input type="checkbox" name="oversight_ack" id="gb-ack" value="1">
-        ✅ Human Oversight: ich bestätige die Freigabe dieses aktiven Scans gegen das autorisierte Ziel
+        {{ t('oversight.active_steps') }}
       </label>
       <button type="submit" id="gb-scan-go" disabled>Scan starten</button>
     </form>

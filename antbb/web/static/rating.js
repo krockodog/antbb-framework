@@ -21,7 +21,7 @@
     let h = `<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
       <span style="font-size:2.2rem;font-weight:800;color:${col};">${g}</span>
       <span style="font-size:1.3rem;">${rating.score}/100</span>
-      <span class="hint">Risikopunkte: ${rating.risk_points} · verifiziert: ${rating.verified_count}</span>
+      <span class="hint">${window.t ? window.t("rating.points", {points: rating.risk_points, verified: rating.verified_count}) : (rating.risk_points + " / " + rating.verified_count)}</span>
     </div><div class="row" style="margin:.5rem 0;">`;
     Object.entries(rating.subscores).forEach(([dim,v])=>{
       const c = GRADE_COL[v.grade]||"#8a92a6";
@@ -29,13 +29,13 @@
     });
     h += `</div>`;
     const a = rating.assessment;
-    if (a) h += `<p class="hint"><strong>KI-Einschätzung</strong> (${esc(a.source)}, ${esc(a.disclaimer)}):<br>${esc(a.text)}</p>`;
+    if (a) h += `<p class="hint"><strong>${window.t ? window.t("rating.assessment") : "KI-Einschätzung"}</strong> (${esc(a.source)}, ${esc(a.disclaimer)}):<br>${esc(a.text)}</p>`;
     rv.innerHTML = h;
     renderHeat(rating.heatmap);
-  }).catch(()=>{ rv.innerHTML = "<p class='hint'>Rating nicht verfügbar.</p>"; });
+  }).catch(()=>{ rv.innerHTML = "<p class='hint'>" + (window.t ? window.t("rating.unavailable") : "Rating nicht verfügbar.") + "</p>"; });
 
   function renderHeat(hm){
-    if (!hm || !hm.total_cells){ hv.innerHTML = "<p class='hint'>Keine zählbaren Befunde – keine Heatmap.</p>"; return; }
+    if (!hm || !hm.total_cells){ hv.innerHTML = "<p class='hint'>" + (window.t ? window.t("rating.empty") : "") + "</p>"; return; }
     const sevs = hm.severities, dims = hm.dimensions, sm = hm.severity_matrix;
     let h = "<table class='heatmap-grid'><tr><th>Kategorie \\ Severity</th>";
     sevs.forEach(sv => h += `<th>${esc(sv)}</th>`);

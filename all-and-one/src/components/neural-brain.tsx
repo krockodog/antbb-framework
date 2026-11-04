@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useI18n } from "@/i18n/language";
 import { AntGlyph } from "@/components/ant-glyph";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -42,14 +43,18 @@ type SceneBag = {
 const QUEENS: QueenId[] = ["red", "blue", "yellow"];
 
 const QUEEN_NAME: Record<QueenId, string> = {
-  red: "Rote Königin",
-  blue: "Blaue Königin",
-  yellow: "Gelbe Königin",
+  red: "queen.red.name",
+  blue: "queen.blue.name",
+  yellow: "queen.yellow.name",
 };
 
 const HUE: Record<QueenId, number> = { red: 0, blue: 1, yellow: 2 };
 
-function buildAnts(payload: BrainPayload | null): AntModel[] {
+function buildAnts(
+  payload: BrainPayload | null,
+  labelFor: (queen: QueenId) => string,
+  swarmLabel: string,
+): AntModel[] {
   const ants: AntModel[] = [];
   for (const queen of QUEENS) {
     const summary = payload?.queens.find((item) => item.queen_id === queen);
@@ -57,8 +62,8 @@ function buildAnts(payload: BrainPayload | null): AntModel[] {
       id: `queen-${queen}`,
       queen,
       kind: "queen",
-      label: summary?.name ?? QUEEN_NAME[queen],
-      aria: summary?.name ?? QUEEN_NAME[queen],
+      label: labelFor(queen),
+      aria: labelFor(queen),
       soldier: null,
     });
     const troops = summary?.soldiers ?? [];
@@ -78,7 +83,7 @@ function buildAnts(payload: BrainPayload | null): AntModel[] {
         queen,
         kind: "swarm",
         label: null,
-        aria: "Schwarm",
+        aria: swarmLabel,
         soldier: null,
       });
     }
@@ -95,6 +100,7 @@ function fallbackHomes(width: number, height: number): Record<QueenId, { x: numb
 }
 
 export function NeuralBrain({ focus }: { focus: QueenId | null }) {
+  const { t } = useI18n();
   const [payload, setPayload] = useState<BrainPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -105,7 +111,10 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
   const simsRef = useRef<Map<string, Sim>>(new Map());
   const nodesRef = useRef<Map<string, HTMLButtonElement>>(new Map());
   const focusRef = useRef<QueenId | null>(focus);
-  const ants = useMemo(() => buildAnts(payload), [payload]);
+  const ants = useMemo(
+    () => buildAnts(payload, (queen) => t(QUEEN_NAME[queen]), t("brain.swarm")),
+    [payload, t],
+  );
   antsRef.current = ants;
   focusRef.current = focus;
 
@@ -228,7 +237,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
       if (dead) return;
       sceneRef.current = createScene(THREE, canvas, host.clientWidth, host.clientHeight);
     })().catch(() => {
-      if (!dead) setError("Das Partikelfeld konnte nicht starten.");
+      if (!dead) setError(t("brain.start_failed"));
     });
 
     const onResize = () => {
@@ -290,7 +299,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
             <p className="brain-strip" role="status">
               {strip}
             </p>
-            {error ? <p className="mt-2 text-xs text-[var(--gold)]">Die API antwortet nicht. Der Schwarm bleibt sichtbar.</p> : null}
+            {error ? <p className="mt-2 text-xs text-[var(--gold)]">{t("queen.api_down")}</p> : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <FilterLink current={focus} queen={null} label="Alle" />
@@ -306,7 +315,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[0.68rem] tracking-[0.16em] uppercase opacity-60">
-                {selected.kind === "queen" ? "Königin" : "Soldaten"}
+                {selected.kind === "queen" ? t("brain.queen") : t("brain.soldiers")}
               </p>
               <h2 className="font-heading mt-1 text-3xl">{selected.label}</h2>
             </div>
@@ -333,7 +342,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
               <p>{summary?.strip_teil}</p>
               <p>
                 Oversight {summary?.oversight ? "ist gesetzt" : "fehlt"}. Scope{" "}
-                {summary ? `${summary.scope.length} Ziele` : "wird gelesen"}.
+                {summary ? t("brain.targets", { n: summary.scope.length }) : t("brain.reading")}.
               </p>
             </div>
           )}
@@ -341,7 +350,7 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
             href={selected.queen === "yellow" ? "/yellow" : `/${selected.queen}`}
             className={cn(buttonVariants({ size: "lg" }), "mt-5 inline-flex h-10 px-4")}
           >
-            Zur {selected.queen === "red" ? "Roten" : selected.queen === "blue" ? "Blauen" : "Gelben"} Königin
+            {t(`queen.${selected.queen}.cta`)}
           </Link>
         </aside>
       ) : null}

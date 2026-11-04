@@ -3,11 +3,22 @@
    Variiert bei jedem Reload und gilt site-weit, weil hier in base.html gesetzt. #}
 {% set _colony_refs = ['ref1_throne', 'ref2_throne2', 'ref3_symmetric', 'ref4_radial', 'ref5_wide'] %}
 {% set _colony_pick = _colony_refs | random %}
-<html lang="de">
+<html lang="{{ current_lang() }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}antbb 🐜{% endblock %}</title>
+  <title>{% block title %}antbb{% endblock %}</title>
+  <script>
+    window.LANG = {{ current_lang()|tojson|safe }};
+    window.I18N = {{ i18n_catalog()|tojson|safe }};
+    window.t = function (key, vars) {
+      var text = (window.I18N && window.I18N[key]) || key;
+      if (!vars) return text;
+      return text.replace(/\{(\w+)\}/g, function (_, name) {
+        return vars[name] == null ? "" : String(vars[name]);
+      });
+    };
+  </script>
   <link rel="stylesheet" href="/static/style.css">
   <style>
     /* Zufällig gewählter Hintergrund (.webp bevorzugt, .jpg als Fallback) */
@@ -40,17 +51,32 @@
 </head>
 <body class="{% block body_class %}{% endblock %}" data-colony="{{ _colony_pick }}">
   <header>
-    <h1>🐜 antbb · All and One <span class="badge">lokal · simuliert</span></h1>
+    <h1>antbb · All and One</h1>
     {% set aq = active_queen|default('') %}
-    <nav><a class="hub-back" href="/" title="Zurück zum Hub">← Hub</a> · <a href="/">Scope-Manager</a> · {% if aq != 'red' %}<a href="/red">🔴 Red Queen</a> · {% endif %}{% if aq != 'blue' %}<a href="/blue">🛡 Blue Queen</a> · {% endif %}{% if aq != 'yellow' %}<a href="/yellow">🟡 Yellow Queen</a> · {% endif %}<a href="/wlan">📡 WLAN</a>{% if not blue_view %} · <a href="/brain">🧠 Neuronales Gehirn</a>{% endif %} · <a href="/assets">🔒 Eigene Assets</a> · <a href="/history">🗂️ Historie</a></nav>
+    <nav>
+      <a class="hub-back" href="/" title="{{ t('nav.back_hub') }}">← {{ t('nav.hub') }}</a>
+      · <a href="/">{{ t('nav.scope') }}</a>
+      · {% if aq != 'red' %}<a href="/red">{{ t('nav.red') }}</a> · {% endif %}
+      {% if aq != 'blue' %}<a href="/blue">{{ t('nav.blue') }}</a> · {% endif %}
+      {% if aq != 'yellow' %}<a href="/yellow">{{ t('nav.yellow') }}</a> · {% endif %}
+      <a href="/wlan">{{ t('nav.wlan') }}</a>
+      {% if not blue_view %} · <a href="/brain">{{ t('nav.brain') }}</a>{% endif %}
+      · <a href="/assets">{{ t('nav.assets') }}</a>
+      · <a href="/history">{{ t('nav.history') }}</a>
+      · <span class="lang-switch" aria-label="{{ t('lang.switch') }}">
+          <a href="{{ lang_href('de') }}"{% if current_lang() == 'de' %} aria-current="true"{% endif %}>DE</a>
+          |
+          <a href="{{ lang_href('en') }}"{% if current_lang() == 'en' %} aria-current="true"{% endif %}>EN</a>
+        </span>
+    </nav>
   </header>
   <main>
     {% block content %}{% endblock %}
   </main>
   <footer>
     <details>
-      <summary>⚠️ Pflichthinweis / Disclaimer</summary>
-      <pre class="disclaimer">{{ disclaimer if disclaimer else "Tests nur im autorisierten Scope. § 202a-c StGB / CFAA beachten." }}</pre>
+      <summary>{{ t('footer.summary') }}</summary>
+      <pre class="disclaimer">{{ t('legal.full') }}</pre>
     </details>
   </footer>
 </body>

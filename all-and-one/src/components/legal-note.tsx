@@ -1,11 +1,12 @@
+"use client";
+
+import { useI18n } from "@/i18n/language";
+
 export function LegalNote() {
+  const { t } = useI18n();
   return (
     <p className="legal-note">
-      Unbefugtes Ausspähen, Abfangen oder Vorbereiten von Angriffen auf Daten
-      ist strafbar (§ 202a, § 202b und § 202c StGB; im US-Kontext der CFAA).
-      Dieser Hinweis ersetzt kein Oversight. Aktive Arbeit läuft nur mit
-      gesetztem Häkchen und einem konkreten Ziel auf der Allowlist. Dieser
-      Stand führt keine Angriffe aus.
+      {t("legal.full")} {t("legal.not_substitute")} {t("scope.default_deny")}
     </p>
   );
 }

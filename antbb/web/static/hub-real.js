@@ -4,7 +4,7 @@
     document.querySelectorAll("a").forEach(function(a){
       var t=(a.textContent||"").replace(/\s+/g," ").trim();
       if(/^Gelbe\s+(Läufe|Laeufe|Fälle|Faelle)/i.test(t)){
-        a.textContent="Gelbe Fälle";
+        a.textContent = window.t ? window.t("hub.yellow_cases") : "Gelbe Fälle";
         a.setAttribute("href","/yellow");
       }
     });
@@ -31,7 +31,7 @@
           var label=p.querySelector("span");
           p.textContent="";
           if(label){ p.appendChild(label); p.appendChild(document.createTextNode(" "+(data.live_satz||""))); }
-          else p.textContent="Live-Status "+(data.live_satz||"");
+          else p.textContent=(window.t ? window.t("hub.live_status") : "Live-Status")+" "+(data.live_satz||"");
         });
         var host=null;
         card.querySelectorAll("div").forEach(function(d){

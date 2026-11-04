@@ -37,6 +37,20 @@ from ..oauth import OAuthError, TokenStore, provider_from_config
 BASE = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 
+
+def _i18n_tojson(value):
+    import json
+    return json.dumps(value, ensure_ascii=True).replace("<", "\\u003c")
+
+
+from ..i18n import catalog_for, current_lang, lang_href, t as i18n_t  # noqa: E402
+
+templates.env.filters["tojson"] = _i18n_tojson
+templates.env.globals["t"] = i18n_t
+templates.env.globals["lang_href"] = lang_href
+templates.env.globals["current_lang"] = current_lang
+templates.env.globals["i18n_catalog"] = catalog_for
+
 app = FastAPI(title="antbb – Ameisen-Schwarm Bug-Bounty (lokal)")
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 
@@ -1183,8 +1197,10 @@ def api_capabilities():
 
 
 @app.get("/api/disclaimer")
-def api_disclaimer():
-    return {"disclaimer": DISCLAIMER_TEXT}
+def api_disclaimer(request: Request):
+    from ..i18n import activate_request, t as tr
+    code = activate_request(request)
+    return {"disclaimer": tr("legal.full"), "lang": code}
 
 
 @app.get("/api/targets")
