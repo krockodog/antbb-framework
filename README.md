@@ -2,12 +2,10 @@
   <img src="docs/images/brain-city-capital.png" alt="Neural brain: the red queen's throne in the ant city" width="720">
 </p>
 
-<p align="center">
-All and One — RED · BLUE · YELLOW Ant-Team
-</p>
+<h1 align="center">All and One - RED-BLUE-Yellow-Ant-Team</h1>
 
 <p align="center">
-All and One - RED-BLUE-Yellow-Ant-Team
+Bug bounty and pentest (Red), protection and hardening (Blue), reverse engineering (Yellow). One process, one port, one address.
 </p>
 
 Deutsch: [README.de.md](README.de.md)
@@ -21,8 +19,6 @@ Deutsch: [README.de.md](README.de.md)
   <img alt="safety: scope default-deny + human Oversight" src="https://img.shields.io/badge/safety-default--deny_%2B_Oversight-1f6feb">
   <img alt="GitHub stars" src="https://img.shields.io/github/stars/krockodog/antbb-framework">
 </p>
-
-**An orchestrated security framework with three teams:** bug bounty and pentest (Red), protection and hardening (Blue), reverse engineering (Yellow). One process, one port, one address.
 
 Every real result — targets, runs, findings, logs — adds to the wealth of the ant city, and that growth has no last stage: knowledge itself is its prosperity. The more knowledge and power a queen gathers, the better she knows how to lead her people, where to send them, and how to protect them. The city's building stage is already calculated from the real counters and shown on screen (from 1 hut, 10 wells, 50 stone houses, 200 towers, 1000 modern buildings). The matching 3D buildings are still in progress.
 

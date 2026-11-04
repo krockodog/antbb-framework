@@ -2,12 +2,10 @@
   <img src="docs/images/brain-city-capital.png" alt="Neuronales Gehirn: Thron der Roten Königin in der Ameisenstadt" width="720">
 </p>
 
-<p align="center">
-All and One — RED · BLUE · YELLOW Ant-Team
-</p>
+<h1 align="center">All and One - RED-BLUE-Yellow-Ant-Team</h1>
 
 <p align="center">
-All and One - RED-BLUE-Yellow-Ant-Team
+Bug Bounty und Pentest (Red), Schutz und Hardening (Blue), Reverse Engineering (Yellow). Ein Prozess, ein Port, eine Adresse.
 </p>
 
 English: [README.md](README.md)
@@ -22,11 +20,7 @@ English: [README.md](README.md)
   <img alt="GitHub-Sterne" src="https://img.shields.io/github/stars/krockodog/antbb-framework">
 </p>
 
-**Orchestriertes Security-Framework mit drei Teams:** Bug Bounty und Pentest (Red), Schutz und Hardening (Blue), Reverse Engineering (Yellow). Ein Prozess, ein Port, eine Adresse.
-
-Orchestrierte Ameisenfarmen — die vom Bug Bounty und Pentest über Reverse Engineering bis zum Schutz und Hardening helfen.
-
-Jedes echte Ergebnis – Ziele, Läufe, Befunde, Logs – mehrt den Reichtum der Ameisenstadt, und dieses Wachstum kennt keine Endstufe: Wissen selbst ist ihr Wohlstand. Je mehr Wissen und Macht eine Königin sammelt, desto besser weiß sie ihr Volk zu führen, einzusetzen und zu schützen. Die Ausbaustufe der Stadt wird bereits aus den echten Zählern berechnet und angezeigt (ab 1 Hütten, 10 Brunnen, 50 Steinhäuser, 200 Türme, 1000 moderne Gebäude); die zugehörigen 3D-Gebäude sind in Arbeit.
+Orchestrierte Ameisenfarmen — die vom Bug Bounty und Pentest über Reverse Engineering bis zum Schutz und Hardening helfen. Jedes echte Ergebnis – Ziele, Läufe, Befunde, Logs – mehrt den Reichtum der Ameisenstadt, und dieses Wachstum kennt keine Endstufe: Wissen selbst ist ihr Wohlstand. Je mehr Wissen und Macht eine Königin sammelt, desto besser weiß sie ihr Volk zu führen, einzusetzen und zu schützen. Die Ausbaustufe der Stadt wird bereits aus den echten Zählern berechnet und angezeigt (ab 1 Hütten, 10 Brunnen, 50 Steinhäuser, 200 Türme, 1000 moderne Gebäude); die zugehörigen 3D-Gebäude sind in Arbeit.
 
 > Unbefugtes Ausspähen, Abfangen oder Vorbereiten von Angriffen auf Daten ist strafbar (§ 202a–c StGB; im US-Kontext der CFAA). Aktive Arbeit läuft nur mit bestätigtem Human Oversight und einem konkreten Ziel im Scope. Der Hinweis ersetzt kein Oversight.
 
