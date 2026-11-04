@@ -742,8 +742,73 @@ if [ "$CORE_OK" != "1" ]; then
   warn "Kernstart ist unsicher (Importe fehlten). Prüfe Netzwerk/pip und starte das Skript erneut."
 fi
 
+_ensure_not_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    case "${ANTBB_ALLOW_ROOT:-}" in
+      1|true|yes|on|TRUE|YES|ON)
+        warn "WARNING: starting the web UI as root because ANTBB_ALLOW_ROOT=1. Use an unprivileged user."
+        ;;
+      *)
+        die "Refusing to start the web UI as root. Re-run as a normal user (package steps already use sudo). Monitor-mode WLAN stays in the sudoers wrapper, not this process."
+        ;;
+    esac
+  fi
+}
+
+_ensure_bind() {
+  case "$HOST" in
+    127.*|localhost|::1) ;;
+    *)
+      case "${ANTBB_EXPOSE:-}${YQ_EXPOSE:-}" in
+        1|true|yes|on|TRUE|YES|ON)
+          warn "WARNING: binding the web UI to ${HOST} because ANTBB_EXPOSE=1. This exposes the pentest console beyond localhost."
+          ;;
+        *)
+          die "Refusing to bind to ${HOST}. The default is 127.0.0.1. Set ANTBB_EXPOSE=1 to opt in."
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_ensure_admin_credential() {
+  if [ -n "${ANTBB_ADMIN_PASSWORD_HASH:-}" ] || [ -n "${ANTBB_ADMIN_PASSWORD:-}" ]; then
+    return 0
+  fi
+  if [ ! -t 0 ] || [ "${ANTBB_NONINTERACTIVE:-0}" = "1" ] || [ "${ANTBB_ASK_KEY:-1}" = "0" ]; then
+    die "Refusing to start: set ANTBB_ADMIN_PASSWORD_HASH in antbb.env (chmod 600). There is no default password. Generate one with: python -m antbb.webauth hash-password"
+  fi
+  local pw pw2 hash
+  pw=$(_read_secret "Admin password for the web UI (stored only as a hash in antbb.env): ")
+  pw2=$(_read_secret "Repeat password: ")
+  if [ -z "$pw" ] || [ "$pw" != "$pw2" ]; then
+    unset pw pw2
+    die "Password missing or the two entries did not match."
+  fi
+  hash=$(printf '%s' "$pw" | "$PY" -m antbb.webauth hash-password --stdin) || {
+    unset pw pw2 hash
+    die "Could not hash the admin password."
+  }
+  unset pw pw2
+  touch "$ENV_FILE"
+  if [ -f "$ENV_FILE" ]; then
+    grep -v '^[[:space:]]*ANTBB_ADMIN_PASSWORD_HASH=' "$ENV_FILE" > "${ENV_FILE}.tmp" 2>/dev/null || true
+    mv "${ENV_FILE}.tmp" "$ENV_FILE"
+  fi
+  printf 'ANTBB_ADMIN_PASSWORD_HASH=%s\n' "$hash" >> "$ENV_FILE"
+  chmod 600 "$ENV_FILE" 2>/dev/null || true
+  export ANTBB_ADMIN_PASSWORD_HASH="$hash"
+  unset hash
+  ok "Admin password hash written to antbb.env (chmod 600). The password was not logged."
+}
+
+_ensure_not_root
+_ensure_bind
+_ensure_admin_credential
+
 say "Starte antbb Web-GUI"
 printf '\n  \033[1;32mStartseite:  %s\033[0m\n' "$URL"
+printf '  Bind:        %s (ANTBB_EXPOSE=1 to opt into another interface)\n' "$HOST"
 printf '  Stoppen:     Ctrl+C\n'
 printf '  Port ändern: ANTBB_PORT=1001 bash install-and-start.sh\n\n'
 
@@ -754,4 +819,4 @@ printf '  Port ändern: ANTBB_PORT=1001 bash install-and-start.sh\n\n'
   fi ) &
 
 export ANTBB_HOST="$HOST" ANTBB_PORT="$PORT" ANTBB_WEB_HOST="$HOST" ANTBB_WEB_PORT="$PORT"
-exec "$PY" -m uvicorn antbb.web.app:app --host "$HOST" --port "$PORT"
+exec "$PY" -m antbb.serve --host "$HOST" --port "$PORT"

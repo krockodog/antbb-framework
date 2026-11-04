@@ -1,0 +1,24 @@
+[Unit]
+Description=All and One - RED-BLUE-Yellow-Ant-Team
+After=network-online.target
+
+[Service]
+Type=simple
+User=antbb
+Group=antbb
+WorkingDirectory=/opt/antbb
+Environment=ANTBB_HOST=127.0.0.1
+Environment=ANTBB_PORT=1001
+Environment=ALLONE_HOST=127.0.0.1
+Environment=ALLONE_PORT=1001
+Environment=ALLONE_WEB_ROOT=/opt/antbb/all-and-one/out
+Environment=PYTHONPATH=/opt/antbb
+EnvironmentFile=-/opt/antbb/antbb.env
+ExecStart=/opt/antbb/.venv/bin/python -m api --host 127.0.0.1 --port 1001
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

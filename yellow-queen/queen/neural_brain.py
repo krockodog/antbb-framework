@@ -1,11 +1,12 @@
 """Yellow Neural Brain – Snapshot lesen/schreiben (Anzeige + Navigation).
 
-Knoten für All-and-One unter http://192.168.2.7:1001/brain (kanonisch).
+Knoten für All-and-One unter http://127.0.0.1:1001/brain (kanonisch, Loopback).
 Interim /yellow/brain bleibt als Yellow Live-Status.
 """
 from __future__ import annotations
 
 import json
+import os
 import threading
 from typing import Any
 
@@ -19,7 +20,7 @@ PHASES_DE = {
     "reconstruct": "Rekonstruktion", "dynamic": "Dynamic (Lab, nur mit Oversight)", "merge": "Merge (Dossier/Ledger)",
 }
 
-CANONICAL_BRAIN = "http://192.168.2.7:1001/brain"
+CANONICAL_BRAIN = os.environ.get("ANTBB_PUBLIC_ORIGIN", "http://127.0.0.1:1001").rstrip("/") + "/brain"
 
 
 def idle_snapshot() -> dict[str, Any]:

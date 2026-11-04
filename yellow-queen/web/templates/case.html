@@ -7,7 +7,7 @@
 <div>Dynamic</div><div>{{ case.dynamic }}</div><div>Zuletzt gelaufen</div><div class="mut">{{ snap.last_ran_at or case.updated_at }}</div></div>
 <p>
   <a class="pill" href="/yellow/brain?case={{ case.id }}">📡 Yellow Live-Status</a>
-  <a class="pill" href="http://192.168.2.7:1001/brain">🧠 Gehirn :1001</a>
+  <a class="pill" href="http://127.0.0.1:1001/brain">🧠 Gehirn :1001</a>
   <a class="pill" href="/yellow/case/{{ case.id }}/dossier.md">Dossier (md)</a>
   <a class="pill" href="/yellow/case/{{ case.id }}/ledger.md">Ledger (md)</a>
 </p>

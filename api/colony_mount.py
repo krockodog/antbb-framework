@@ -192,7 +192,7 @@ def attach_colony(app: FastAPI) -> dict[str, Any]:
     else:
         @app.get("/red", include_in_schema=False)
         def red_fallback():
-            return RedirectResponse("http://192.168.2.7:1002/", status_code=302)
+            return RedirectResponse("/", status_code=302)
 
         report["red"] = "/red (fallback redirect)"
 

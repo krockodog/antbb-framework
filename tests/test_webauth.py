@@ -22,7 +22,10 @@ def test_hash_roundtrip():
 
 
 def test_user_lifecycle_and_roles():
-    st = Store("/tmp/antbb_test_webauth.db")
+    path = "/tmp/antbb_test_webauth.db"
+    if os.path.exists(path):
+        os.remove(path)
+    st = Store(path)
     try:
         webauth.create_user(st, "admin1", "pw-admin-123", role="admin")
         webauth.create_user(st, "view1", "pw-view-123", role="viewer")
