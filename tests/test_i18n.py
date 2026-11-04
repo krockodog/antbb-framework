@@ -78,6 +78,12 @@ def test_unknown_language_falls_back_to_german():
     assert "not a substitute" in t("legal.not_substitute", "en").lower()
     assert "default-deny" in t("scope.default_deny", "en").lower()
     assert t("oversight.confirm", "en") != t("oversight.confirm", "de")
+    german_hint = t("bind.local_only", "de")
+    english_hint = t("bind.local_only", "en")
+    assert "ANTBB_EXPOSE=0" in german_hint and "ANTBB_EXPOSE=1" in german_hint
+    assert "ANTBB_EXPOSE=0" in english_hint and "ANTBB_EXPOSE=1" in english_hint
+    assert "SSH" in german_hint and "SSH" in english_hint
+    assert german_hint != english_hint
 
 
 def test_switcher_renders_and_preserves_the_query():

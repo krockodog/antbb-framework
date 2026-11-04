@@ -63,7 +63,7 @@ Danach im Browser: http://127.0.0.1:1001/login
 >
 > Nicht als root starten. Die Einstiege verweigern das; die Unit setzt `User=antbb`.
 >
-> Der Bind bleibt `127.0.0.1`, außer `ANTBB_EXPOSE=1` ist absichtlich gesetzt. Dieses Opt-in schreibt eine Warnung.
+> Der Default ist `ANTBB_EXPOSE=0`: der Bind bleibt `127.0.0.1` (nur Loopback). Netzwerkzugriff ist der Einzeiler `ANTBB_EXPOSE=1` und schreibt eine Warnung. Bevorzugt einen SSH-Tunnel.
 >
 > Fernzugriff über einen SSH-Tunnel (`ssh -L 1001:127.0.0.1:1001 <user>@<host>`), dann dieselbe URL lokal öffnen. Den Port nicht veröffentlichen.
 
@@ -323,7 +323,7 @@ Dienst und Direktstart stehen im [Schnellstart](#schnellstart): `systemctl enabl
 >
 > **Nicht root.** `User=antbb`. Ein Start als root wird verweigert. `ANTBB_ALLOW_ROOT=1` loggt nur eine Warnung und ist kein unterstützter Betrieb.
 >
-> **Localhost.** Der Bind bleibt `127.0.0.1`. Eine andere Schnittstelle braucht `ANTBB_EXPOSE=1` und schreibt eine Warnung.
+> **Localhost.** Der Default ist `ANTBB_EXPOSE=0`: der Bind bleibt `127.0.0.1`. Netzwerkzugriff ist `ANTBB_EXPOSE=1` und schreibt eine Warnung. Bevorzugt einen SSH-Tunnel. Den Port nicht veröffentlichen.
 >
 > **Fernzugriff.** SSH-Tunnel (`ssh -L 1001:127.0.0.1:1001 <user>@<host>`), nicht ein veröffentlichter Port.
 

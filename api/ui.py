@@ -87,11 +87,18 @@ def attach_ui(app: FastAPI, root: Path) -> None:
 
     app.add_api_route("/red/brain", _colony_brain, methods=["GET"], include_in_schema=False, response_model=None)
     app.add_api_route("/blue/brain", _colony_brain, methods=["GET"], include_in_schema=False, response_model=None)
+    app.add_api_route("/yellow/brain", _colony_brain, methods=["GET"], include_in_schema=False, response_model=None)
 
     @app.get("/{full_path:path}", include_in_schema=False, response_model=None)
     def asset(full_path: str) -> FileResponse | JSONResponse:
         lowered = full_path.strip("/")
         if any(lowered == p.rstrip("/") or lowered.startswith(p) for p in RESERVED_PREFIXES):
+            # Hub pages stay reachable from the static export when the colony
+            # mount did not register its own handler.
+            if lowered in {"red", "blue", "yellow"}:
+                built = _safe(root, full_path)
+                if built is not None:
+                    return FileResponse(built)
             return JSONResponse({"detail": "Diesen Pfad kenne ich nicht."}, status_code=404)
         page = _safe(root, full_path)
         if page is None:

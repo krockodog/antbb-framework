@@ -37,6 +37,7 @@
   "atk.might": "could enable:",
   "atk.paths": "Path list (text, with remediation)",
   "atk.verified": "VERIFIED",
+  "bind.local_only": "The default is ANTBB_EXPOSE=0: this console is reachable only on this machine. Network access requires ANTBB_EXPOSE=1. Prefer an SSH tunnel.",
   "blue.all": "all",
   "blue.apply": "Active fixes / honeypot start (Oversight)",
   "blue.aria": "Blue Queen 3D",

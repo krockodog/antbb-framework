@@ -37,6 +37,7 @@
   "atk.might": "könnte ermöglichen:",
   "atk.paths": "Pfadliste (textuell, mit Remediation)",
   "atk.verified": "VERIFIZIERT",
+  "bind.local_only": "Standard ist ANTBB_EXPOSE=0: die Konsole ist nur lokal erreichbar. Netzwerkzugriff braucht ANTBB_EXPOSE=1. Bevorzugt einen SSH-Tunnel.",
   "blue.all": "alle",
   "blue.apply": "Aktive Fixes / Honeypot-Start (Oversight)",
   "blue.aria": "Blaue Königin 3D",

@@ -58,7 +58,7 @@ Health check (no session): `curl -s http://127.0.0.1:1001/api/health`
 
 ## Binding beyond localhost
 
-`ANTBB_EXPOSE=1` together with `ANTBB_HOST` (or `--host`) is the opt-in. The process prints a warning. Leave this unset on a normal deployment and use an SSH tunnel when you need a remote browser.
+The default is `ANTBB_EXPOSE=0` (also when the variable is unset): loopback only. Network access is the one-line switch `ANTBB_EXPOSE=1` together with `ANTBB_HOST` (or `--host`). The process prints a warning. Leave it at `0` on a normal deployment and use an SSH tunnel when you need a remote browser. Do not publish the port.
 
 Starting as root is refused. `ANTBB_ALLOW_ROOT=1` only logs a warning and is not the supported setup.
 
