@@ -29,10 +29,10 @@
     });
     h += `</div>`;
     const a = rating.assessment;
-    if (a) h += `<p class="hint"><strong>${window.t ? window.t("rating.assessment") : "KI-Einschätzung"}</strong> (${esc(a.source)}, ${esc(a.disclaimer)}):<br>${esc(a.text)}</p>`;
+    if (a) h += `<p class="hint"><strong>${window.t("rating.assessment")}</strong> (${esc(a.source)}, ${esc(a.disclaimer)}):<br>${esc(a.text)}</p>`;
     rv.innerHTML = h;
     renderHeat(rating.heatmap);
-  }).catch(()=>{ rv.innerHTML = "<p class='hint'>" + (window.t ? window.t("rating.unavailable") : "Rating nicht verfügbar.") + "</p>"; });
+  }).catch(()=>{ rv.innerHTML = "<p class='hint'>" + window.t("rating.unavailable") + "</p>"; });
 
   function renderHeat(hm){
     if (!hm || !hm.total_cells){ hv.innerHTML = "<p class='hint'>" + (window.t ? window.t("rating.empty") : "") + "</p>"; return; }

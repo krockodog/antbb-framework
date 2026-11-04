@@ -79,7 +79,7 @@
       close(); h += "<p>" + inl(l) + "</p>";
     });
     close();
-    return h || "<p class='hint'>SKILL.md ist leer.</p>";
+    return h || "<p class='hint'>" + window.t("red.skill_empty") + "</p>";
   }
   let CAP = null;
   const dlg = document.getElementById("bq-skill-dialog");
@@ -92,12 +92,12 @@
     const show = () => {
       const s = ((CAP && CAP.soldiers) || []).find(x => x.name === name);
       title.textContent = "SKILL.md · " + name;
-      body.innerHTML = s && s.skill ? mdLite(s.skill.skill_md) : "<p class='hint'>Nicht gefunden.</p>";
+      body.innerHTML = s && s.skill ? mdLite(s.skill.skill_md) : "<p class='hint'>" + window.t("js.not_found") + "</p>";
       if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
     };
     if (CAP) return show();
     fetch("/api/blue").then(r => r.json()).then(d => { CAP = d; show(); })
-      .catch(() => { title.textContent = "SKILL.md"; body.innerHTML = "<p class='hint'>Konnte nicht geladen werden.</p>"; });
+      .catch(() => { title.textContent = "SKILL.md"; body.innerHTML = "<p class='hint'>" + window.t("js.load_fail") + "</p>"; });
   });
   if (dlg) dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
 })();

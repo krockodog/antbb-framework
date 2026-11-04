@@ -15,7 +15,7 @@
     if (g.empty){ host.innerHTML="<p class='hint'>Keine Befunde – kein Angriffspfad (ehrlicher Leerzustand).</p>"; return; }
     renderGraph(g);
     renderPaths(g);
-  }).catch(()=>{ host.innerHTML="<p class='hint'>Angriffspfad nicht verfügbar.</p>"; });
+  }).catch(()=>{ host.innerHTML="<p class='hint'>" + window.t("runs.na") + "</p>"; });
 
   function renderGraph(g){
     // Knoten pro Stage vertikal stapeln.
@@ -50,25 +50,25 @@
       svg += `<g><rect x="${p.x-66}" y="${p.y-16}" width="132" height="32" rx="6"
         fill="#161b22" stroke="${col}" stroke-width="1.6"/>`;
       if (n.type==="finding" && n.verified)
-        svg += `<circle cx="${p.x+58}" cy="${p.y-10}" r="4" fill="#3fffa3"><title>VERIFIZIERT</title></circle>`;
+        svg += `<circle cx="${p.x+58}" cy="${p.y-10}" r="4" fill="#3fffa3"><title>${window.t("atk.verified")}</title></circle>`;
       svg += `<text x="${p.x}" y="${p.y+4}" fill="#e6edf3" font-size="11" text-anchor="middle"
         font-family="sans-serif">${esc(label)}</text><title>${esc(n.label)} [${esc(n.type)}${n.severity?"/"+esc(n.severity):""}]</title></g>`;
     });
     svg += `</svg>`;
     host.insertAdjacentHTML("beforeend", svg);
     host.insertAdjacentHTML("beforeend",
-      `<p class='hint'>${esc(g.note)} Gestrichelte Kanten = hypothetisch; grüner Punkt = verifizierter Befund.</p>`);
+      `<p class='hint'>${esc(g.note)} ${window.t("atk.legend")}</p>`);
   }
 
   function renderPaths(g){
     if(!g.paths||!g.paths.length) return;
-    let h = "<h2>Pfadliste (textuell, mit Remediation)</h2>";
+    let h = "<h2>" + window.t("atk.paths") + "</h2>";
     g.paths.forEach(p=>{
       h += `<div style="margin:.6rem 0;"><strong>Asset ${esc(p.asset)}</strong>
         <span class="badge" style="border:1px solid ${SEVCOL[p.max_severity]||'#888'};color:${SEVCOL[p.max_severity]||'#888'}">max ${esc(p.max_severity)}</span><ul>`;
       p.steps.forEach(s=>{
-        const tag = s.verified ? "VERIFIZIERT" : (s.status||"offen");
-        h += `<li>[${esc(s.severity)}/${esc(tag)}] <strong>${esc(s.finding)}</strong> → <em>könnte ermöglichen:</em> ${esc(s.enables)}<br>
+        const tag = s.verified ? window.t("atk.verified") : (s.status||"open");
+        h += `<li>[${esc(s.severity)}/${esc(tag)}] <strong>${esc(s.finding)}</strong> → <em>${window.t("atk.might")}</em> ${esc(s.enables)}<br>
           <span class="hint">Fix: ${esc(s.remediation)}</span></li>`;
       });
       h += "</ul></div>";

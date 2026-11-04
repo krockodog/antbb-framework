@@ -141,7 +141,7 @@
     var cap = document.createElement("div");
     cap.className = "ant-caption";
     cap.id = "ant-colony-caption";
-    cap.textContent = "🐜 Das Ameisenvolk · Königin + Soldaten";
+    cap.textContent = "🐜 " + window.t("ants.caption");
     host.appendChild(cap);
 
     var mountTarget = document.querySelector("main") || document.body;
@@ -185,7 +185,7 @@
   function wireSoldierOpen(el, name) {
     if (el.dataset && el.dataset.wiredOpen === "1") return;
     if (el.dataset) el.dataset.wiredOpen = "1";
-    el.title = "Playbooks & SKILL.md von " + name + " öffnen";
+    el.title = window.t("ants.open", {name: name});
     el.setAttribute("role", "button");
     el.setAttribute("tabindex", "0");
     el.setAttribute("data-soldier", name);
@@ -286,7 +286,7 @@
 
     var cap = document.getElementById("ant-colony-caption");
     if (cap) {
-      cap.textContent = "🐜 Das Ameisenvolk · Königin + " + soldiers.length + " Soldaten";
+      cap.textContent = "🐜 " + window.t("ants.caption_n", {n: soldiers.length});
     }
     if (reduce) renderStatic();
   }

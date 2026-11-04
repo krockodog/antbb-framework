@@ -267,7 +267,7 @@ def _start_scan_async(target_id: int, active: bool, fuzz: bool,
     """Startet einen Scan in einem Daemon-Thread. Nur interne Service-Calls."""
     with _SCAN_LOCK:
         if SCAN_STATE["status"] == "running":
-            raise HTTPException(409, "Ein Scan läuft bereits.")
+            raise HTTPException(409, i18n_t("err.scan_running"))
         LIVE_FEED.clear()
         _reset_agents()
         SCAN_STATE.update({
@@ -379,7 +379,7 @@ def index(request: Request):
 def target_page(request: Request, target_id: int):
     t = svc.get_target(target_id)
     if not t:
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     o = svc.get_oversight(target_id)
     scopes = [_rowdict(s) for s in svc.list_scopes(target_id)]
     findings = [_rowdict(f) for f in svc.list_findings(target_id)]
@@ -509,11 +509,7 @@ def wlan_page(request: Request, target_id: Optional[int] = None):
     target_id ist optional und wird nur an die passiven Survey-Panels durchgereicht."""
     if target_id is not None and not svc.get_target(target_id):
         target_id = None
-    notice = ("Drei klare Bereiche: WLAN-Scope (Allowlist) · Coverage & Scan (passiv + "
-              "Königin-Voll-Scan) · Offensiv/Airgorah (Gate-pflichtig).\n"
-              "Ein-Klick „Voller WLAN-Scan“: Königin dispatcht alle defensiven Checks – "
-              "kein Haken-Klicken. Offensiv bleibt default-deny (Engagement + Oversight + "
-              "ANTBB_WIFI=1). § 202a-c StGB / CFAA beachten.")
+    notice = i18n_t("wlan.notice")
     return templates.TemplateResponse(request, "wlan.html", {
         "target_id": target_id,
         "notice": notice,
@@ -539,7 +535,7 @@ def _gb_static_status() -> dict:
         from .. import greenbone as _gb
         return _gb.status(probe=False)
     except Exception as exc:  # defensiv: /blue darf nie an Greenbone scheitern
-        return {"available": False, "error": f"Greenbone nicht verfügbar ({type(exc).__name__})",
+        return {"available": False, "error": i18n_t("err.greenbone", kind=type(exc).__name__),
                 "message": "", "import_available": True}
 
 
@@ -588,12 +584,12 @@ def blue_page(request: Request):
     }
     # --- Soldaten-Karten + Phasen-Pipeline (server-seitig, sofort lesbar) ---
     phase_meta = {
-        "assess": ("Assess", "Bestand & Lage erfassen"),
-        "watch": ("Watch", "Veränderungen beobachten"),
-        "harden": ("Harden", "Konfiguration härten"),
-        "defend": ("Defend", "Erkennen & Täuschen"),
-        "remediate": ("Remediate", "Lücken schließen"),
-        "verify": ("Verify", "Schließung belegen"),
+        "assess": ("Assess", i18n_t("blue.phase.assess")),
+        "watch": ("Watch", i18n_t("blue.phase.watch")),
+        "harden": ("Harden", i18n_t("blue.phase.harden")),
+        "defend": ("Defend", i18n_t("blue.phase.defend")),
+        "remediate": ("Remediate", i18n_t("blue.phase.remediate")),
+        "verify": ("Verify", i18n_t("blue.phase.verify")),
     }
     blue_phases = []
     for ph in (cap.get("blue_phases") or []):
@@ -697,10 +693,10 @@ def api_blue_remediation_findings():
 def api_blue_remediation_apply(finding_id: int, payload: dict):
     row = svc.store.get_finding(finding_id)
     if row is None:
-        raise HTTPException(404, "Finding nicht gefunden")
+        raise HTTPException(404, i18n_t("err.finding_missing"))
     finding = _rowdict(row)
     if not payload.get("oversight_ack") or not svc.is_confirmed(finding["target_id"]):
-        raise HTTPException(403, "Human Oversight für dieses Target fehlt; Remediation bleibt aus.")
+        raise HTTPException(403, i18n_t("err.oversight_remediation"))
     from .. import remediation_apply
     try:
         result = remediation_apply.apply_fix(finding, payload)
@@ -805,7 +801,7 @@ async def api_blue_greenbone_import(request: Request):
             form = await request.form()
             up = form.get("file")
             if up is None or not hasattr(up, "read"):
-                raise HTTPException(400, "Feld 'file' fehlt.")
+                raise HTTPException(400, i18n_t("err.file_missing"))
             data = await up.read(_gb.MAX_IMPORT_BYTES + 1)
             if form.get("target_id"):
                 target_id = int(form.get("target_id"))
@@ -836,7 +832,7 @@ def api_blue_greenbone_scan(payload: dict):
     try:
         tid = int(payload.get("target_id"))
     except (TypeError, ValueError):
-        raise HTTPException(400, "target_id fehlt (Scope ist default-deny).")
+        raise HTTPException(400, i18n_t("err.target_id"))
     try:
         res = svc.greenbone_scan(
             tid, str(payload.get("host") or ""), ack is True,
@@ -955,7 +951,7 @@ async def api_remote_tunnel_start(request: Request):
     if not confirm:
         return JSONResponse(
             {"ok": False, "running": False, "url": "",
-             "reason": "Oversight-Bestätigung fehlt (confirm=true erforderlich)."},
+             "reason": i18n_t("err.tunnel_oversight")},
             status_code=403)
     res = _ra.start_cloudflare_tunnel(oversight=True, named=bool(p.get("named")))
     # Modus auf cloudflare setzen, damit die Startseite den aktiven Transport zeigt.
@@ -1167,7 +1163,7 @@ def api_report_revisions(report_id: int):
 def api_report_revision_body(revision_id: int):
     row = svc.get_report_revision(revision_id)
     if not row:
-        raise HTTPException(404, "Revision nicht gefunden")
+        raise HTTPException(404, i18n_t("err.revision_missing"))
     return row["body"]
 
 
@@ -1266,7 +1262,7 @@ def api_get_mode(target_id: int):
 def api_set_mode(target_id: int, payload: dict):
     pol = payload.get("mode_policy", "auto")
     if pol not in ("defensive", "auto", "offensive"):
-        raise HTTPException(400, "mode_policy muss defensive|auto|offensive sein")
+        raise HTTPException(400, i18n_t("err.mode_policy"))
     svc.set_mode_policy(target_id, pol)
     return svc.mode_status(target_id)
 
@@ -1328,7 +1324,7 @@ def api_finding_to_blue(finding_id: int, payload: Optional[dict] = None):
     payload = payload or {}
     row = svc.store.get_finding(finding_id)
     if row is None:
-        raise HTTPException(404, "Finding nicht gefunden")
+        raise HTTPException(404, i18n_t("err.finding_missing"))
     fd = _rowdict(row) if not isinstance(row, dict) else row
     tid = payload.get("target_id") or fd.get("target_id")
     title = payload.get("title") or fd.get("title") or f"Finding #{finding_id}"
@@ -1400,24 +1396,22 @@ def providers_page():
             f"<td><span style='background:{color};color:#fff;padding:2px 8px;"
             f"border-radius:10px'>{p['auth_state']}</span></td>"
             f"<td>{p['auth_mode']}</td>"
-            f"<td>{'ja' if p['oauth_available'] else 'nein'}</td>"
+            f"<td>{i18n_t('prov.yes') if p['oauth_available'] else i18n_t('prov.no')}</td>"
             f"<td>{p['default_model']} / {p['fast_model']}</td>"
             f"<td><code>{p['base_url']}</code></td>"
             f"<td>{login}</td></tr>"
         )
     html = (
-        "<html><head><meta charset='utf-8'><title>antbb – LLM-Provider</title></head>"
+        f"<html><head><meta charset='utf-8'><title>{i18n_t('prov.title')}</title></head>"
         "<body style='font-family:sans-serif;max-width:960px;margin:2rem auto'>"
-        "<h1>🐜 antbb – LLM-Provider-Status</h1>"
-        f"<p>Standard-Provider: <b>{st['default_provider']}</b> · "
-        f"Hauptmodell: <b>{st['main_model']}</b> · Flash: <b>{st['fast_model']}</b></p>"
-        "<p style='color:#6b7280'>Zentrale Regel: Kein LLM aktiviert von sich aus einen "
-        "Schwarm. Das Schwarm-Verhalten kommt ausschließlich aus antbb.</p>"
+        f"<h1>🐜 {i18n_t('prov.h1')}</h1>"
+        f"<p>{i18n_t('prov.default', provider=st['default_provider'], main=st['main_model'], fast=st['fast_model'])}</p>"
+        f"<p style='color:#6b7280'>{i18n_t('prov.rule')}</p>"
         "<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse'>"
         "<tr><th>Provider</th><th>Status</th><th>Auth-Modus</th><th>OAuth?</th>"
         "<th>Modelle (main/fast)</th><th>Base-URL</th><th>Aktion</th></tr>"
         + "".join(rows) +
-        "</table><p><a href='/'>← zurück</a></p></body></html>"
+        f"</table><p><a href='/'>← {i18n_t('prov.back')}</a></p></body></html>"
     )
     return HTMLResponse(html)
 
@@ -1427,13 +1421,12 @@ def auth_login(provider: str):
     inst = _oauth_provider(provider)
     if not inst.available:
         return HTMLResponse(
-            f"<h2>OAuth nicht verfügbar</h2><p>Provider '{provider}' hat keinen "
-            f"dokumentierten OAuth-Flow.</p>"
-            f"<p><a href='/providers'>← Provider-Status</a></p>", status_code=400)
+            f"<h2>{i18n_t('err.oauth.unavailable')}</h2><p>{i18n_t('err.oauth.noflow', provider=provider)}</p>"
+            f"<p><a href='/providers'>← {i18n_t('err.oauth.providers')}</a></p>", status_code=400)
     try:
         url, _state = inst.build_authorize_url()
     except OAuthError as exc:
-        return HTMLResponse(f"<h2>OAuth-Fehler</h2><pre>{exc}</pre>", status_code=400)
+        return HTMLResponse(f"<h2>{i18n_t('err.oauth.fail')}</h2><pre>{exc}</pre>", status_code=400)
     return RedirectResponse(url, status_code=303)
 
 
@@ -1441,9 +1434,9 @@ def auth_login(provider: str):
 def auth_callback(provider: str, code: Optional[str] = None,
                   state: Optional[str] = None, error: Optional[str] = None):
     if error:
-        return HTMLResponse(f"<h2>OAuth abgebrochen</h2><pre>{error}</pre>", status_code=400)
+        return HTMLResponse(f"<h2>{i18n_t('err.oauth.abort')}</h2><pre>{error}</pre>", status_code=400)
     if not code or not state:
-        return HTMLResponse("<h2>OAuth-Callback unvollständig.</h2>", status_code=400)
+        return HTMLResponse(f"<h2>{i18n_t('err.oauth.incomplete')}</h2>", status_code=400)
     inst = _oauth_provider(provider)
     try:
         meta = inst.exchange_code(code, state)
@@ -1461,14 +1454,14 @@ def auth_callback(provider: str, code: Optional[str] = None,
 @app.get("/api/targets/{target_id}/rating")
 def api_rating(target_id: int, ai: int = 1):
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     return JSONResponse(svc.rating(target_id, with_ai=bool(ai)))
 
 
 @app.get("/api/targets/{target_id}/heatmap")
 def api_heatmap(target_id: int):
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     return JSONResponse(svc.heatmap(target_id))
 
 
@@ -1487,28 +1480,31 @@ def api_queens():
     blue = [s["name"] for s in sol if str(s.get("name", "")).startswith("blue-")]
     n_targets = len(svc.list_targets())
     out.append({"queen_id": "red", "soldier_ids": red,
-                "live_satz": f"Bereit · {len(red)} Soldaten · {n_targets} aktive(s) Ziel(e)"})
+                "live_satz": i18n_t("hub.red.live", n=len(red), targets=n_targets)})
     out.append({"queen_id": "blue", "soldier_ids": blue,
-                "live_satz": f"Bereit · {len(blue)} Soldaten (read-only Default)"})
+                "live_satz": i18n_t("hub.blue.live", n=len(blue))})
     try:
         import importlib
         yreg = list(importlib.import_module("yellow_queen.soldiers").REGISTRY)
         ycases = importlib.import_module("yellow_queen.db").list_cases(1000)
-        ysatz = f"Bereit · {len(yreg)} Soldaten · {len(ycases)} Fall/Fälle"
+        ysatz = i18n_t("hub.yellow.live", n=len(yreg), cases=len(ycases))
     except Exception as e:  # noqa: BLE001
-        yreg, ysatz = [], f"Yellow-Daten nicht ladbar ({type(e).__name__})"
+        yreg, ysatz = [], i18n_t("hub.yellow.unloadable", kind=type(e).__name__)
     out.append({"queen_id": "yellow", "soldier_ids": yreg, "live_satz": ysatz})
     # Feste Texte 1:1 aus all-and-one/src/components/queen-cards.tsx (STATIC) – Datenvertrag der Landing.
     meta = {
-        "red": dict(name="Rote Königin", kicker="Red-Teaming", cta="Zur Roten Königin", href="/red",
-                    summary="Bug Bounty und Pentest im engen Scope. Aktive Arbeit nur mit Scope und Oversight.",
-                    tut="Grenzschau", strip_teil="Rot tut Grenzschau"),
-        "blue": dict(name="Blaue Königin", kicker="Blue Safety-Teaming", cta="Zur Blauen Königin", href="/blue",
-                     summary="Schutz und Hardening mit echten Colony-Prüfungen und Greenbone-Anbindung.",
-                     tut="Härtelage", strip_teil="Blau tut Härtelage"),
-        "yellow": dict(name="Gelbe Königin", kicker="Yellow Reverse-Teaming", cta="Zur Gelben Königin", href="/yellow",
-                       summary="Reverse Engineering mit echten RE-Soldaten. Ohne Oversight bleiben tiefe Schritte gesperrt.",
-                       tut="Wegerklärung", strip_teil="Gelb tut Wegerklärung"),
+        "red": dict(name=i18n_t("queen.red.name"), kicker=i18n_t("queen.red.kicker"),
+                    cta=i18n_t("queen.red.cta"), href="/red",
+                    summary=i18n_t("queen.red.summary"),
+                    tut=i18n_t("queen.red.tut"), strip_teil=i18n_t("queen.red.strip")),
+        "blue": dict(name=i18n_t("queen.blue.name"), kicker=i18n_t("queen.blue.kicker"),
+                     cta=i18n_t("queen.blue.cta"), href="/blue",
+                     summary=i18n_t("queen.blue.summary"),
+                     tut=i18n_t("queen.blue.tut"), strip_teil=i18n_t("queen.blue.strip")),
+        "yellow": dict(name=i18n_t("queen.yellow.name"), kicker=i18n_t("queen.yellow.kicker"),
+                       cta=i18n_t("queen.yellow.cta"), href="/yellow",
+                       summary=i18n_t("queen.yellow.summary"),
+                       tut=i18n_t("queen.yellow.tut"), strip_teil=i18n_t("queen.yellow.strip")),
     }
     for q in out:
         q.update(meta[q["queen_id"]])
@@ -1540,7 +1536,7 @@ def api_soldier_override(name: str, payload: dict):
     """
     key = payload.get("key")
     if not key:
-        raise HTTPException(400, "key erforderlich (z.B. enabled|intensity|flags|description)")
+        raise HTTPException(400, i18n_t("err.key_required"))
     oid = svc.set_soldier_override(name, payload.get("playbook", ""),
                                    key, str(payload.get("value", "")))
     return {"ok": True, "id": oid, "soldier": name}
@@ -1549,7 +1545,7 @@ def api_soldier_override(name: str, payload: dict):
 @app.delete("/api/soldiers/{name}/override")
 def api_soldier_override_delete(name: str, playbook: str = "", key: str = ""):
     if not key:
-        raise HTTPException(400, "key erforderlich")
+        raise HTTPException(400, i18n_t("err.key_required_short"))
     svc.delete_soldier_override(name, playbook, key)
     return {"ok": True}
 
@@ -1558,7 +1554,7 @@ def api_soldier_override_delete(name: str, playbook: str = "", key: str = ""):
 def api_soldier_mem(name: str, payload: dict):
     text = (payload.get("text") or "").strip()
     if not text:
-        raise HTTPException(400, "text erforderlich")
+        raise HTTPException(400, i18n_t("err.text_required"))
     mid = svc.add_soldier_mem(name, text)
     return {"ok": True, "id": mid}
 
@@ -1578,7 +1574,7 @@ def api_brain(target_id: int):
     """
     t = svc.get_target(target_id)
     if not t:
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     mode = svc.mode_status(target_id)
     brain = {
         "target": {"id": t["id"], "name": t["name"]},
@@ -1678,7 +1674,7 @@ def api_wlan_add_point(payload: dict):
     label = (payload.get("label") or "").strip()
     samples = payload.get("samples") or {}
     if not label or not isinstance(samples, dict) or not samples:
-        raise HTTPException(400, "label + samples{bssid:rssi} erforderlich")
+        raise HTTPException(400, i18n_t("err.heat_label"))
     n = svc.wlan_add_point(label, samples,
                            target_id=payload.get("target_id"),
                            own_bssids=payload.get("own_bssids") or [])
@@ -1704,10 +1700,10 @@ def api_wlan_heatmap_sample(payload: dict):
     payload: {x, y, samples:{bssid:rssi}, ort?, own_bssids?, ap_meta?, target_id?}.
     x/y sind normalisiert 0..1 (Klick auf Grundriss/Raster). Nur echte RSSI-Werte."""
     if "x" not in payload or "y" not in payload:
-        raise HTTPException(400, "x + y (0..1) erforderlich")
+        raise HTTPException(400, i18n_t("err.heat_xy"))
     samples = payload.get("samples") or {}
     if not isinstance(samples, dict) or not samples:
-        raise HTTPException(400, "samples{bssid:rssi} erforderlich (echte Scan-Werte)")
+        raise HTTPException(400, i18n_t("err.heat_samples"))
     try:
         n = svc.wlan_heatmap_add_sample(
             payload["x"], payload["y"], samples,
@@ -1894,7 +1890,7 @@ def api_wlan_engagement_create(payload: dict):
     bssids = payload.get("bssids") or []
     ssids = payload.get("ssids") or []
     if not name or (not bssids and not ssids):
-        raise HTTPException(400, "name + mindestens eine BSSID oder SSID erforderlich")
+        raise HTTPException(400, i18n_t("err.wifi_name"))
     eid = svc.wlan_engagement_create(
         name, bssids=bssids, ssids=ssids,
         start_ts=payload.get("start_ts"), end_ts=payload.get("end_ts"),
@@ -2168,7 +2164,7 @@ def api_wlan_full_scan(payload: Optional[dict] = None):
 def api_firewall_plan(target_id: int, resolve: int = 1):
     """Scope-Egress-Firewall-Plan (DRY-RUN). Ändert NIE die echte Firewall."""
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     return JSONResponse({"plan": svc.egress_firewall_plan(target_id, resolve=bool(resolve)),
                          "engines": svc.egress_firewall_engines()})
 
@@ -2178,7 +2174,7 @@ def html_branded_report(target_id: int, company: str = "", logo: str = "",
                         color: str = "", title: str = "", client: str = ""):
     """Gebrandetes HTML (inline anzeigbar/druckbar). Reine Finding-Daten."""
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     brand = {k: v for k, v in {"company_name": company, "logo_path": logo,
              "primary_color": color, "report_title": title,
              "client": client}.items() if v}
@@ -2196,7 +2192,7 @@ def html_report_print(target_id: int, company: str = "", logo: str = "",
                       color: str = "", title: str = "", client: str = ""):
     """Druck-optimierte HTML-Ansicht (@media print). Immer verfügbar."""
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     brand = {k: v for k, v in {"company_name": company, "logo_path": logo,
              "primary_color": color, "report_title": title,
              "client": client}.items() if v}
@@ -2213,7 +2209,7 @@ def html_report_pdf(target_id: int, company: str = "", logo: str = "",
                     color: str = "", title: str = "", client: str = ""):
     """PDF-Download des professionellen Reports (oder ehrlicher HTML-Fallback)."""
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     brand = {k: v for k, v in {"company_name": company, "logo_path": logo,
              "primary_color": color, "report_title": title,
              "client": client}.items() if v}
@@ -2252,7 +2248,7 @@ def html_report_pdf(target_id: int, company: str = "", logo: str = "",
 def api_branded_export(target_id: int, payload: Optional[dict] = None):
     payload = payload or {}
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     return JSONResponse(svc.branded_report_export(
         target_id, brand=payload.get("brand"),
         want_pdf=bool(payload.get("pdf", True))))
@@ -2289,7 +2285,7 @@ def api_checkpoint_replay(run_id: str):
 def api_attackpath(target_id: int):
     """Hypothetischer Angriffspfad-Graph (nur Darstellung, kein Executor)."""
     if not svc.get_target(target_id):
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     return JSONResponse(svc.attack_graph(target_id))
 
 
@@ -2297,7 +2293,7 @@ def api_attackpath(target_id: int):
 def html_attackpath(target_id: int):
     t = svc.get_target(target_id)
     if not t:
-        raise HTTPException(404, "Target nicht gefunden")
+        raise HTTPException(404, i18n_t("err.target_missing"))
     return HTMLResponse(
         "<!doctype html><html lang='de'><head><meta charset='utf-8'>"
         f"<title>Angriffspfad – {t['name']}</title>"

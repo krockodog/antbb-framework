@@ -1,97 +1,94 @@
 {% extends "base.html" %}
-{% block title %}🧠 Neuronales Gehirn der Königin · antbb{% endblock %}
+{% block title %}{{ t('brn.title') }}{% endblock %}
 {% block body_class %}brain-body{% endblock %}
 {% block content %}
+{% set tr = t %}
 <section class="brain-view">
-  <div class="brain-title">🧠 Neuronales Gehirn · Offensive Kolonie</div>
+  <div class="brain-title">🧠 {{ tr('brn.heading') }}</div>
   <div id="brain-canvas" class="brain-canvas"></div>
 </section>
 
-<!-- Node-/Log-Overlay über dem GPU-Partikelfeld (verändert die Engine nicht). -->
-<a class="hub-back" href="/" style="position:fixed;top:4.2rem;left:1rem;z-index:50;padding:.35rem .7rem;border-radius:999px;border:1px solid rgba(212,175,106,.45);background:rgba(8,10,16,.75);color:#e8ecf5;text-decoration:none;font:600 .78rem system-ui">← Hub</a>
-<button id="wiki-open" aria-label="Schwarm-Wiki öffnen"
+<!-- Node/log overlay above the GPU particle field. The engine stays unchanged. -->
+<a class="hub-back" href="/" style="position:fixed;top:4.2rem;left:1rem;z-index:50;padding:.35rem .7rem;border-radius:999px;border:1px solid rgba(212,175,106,.45);background:rgba(8,10,16,.75);color:#e8ecf5;text-decoration:none;font:600 .78rem system-ui">← {{ tr('brn.hub') }}</a>
+<button id="wiki-open" aria-label="{{ tr('brn.wiki.open') }}"
   style="position:fixed;top:4.2rem;left:5.6rem;z-index:50;padding:.35rem .8rem;border-radius:999px;border:1px solid rgba(56,224,255,.4);background:rgba(8,10,16,.75);color:#cfefff;text-decoration:none;font:600 .78rem system-ui;cursor:pointer">
-  📖 Schwarm-Wiki</button>
+  📖 {{ tr('brn.wiki') }}</button>
 
-<!-- Schwarm-Wiki: wer macht was, wie, wo, warum — alle drei Königinnen. -->
-<div id="wiki-overlay" class="wiki-overlay" role="dialog" aria-modal="true" aria-label="Schwarm-Wiki" hidden>
+<div id="wiki-overlay" class="wiki-overlay" role="dialog" aria-modal="true" aria-label="{{ tr('brn.wiki') }}" hidden>
   <div class="wiki-box">
-    <button id="wiki-close" class="bp-mini wiki-close" aria-label="schließen">✕</button>
-    <p class="wiki-kicker">Ein Schwarm · drei Königinnen</p>
-    <h2 class="wiki-title">📖 Schwarm-Wiki</h2>
-    <p class="wiki-lede">Wer erklärt was, wie, wo — und warum. Jede Königin führt ihre eigene Kolonie
-       mit eigenen Soldaten, Playbooks und Leitplanken; geteilt werden Scope (default-deny),
-       Human Oversight und der kanonische Beweis.</p>
+    <button id="wiki-close" class="bp-mini wiki-close" aria-label="{{ tr('idx.close') }}">✕</button>
+    <p class="wiki-kicker">{{ tr('brn.wiki.kicker') }}</p>
+    <h2 class="wiki-title">📖 {{ tr('brn.wiki') }}</h2>
+    <p class="wiki-lede">{{ tr('brn.wiki.lede') }}</p>
     <div class="wiki-grid">
       <article class="wiki-card wiki-red">
-        <h3>🔴 Rote Königin <small>Red-Teaming</small></h3>
+        <h3>🔴 {{ tr('queen.red.name') }} <small>{{ tr('queen.red.kicker') }}</small></h3>
         <dl>
-          <dt>WER</dt><dd>18 offensive Soldaten — Recon, Web, API, Auth, OSINT, WLAN, Cloud, Exploit, Report.</dd>
-          <dt>WAS</dt><dd>Bug Bounty und Pentest im autorisierten Scope; jeder Befund durchläuft ein Proof-Gate.</dd>
-          <dt>WIE</dt><dd>5-Phasen-Pipeline: Recon → Vulnerability Assessment → Exploitation → Post-Exploitation → Reporting. Rein lesend per Default, aktiv nur mit Oversight.</dd>
-          <dt>WO</dt><dd><a href="/red">/red</a> — Start, Scope-Manager, Soldaten, Findings und die Fix-Brücke zur blauen Kolonie.</dd>
-          <dt>WARUM</dt><dd>Angriffe verstehen, bevor sie geschehen. Verdacht bleibt Verdacht — „verifiziert“ gilt erst mit Nachweis.</dd>
+          <dt>{{ tr('brn.who') }}</dt><dd>{{ tr('brn.red.who') }}</dd>
+          <dt>{{ tr('brn.what') }}</dt><dd>{{ tr('brn.red.what') }}</dd>
+          <dt>{{ tr('brn.how') }}</dt><dd>{{ tr('brn.red.how') }}</dd>
+          <dt>{{ tr('brn.where') }}</dt><dd><a href="/red">/red</a> — {{ tr('brn.red.where') }}</dd>
+          <dt>{{ tr('brn.why') }}</dt><dd>{{ tr('brn.red.why') }}</dd>
         </dl>
       </article>
       <article class="wiki-card wiki-blue">
-        <h3>🛡 Blaue Königin <small>Blue Safety-Teaming</small></h3>
+        <h3>🛡 {{ tr('queen.blue.name') }} <small>{{ tr('queen.blue.kicker') }}</small></h3>
         <dl>
-          <dt>WER</dt><dd>24 defensive Soldaten — vom Backup-Gardisten bis zum Honeypot-Hüter.</dd>
-          <dt>WAS</dt><dd>Schutz und Härtung: Patch-Stand, TLS-Lage, Greenbone-Import, Remediation mit Vorher/Nachher-Evidence.</dd>
-          <dt>WIE</dt><dd>6-Phasen-Pipeline: Assess → Watch → Harden → Defend → Remediate → Verify. Read-only Default, aktive Fixes und Honeypots nur mit Oversight.</dd>
-          <dt>WO</dt><dd><a href="/blue">/blue</a> — Phasen, Kolonie-Start, Jobs, Ledger, Attack-Log, Posture/SIEM.</dd>
-          <dt>WARUM</dt><dd>„Nachweislich geschlossen“ gilt erst mit Beleg — und eine Lücke, die zurückkommt, wird ehrlich wieder als offen geführt.</dd>
+          <dt>{{ tr('brn.who') }}</dt><dd>{{ tr('brn.blue.who') }}</dd>
+          <dt>{{ tr('brn.what') }}</dt><dd>{{ tr('brn.blue.what') }}</dd>
+          <dt>{{ tr('brn.how') }}</dt><dd>{{ tr('brn.blue.how') }}</dd>
+          <dt>{{ tr('brn.where') }}</dt><dd><a href="/blue">/blue</a> — {{ tr('brn.blue.where') }}</dd>
+          <dt>{{ tr('brn.why') }}</dt><dd>{{ tr('brn.blue.why') }}</dd>
         </dl>
       </article>
       <article class="wiki-card wiki-yellow">
-        <h3>🟡 Gelbe Königin <small>Yellow Reverse-Teaming</small></h3>
+        <h3>🟡 {{ tr('queen.yellow.name') }} <small>{{ tr('queen.yellow.kicker') }}</small></h3>
         <dl>
-          <dt>WER</dt><dd>Die RE-Orchestratin mit Tool-Doctor — Ghidra, diec, Unpacker, Frida-Lab.</dd>
-          <dt>WAS</dt><dd>Reverse Engineering von Samples: EXE, DLL, APK, ELF, HEX — klassifiziert, mit Toolchain und Dossier.</dd>
-          <dt>WIE</dt><dd>RE-Pipeline: Triage → Identifikation → Entpacken → Static → Dynamic → Dossier. Jeder Schritt begründet sich selbst; Lab-Schritte nur mit Oversight.</dd>
-          <dt>WO</dt><dd><a href="/yellow">/yellow</a> — Upload, Fälle, Tool-Doctor; jedes Fall-Dossier unter <code>/yellow/case/…</code>.</dd>
-          <dt>WARUM</dt><dd>Kein Schritt ohne Begründung — Vertrauen entsteht durch Erklärung, nicht durch Black Box.</dd>
+          <dt>{{ tr('brn.who') }}</dt><dd>{{ tr('brn.yellow.who') }}</dd>
+          <dt>{{ tr('brn.what') }}</dt><dd>{{ tr('brn.yellow.what') }}</dd>
+          <dt>{{ tr('brn.how') }}</dt><dd>{{ tr('brn.yellow.how') }}</dd>
+          <dt>{{ tr('brn.where') }}</dt><dd><a href="/yellow">/yellow</a> — {{ tr('brn.yellow.where') }}</dd>
+          <dt>{{ tr('brn.why') }}</dt><dd>{{ tr('brn.yellow.why') }}</dd>
         </dl>
       </article>
     </div>
-    <p class="wiki-foot">Geteilte Leitplanken: default-deny Scope · Human Oversight für aktive Schritte ·
-       Proof-Gate · keine Secrets/PII in Findings · § 202a-c StGB / CFAA beachten.</p>
+    <p class="wiki-foot">{{ tr('brn.wiki.foot') }}</p>
   </div>
 </div>
-<aside id="brain-panel" class="brain-panel" aria-label="Gehirn-Knoten">
+<aside id="brain-panel" class="brain-panel" aria-label="{{ tr('brn.nodes.aria') }}">
   <div class="bp-head">
-    <strong>🕸️ Knoten</strong>
-    <button id="bp-refresh" class="bp-mini" title="Aktualisieren">⟳</button>
-    <button id="bp-toggle" class="bp-mini" title="Ein-/Ausklappen">⟨⟩</button>
+    <strong>🕸️ {{ tr('brn.nodes') }}</strong>
+    <button id="bp-refresh" class="bp-mini" title="{{ tr('brn.refresh') }}">⟳</button>
+    <button id="bp-toggle" class="bp-mini" title="{{ tr('brn.collapse') }}">⟨⟩</button>
   </div>
   <div id="bp-counts" class="bp-counts"></div>
   <div class="bp-tabs">
-    <button data-tab="nodes" class="active">Knoten</button>
-    <button data-tab="logs">Logs</button>
+    <button data-tab="nodes" class="active">{{ tr('brn.nodes') }}</button>
+    <button data-tab="logs">{{ tr('brn.logs') }}</button>
   </div>
 
   <div id="bp-view-nodes" class="bp-view">
-    <div class="bp-hint">Klick auf einen Knoten zeigt Details, Logs & Löschen.
-      <span class="bp-human">Löschen/Zurücksetzen nur durch einen Menschen (Bestätigung nötig).</span></div>
+    <div class="bp-hint">{{ tr('brn.nodes.hint') }}
+      <span class="bp-human">{{ tr('brn.nodes.human') }}</span></div>
     <div id="bp-nodes"></div>
     <div class="bp-danger-zone">
-      <button id="bp-del-all" class="btn-danger bp-wide">🧨 ALLES löschen (operative Daten)</button>
-      <div class="bp-hint">Königin-Wissen (Fähigkeiten/Mems) bleibt erhalten · automatisches DB-Backup.</div>
+      <button id="bp-del-all" class="btn-danger bp-wide">🧨 {{ tr('brn.purge') }}</button>
+      <div class="bp-hint">{{ tr('brn.purge.hint') }}</div>
     </div>
   </div>
 
   <div id="bp-view-logs" class="bp-view">
     <div class="bp-logfilter">
-      <input id="bp-log-target" type="number" placeholder="Target-ID (optional)" min="1">
-      <input id="bp-log-run" type="text" placeholder="Run-ID (optional)">
-      <button id="bp-log-apply" class="bp-mini">Filter</button>
-      <button id="bp-log-del" class="btn-danger">🗑 Logs löschen</button>
+      <input id="bp-log-target" type="number" placeholder="{{ tr('brn.ph.target') }}" min="1">
+      <input id="bp-log-run" type="text" placeholder="{{ tr('brn.ph.run') }}">
+      <button id="bp-log-apply" class="bp-mini">{{ tr('brn.filter') }}</button>
+      <button id="bp-log-del" class="btn-danger">🗑 {{ tr('brn.del.logs') }}</button>
     </div>
     <div id="bp-logs" class="bp-logs"></div>
   </div>
 </aside>
 
-<!-- Detail-Dialog für einen Knoten -->
+<!-- Node detail dialog -->
 <div id="bp-detail" class="bp-detail" style="display:none">
   <div class="bp-detail-box">
     <button id="bp-detail-close" class="bp-mini bp-detail-close">✕</button>
@@ -145,8 +142,8 @@
   .bp-badge { font-size:.66rem; padding:.05rem .4rem; border-radius:8px;
     border:1px solid #1d2740; color:#8a92a6; }
   .bp-badge.run { color:#7fd6a0; border-color:#27ae6055; }
-  .bp-badge.läuft { color:#58a6ff; border-color:#58a6ff55; animation:bp-pulse 1.4s infinite; }
-  .bp-badge.hängt { color:#f0883e; border-color:#f0883e55; animation:bp-pulse 1s infinite; }
+  .bp-badge.is-live { color:#58a6ff; border-color:#58a6ff55; animation:bp-pulse 1.4s infinite; }
+  .bp-badge.is-stuck { color:#f0883e; border-color:#f0883e55; animation:bp-pulse 1s infinite; }
   @keyframes bp-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
   .bp-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:#8a92a6; }
   .bp-dot.critical{background:#ff7b72} .bp-dot.high{background:#f0883e}
@@ -215,7 +212,7 @@
     padding:.5rem .65rem; overflow:auto; font-size:.72rem; color:#c9d1d9; }
   .sol-actions { margin-top:.4rem; border-top:1px solid #1d2740; padding-top:.45rem; }
 
-  @media (prefers-reduced-motion: reduce){ .bp-badge.läuft,.bp-badge.hängt{animation:none} }
+  @media (prefers-reduced-motion: reduce){ .bp-badge.is-live,.bp-badge.is-stuck{animation:none} }
 
   /* ---- Schwarm-Wiki ---- */
   .wiki-overlay {
@@ -292,10 +289,10 @@
 </script>
 <!-- 🐜 Offensive Kolonie: Pentest-/Bugbounty-/WLAN-Runs (echte Historie). Blue Queen → /blue -->
 <script src="/static/brain/runs.js?v=20261023s"></script>
-<!-- 🐜 Ameisenvolk-Overlay (offensive Königin + Soldaten; kein Blue Queen) -->
+<!-- Ant overlay: offensive queen + soldiers. Blue Queen stays on /blue. -->
 <script src="/static/brain/ants.js?v=20261024-j7-20261024013043"></script>
 <script src="/static/brain/queens.js?v=1"></script>
-<!-- 🐜 3D-Völker (GLB, Overlay; Rot herrscht, Blau/Gelb darunter) -->
+<!-- 3D colonies (GLB overlay; red leads, blue and yellow underneath) -->
 <script type="module" src="/static/brain/ants3d.js?v=23"></script>
 <style id="brain-pointer-passthrough">
   /* Stadt-iframe (z1) muss Drag/Wheel/Touch bekommen: Wirbel + Vollflaechen-Wrapper durchlaessig, nur echte Controls klickbar */

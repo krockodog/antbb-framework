@@ -46,9 +46,8 @@ def resolve_bind_host(raw: str | None = None) -> str:
         return host
     if not expose_enabled():
         raise SystemExit(
-            f"Refusing to bind the web UI to {host}. "
-            "The default is 127.0.0.1. Set ANTBB_EXPOSE=1 to opt in, "
-            "and prefer an SSH tunnel instead of exposing this console."
+            f"ANTBB_EXPOSE is 0 (default): loopback only. "
+            f"Set ANTBB_EXPOSE=1 to bind to {host}. Prefer an SSH tunnel."
         )
     _warn_nonlocal(host)
     return host
@@ -87,8 +86,8 @@ def bind_violation(server_host: str | None) -> str | None:
         _warn_nonlocal(host)
         return None
     return (
-        f"Refusing requests: the process is listening on {server_host}, not loopback. "
-        "Restart with the default 127.0.0.1, or set ANTBB_EXPOSE=1 to opt in."
+        f"ANTBB_EXPOSE is 0 (default): loopback only. "
+        f"Set ANTBB_EXPOSE=1 to bind to {server_host}. Prefer an SSH tunnel."
     )
 
 
@@ -97,8 +96,8 @@ def _warn_nonlocal(host: str) -> None:
         return
     _WARNED.add(host)
     print(
-        f"WARNING: web UI is binding to {host} because ANTBB_EXPOSE=1 "
-        "(or YQ_EXPOSE=1). This exposes an authorized-pentest console. "
+        f"WARNING: ANTBB_EXPOSE is 1 (or YQ_EXPOSE=1): binding to {host}, "
+        "not loopback. This exposes an authorized-pentest console. "
         "Prefer 127.0.0.1 and an SSH tunnel.",
         file=sys.stderr,
         flush=True,

@@ -487,7 +487,10 @@ def test_docs_use_official_name() -> None:
     assert "1016" not in unit
     hub = (ROOT / "all-and-one" / "src" / "app" / "page.tsx").read_text(encoding="utf-8")
     assert PRODUCT in hub
-    assert DESCRIPTION in hub
+    intro = (ROOT / "all-and-one" / "src" / "components" / "home-intro.tsx").read_text(encoding="utf-8")
+    assert 't("home.pitch")' in intro
+    german = json.loads((ROOT / "antbb" / "locale" / "de.json").read_text(encoding="utf-8"))
+    assert german["home.pitch"] == DESCRIPTION
     brain = (ROOT / "all-and-one" / "src" / "components" / "neural-brain.tsx").read_text(
         encoding="utf-8"
     )

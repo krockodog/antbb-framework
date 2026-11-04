@@ -302,7 +302,7 @@
       ctx.font = "12px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
-        "Noch keine Läufe — der erste Pentest erscheint hier als Ameise.",
+        window.t("runs.empty"),
         W / 2, H * 0.14
       );
     }
@@ -327,7 +327,7 @@
       '<div class="tl-head"><span class="tl-ant">🐜</span> <strong>Zeitraffer</strong>' +
       ' <span class="tl-sub">Lauf abspielen</span></div>' +
       '<div class="tl-row">' +
-      '  <select id="tl-run" title="Lauf aus der Run-Historie"><option value="">— Lauf wählen —</option></select>' +
+      '  <select id="tl-run" title="' + window.t("runs.history") + '"><option value="">' + window.t("runs.pick") + '</option></select>' +
       '  <button id="tl-play" class="tl-btn" title="Play/Pause" disabled>▶</button>' +
       '  <select id="tl-speed" title="Geschwindigkeit">' +
       '    <option value="1">1×</option><option value="2" selected>2×</option>' +
@@ -336,7 +336,7 @@
       '</div>' +
       '<div class="tl-row">' +
       '  <input id="tl-scrub" type="range" min="0" max="1000" value="0" disabled>' +
-      '  <span id="tl-label" class="tl-label">kein Lauf</span>' +
+      '  <span id="tl-label" class="tl-label">' + window.t("runs.none") + '</span>' +
       '</div>' +
       '<div id="tl-meta" class="tl-meta"></div>';
     document.body.appendChild(bar);
@@ -394,7 +394,7 @@
     var sel = document.getElementById("tl-run");
     if (!sel) return;
     var cur = sel.value;
-    sel.innerHTML = '<option value="">— Lauf wählen —</option>';
+    sel.innerHTML = '<option value="">' + window.t("runs.pick") + '</option>';
     (runs || []).forEach(function (r) {
       if (isBlueRun(r)) return;
       var opt = document.createElement("option");
@@ -424,14 +424,14 @@
     document.getElementById("tl-scrub").value = 0;
     document.getElementById("tl-scrub").disabled = true;
     document.getElementById("tl-play").disabled = true;
-    document.getElementById("tl-label").textContent = "lädt …";
+    document.getElementById("tl-label").textContent = window.t("runs.loading");
     document.getElementById("tl-meta").textContent = "";
-    if (!id) { document.getElementById("tl-label").textContent = "kein Lauf"; return; }
+    if (!id) { document.getElementById("tl-label").textContent = window.t("runs.none"); return; }
     fetch("/api/runs/" + encodeURIComponent(id) + "/timeline")
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data || !data.ok) {
-          document.getElementById("tl-label").textContent = "nicht verfügbar";
+          document.getElementById("tl-label").textContent = window.t("runs.na");
           return;
         }
         if (isBlueRun(data.run)) {
@@ -451,7 +451,7 @@
         applyProgress();
       })
       .catch(function () {
-        document.getElementById("tl-label").textContent = "Fehler";
+        document.getElementById("tl-label").textContent = window.t("js.error_plain");
       });
   }
 

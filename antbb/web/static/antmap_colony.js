@@ -249,7 +249,7 @@
     sctx.lineWidth = 1.5; sctx.strokeStyle = "rgba(120,150,200,0.35)"; sctx.stroke();
     const off = (snap.effective) === "offensive";
     const title = "ZIEL · AUSGRABUNG" + (targetName ? " (" + targetName + ")" : "");
-    const sub = off ? "offensiv: Tunnel gräbt sich hinein" : "defensiv: Inspektion von außen";
+    const sub = off ? window.t("map.tunnel") : window.t("map.inspect");
     sctx.textAlign = "left";
     sctx.font = "600 12px system-ui, sans-serif";
     const tw = sctx.measureText(title).width;

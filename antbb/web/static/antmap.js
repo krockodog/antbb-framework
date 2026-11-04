@@ -55,7 +55,7 @@
     }, o);
   }
   const nodes = {};
-  nodes.queen = mkNode({ id: "queen", kind: "queen", label: "Königin", role: "Orchestrator (neuronales Gehirn)" });
+  nodes.queen = mkNode({ id: "queen", kind: "queen", label: window.t("map.queen"), role: window.t("map.queen_role") });
   nodes.ants = {};
   AGENTS.forEach((n, i) => {
     nodes.ants[n] = mkNode({ id: n, kind: "ant", label: LABEL[n], role: ROLE[n], lane: i });
@@ -65,9 +65,9 @@
     ["scout", "off", "def"].forEach((rk) => {
       const labels = { scout: "Scout", off: "Offensiv-Master", def: "Defensiv-Master" };
       const roles = {
-        scout: "kartiert das Ziel von außen (läuft zuerst raus)",
-        off: "gräbt sich ins Ziel – nur bei effektiv offensiv",
-        def: "bleibt im Nest, überwacht von innen"
+        scout: window.t("map.scout"),
+        off: window.t("map.off"),
+        def: window.t("map.def")
       };
       nodes.masters.push(mkNode({
         id: a.id + "-" + rk, kind: "master", mrole: rk, area: a.label,
@@ -171,7 +171,7 @@
       (off ? COL.magenta : COL.cyan) + "'>" + (off ? "OFFENSIV" : "DEFENSIV") +
       "</b> — " + (off
         ? "Scout &amp; Offensiv-Master graben sich durch den Tunnel ins Ziel."
-        : "Agenten inspizieren das Ziel nur von außen; Offensiv-Master bleibt im Nest.") +
+        : window.t("map.outside")) +
       (mode.reason ? " · " + mode.reason : "");
   }
 
@@ -227,7 +227,7 @@
     ctx.fillStyle = "#fff6da"; ctx.font = "16px system-ui"; ctx.textAlign = "center";
     ctx.fillText("👑", nd.x, nd.y - r - 6);
     ctx.fillStyle = "rgba(255,236,196,0.92)"; ctx.font = "600 11px system-ui";
-    ctx.fillText("Königin · tippen = Kammer", nd.x, nd.y + r + 15);
+    ctx.fillText(window.t("map.tap"), nd.x, nd.y + r + 15);
   }
 
   function drawAntGlyph(nd) {
@@ -293,7 +293,7 @@
 
   // ---- Hit-Test / Tooltip -------------------------------------------------
   function hit(mx, my) {
-    const cand = [{ nd: nodes.queen, r: 30, name: "Königin" }];
+    const cand = [{ nd: nodes.queen, r: 30, name: window.t("map.queen") }];
     nodes.masters.forEach(m => cand.push({ nd: m, r: 15, name: m.label }));
     AGENTS.forEach(n => cand.push({ nd: nodes.ants[n], r: 20, name: n }));
     let best = null, bd = 1e9;
@@ -322,7 +322,7 @@
     tip.style.top = clamp(cy + 12, 4, H - th - 4) + "px";
   }
   function stLabel(s) {
-    return { idle: "idle", running: "läuft", done: "fertig", blocked: "geblockt" }[s] || s;
+    return { idle: "idle", running: window.t("map.running"), done: window.t("map.done"), blocked: window.t("map.blocked") }[s] || s;
   }
   function esc(s) { return String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])); }
 
@@ -367,7 +367,7 @@
     });
   });
   async function loadBrain() {
-    cbody.innerHTML = "<p class='hint'>lädt Gedächtnis…</p>";
+    cbody.innerHTML = "<p class='hint'>" + window.t("map.loading_mem") + "</p>";
     try {
       const r = await fetch("/api/brain/" + targetId);
       brainData = await r.json();
@@ -398,7 +398,7 @@
     // ---- Capability-Registry (Skills/Playbooks/Tools je Soldat) ----
     const cap = b.capabilities;
     if (cap && cap.soldiers) {
-      h += "<div class='cham-sec'><h4>👑 Capability-Registry (Königin-Gedächtnis)</h4>";
+      h += "<div class='cham-sec'><h4>👑 " + window.t("map.registry") + "</h4>";
       h += "<p>Soldaten: <b>" + cap.soldier_count + "</b> · Playbooks: <b>" +
         cap.playbook_count + "</b> · Tools: <b>" + cap.tool_count + "</b></p>";
       h += "<p class='r'>Beim Start frisch aus den Soldaten aufgebaut (Single Source of Truth). Keine Secrets.</p>";
@@ -431,7 +431,7 @@
         (s.allowed ? "<span style='color:" + COL.green + "'>in-scope</span>" : "<span style='color:" + COL.blocked + "'>out</span>") + "</li>");
       h += "</ul>";
     } else h += "<p class='r'>Noch keine Scopes gespeichert.</p>";
-    h += "<p><b>Frühere Funde (" + m.findings_total + ")</b></p>";
+    h += "<p><b>" + window.t("map.prior", {n: m.findings_total}) + "</b></p>";
     if (m.findings.length) {
       h += "<ul class='cham-list'>";
       m.findings.slice(0, 12).forEach(f => h += "<li class='sev-" + f.severity + "'><b>" + esc(f.severity) +
@@ -448,7 +448,7 @@
     const g = brainData.memgraph;
     if (g.empty || !g.nodes.length) {
       cbody.innerHTML = "<div class='cham-sec'><h4>🕸️ Memgraph</h4>" +
-        "<p class='r'>Noch keine Daten im Gedächtnis-Graph (keine Scopes/Funde gespeichert).</p></div>";
+        "<p class='r'>" + window.t("map.empty_graph") + "</p></div>";
       return;
     }
     const w = Math.max(260, Math.min((cbody.clientWidth || 360) - 20, 520)), ht = 172;

@@ -7,9 +7,11 @@ from fastapi.testclient import TestClient
 
 from antbb import webauth
 from antbb.netbind import (
+    _WARNED,
     assert_not_root,
     assert_runtime_safe,
     bind_violation,
+    expose_enabled,
     is_loopback,
     resolve_bind_host,
 )
@@ -21,21 +23,46 @@ class _FakeRequest:
         self.scope = {"server": (host, 8000)}
 
 
-def test_loopback_defaults_and_refuses_wildcard(monkeypatch):
+def test_loopback_defaults_and_refuses_wildcard(monkeypatch, capsys):
     monkeypatch.delenv("ANTBB_EXPOSE", raising=False)
     monkeypatch.delenv("YQ_EXPOSE", raising=False)
     for name in ("ANTBB_HOST", "ANTBB_WEB_HOST", "ALLONE_HOST", "YQ_HOST"):
         monkeypatch.delenv(name, raising=False)
+    assert expose_enabled() is False
     assert resolve_bind_host(None) == "127.0.0.1"
     assert resolve_bind_host("localhost") == "127.0.0.1"
     assert is_loopback("127.0.0.1")
     assert bind_violation("testserver") is None
     assert bind_violation("127.0.0.1") is None
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as unset:
         resolve_bind_host("0.0.0.0")
-    assert bind_violation("0.0.0.0")
+    assert "ANTBB_EXPOSE is 0 (default)" in str(unset.value)
+    assert "0.0.0.0" in str(unset.value)
+    assert "ANTBB_EXPOSE=1" in str(unset.value)
+    refused = bind_violation("0.0.0.0")
+    assert refused and "ANTBB_EXPOSE is 0 (default)" in refused
+    assert "0.0.0.0" in refused
+
+    monkeypatch.setenv("ANTBB_EXPOSE", "0")
+    assert expose_enabled() is False
+    with pytest.raises(SystemExit) as zero:
+        resolve_bind_host("10.0.0.5")
+    assert "ANTBB_EXPOSE is 0 (default)" in str(zero.value)
+    assert "10.0.0.5" in str(zero.value)
+    for off in ("false", "no", "off", ""):
+        monkeypatch.setenv("ANTBB_EXPOSE", off)
+        assert expose_enabled() is False
+
+    _WARNED.clear()
+    for on in ("1", "true", "yes", "on"):
+        monkeypatch.setenv("ANTBB_EXPOSE", on)
+        assert expose_enabled() is True
     monkeypatch.setenv("ANTBB_EXPOSE", "1")
     assert resolve_bind_host("0.0.0.0") == "0.0.0.0"
+    warning = capsys.readouterr().err
+    assert "ANTBB_EXPOSE is 1" in warning
+    assert "0.0.0.0" in warning
+    assert "SSH tunnel" in warning
     assert bind_violation("192.168.1.5") is None
 
 

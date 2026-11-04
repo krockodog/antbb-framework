@@ -21,9 +21,6 @@ export default function Home() {
           <p className="mt-4 text-sm tracking-wide text-foreground/70">
             All and One - RED-BLUE-Yellow-Ant-Team
           </p>
-          <p className="mt-2 text-sm text-foreground/60">
-            Orchestrierte Ameisenfarmen — die vom Bug Bounty und Pentest über Reverse Engineering bis zum Schutz und Hardening helfen.
-          </p>
         </footer>
       </div>
       <script src="/static/hub-real.js?v=202610240215" defer />

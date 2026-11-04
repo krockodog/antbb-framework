@@ -63,7 +63,7 @@ Then open http://127.0.0.1:1001/login
 >
 > Do not run it as root. The entry points refuse. The unit sets `User=antbb`.
 >
-> The bind stays `127.0.0.1` unless `ANTBB_EXPOSE=1` is set on purpose. That opt-in prints a warning.
+> The default is `ANTBB_EXPOSE=0`: the bind stays `127.0.0.1` (loopback only). Network access is the one-line switch `ANTBB_EXPOSE=1`, which prints a warning. Prefer an SSH tunnel.
 >
 > From another machine, use an SSH tunnel (`ssh -L 1001:127.0.0.1:1001 <user>@<host>`) and open the same URL locally. Do not publish the port.
 
@@ -323,7 +323,7 @@ The service and the direct start are in the [Quick start](#quick-start): `system
 >
 > **Not root.** `User=antbb`. Starting as root is refused. `ANTBB_ALLOW_ROOT=1` only logs a warning and is not a supported setup.
 >
-> **Localhost.** The bind stays `127.0.0.1`. Another interface needs `ANTBB_EXPOSE=1` and prints a warning.
+> **Localhost.** The default is `ANTBB_EXPOSE=0`: the bind stays `127.0.0.1`. Network access is `ANTBB_EXPOSE=1` and prints a warning. Prefer an SSH tunnel. Do not publish the port.
 >
 > **Remote access.** An SSH tunnel (`ssh -L 1001:127.0.0.1:1001 <user>@<host>`), not a published port.
 

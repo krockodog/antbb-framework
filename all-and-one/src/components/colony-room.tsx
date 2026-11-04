@@ -67,7 +67,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
       })
       .catch((reason: unknown) => {
         if (!alive) return;
-        setError(reason instanceof Error ? reason.message : "Die Kolonie antwortet nicht.");
+        setError(reason instanceof Error ? reason.message : t("colony.no_reply"));
       });
     return () => {
       alive = false;
@@ -108,7 +108,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
       await load();
       setBanner(saved.allow.length === 0 ? "Allowlist geleert. Default-deny gilt." : "Allowlist gesetzt.");
     } catch (reason) {
-      setBanner(reason instanceof Error ? reason.message : "Scope ließ sich nicht setzen.");
+      setBanner(reason instanceof Error ? reason.message : t("colony.scope_fail"));
     } finally {
       setBusy(false);
     }
@@ -188,24 +188,24 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
         <SiteHeader />
         <header className="mt-10 max-w-3xl">
           <p className="text-[0.72rem] tracking-[0.22em] uppercase opacity-70">
-            {t("brain.queen")} · {queen} · {detail?.kicker ?? ROLE[queen]}
+            {t("brain.queen")} · {queen} · {t(`queen.${queen}.kicker`)}
           </p>
           <h1 className="font-heading mt-3 text-5xl md:text-6xl">
             {t(`queen.${queen}.name`)}
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-foreground/80">
-            {detail?.summary ?? "Die Kolonie wird gelesen."}
+            {detail?.summary ?? t("colony.reading")}
           </p>
           {queen === "red" ? (
             <p className="mt-3 text-sm text-foreground/65">
-              Kanonische Route: /red. Ältere Arbeitstitel bleiben Namen im Text und bekommen keine zweite Oberfläche.
+              {t("colony.canonical")}
             </p>
           ) : null}
         </header>
 
         {error ? (
           <p className="mt-8 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm" role="alert">
-            {error} Ich starte `./run.sh`, wenn die API fehlt.
+            {error} {t("colony.api_start")}
           </p>
         ) : null}
         {banner ? (
@@ -215,7 +215,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
         ) : null}
 
         {!detail && !error ? (
-          <p className="mt-10 text-sm text-foreground/70">Soldaten, Playbooks und Scope werden gelesen.</p>
+          <p className="mt-10 text-sm text-foreground/70">{t("colony.reading_bits")}</p>
         ) : null}
 
         {detail ? (
@@ -223,7 +223,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
             <section className="space-y-4">
               <Card className="border-0 bg-black/25 ring-white/10">
                 <CardContent className="space-y-3">
-                  <p className="text-[0.68rem] tracking-[0.16em] uppercase opacity-60">Live-Status</p>
+                  <p className="text-[0.68rem] tracking-[0.16em] uppercase opacity-60">{t("hub.live_status")}</p>
                   <p className="text-sm leading-relaxed">{detail.live_satz}</p>
                   <p className="text-sm opacity-75">{detail.strip_teil}</p>
                 </CardContent>
@@ -242,12 +242,12 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
                     />
                   </div>
                   <p className="text-sm leading-relaxed text-foreground/70">
-                    Ohne dieses Häkchen starte ich keinen Lauf. Der Rechtshinweis ersetzt es nicht.
+                    {t("colony.no_tick")}
                   </p>
                   <Separator className="bg-white/10" />
                   <Label htmlFor="scope">Scope</Label>
                   <p className="text-sm leading-relaxed text-foreground/70">
-                    Default-deny. Leer heißt: kein Ziel, kein Lauf. Eine Zeile, ein freigegebenes Ziel.
+                    {t("colony.scope_help")}
                   </p>
                   <Textarea
                     id="scope"
@@ -290,7 +290,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
             </section>
 
             <section>
-              <h2 className="text-[0.72rem] tracking-[0.18em] uppercase opacity-60">Soldaten</h2>
+              <h2 className="text-[0.72rem] tracking-[0.18em] uppercase opacity-60">{t("idx.soldiers")}</h2>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {detail.soldiers.map((item) => {
                   const active = item.soldier_id === soldierId;
@@ -325,7 +325,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
                     </p>
                     <p>{soldier.stub_note}</p>
                     <p className="text-foreground/70">
-                      Oversight ist für Läufe nötig. Playbooks: {soldier.playbook_ids.join(", ")}.
+                      {t("colony.playbooks", { books: soldier.playbook_ids.join(", ") })}
                     </p>
                   </CardContent>
                 </Card>
@@ -381,9 +381,9 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
 
         {queen === "yellow" && detail ? (
           <section className="mt-10 rounded-2xl border border-white/10 bg-black/25 p-5">
-            <h2 className="font-heading text-3xl">Erklärbärin</h2>
+            <h2 className="font-heading text-3xl">{t("colony.explain")}</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-foreground/75">
-              Ich klassifiziere den Namen. Die Datei bleibt zu. Ohne Oversight zeige ich nur die Hülle.
+              {t("colony.explain_body")}
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Input
@@ -396,7 +396,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
                 Klassifikation ansehen
               </Button>
               <Link href="/yellow/laeufe" className="self-center text-sm text-[var(--gold)] underline-offset-4 hover:underline">
-                Läufe öffnen
+                {t("colony.open_runs")}
               </Link>
             </div>
             {classify ? (
@@ -419,7 +419,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
                 </ol>
                 {classify.withheld ? (
                   <p className="text-sm text-foreground/70">
-                    {classify.withheld_count} tiefere Schritte bleiben ohne Oversight zurück.
+                    {t("colony.withheld", { n: classify.withheld_count })}
                   </p>
                 ) : null}
               </div>
@@ -443,7 +443,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
                       <span className="mt-1 block">{run.summary}</span>
                       {queen === "yellow" ? (
                         <Link className="mt-2 inline-block text-[var(--gold)]" href={`/yellow/laeufe#${run.run_id}`}>
-                          Im Laufverzeichnis öffnen
+                          {t("colony.open_dir")}
                         </Link>
                       ) : null}
                     </li>
@@ -454,7 +454,7 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
             <div>
               <h2 className="text-[0.72rem] tracking-[0.18em] uppercase opacity-60">Ledger</h2>
               {detail.ledger.length === 0 ? (
-                <p className="mt-3 text-sm text-foreground/70">Das Ledger dieser Königin ist noch leer.</p>
+                <p className="mt-3 text-sm text-foreground/70">{t("colony.ledger_empty")}</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {detail.ledger.map((entry) => (

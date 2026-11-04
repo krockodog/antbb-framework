@@ -13,7 +13,7 @@
       host.textContent = "";
       const rows = (data.findings || []).filter(f => f.can_apply && f.status !== "GESCHLOSSEN");
       if (!rows.length) {
-        host.appendChild(node("p", "Keine offenen, unterstützten Remediation-Befunde."));
+        host.appendChild(node("p", window.t("rem.none")));
         return;
       }
       rows.forEach(f => {
@@ -27,7 +27,7 @@
         button.type = "button";
         button.className = "blue-go";
         button.addEventListener("click", () => {
-          if (!window.confirm("Human Oversight bestätigen und diese Systemänderung ausführen?")) return;
+          if (!window.confirm(window.t("rem.confirm"))) return;
           const check = f.evidence.check_id;
           const body = {oversight_ack: true};
           if (check === "ip-forwarding") {
@@ -35,7 +35,7 @@
             body.confirm_router = true;
           }
           if (check === "patch-reboot-required") {
-            if (!window.confirm("Neustart nur planen, nicht sofort auslösen?")) return;
+            if (!window.confirm(window.t("rem.reboot"))) return;
             body.confirm_reboot = true;
             body.schedule = window.prompt("Neustart-Zeitplan (systemd-Kalender)", "01:00") || "01:00";
           }
@@ -44,14 +44,14 @@
             if (!body.log_target) return;
           }
           button.disabled = true;
-          result.textContent = "Remediation läuft …";
+          result.textContent = window.t("rem.running");
           fetch("/api/blue/findings/" + encodeURIComponent(f.id) + "/apply", {
             method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
           }).then(async r => {
             const data = await r.json();
             if (!r.ok) throw new Error(data.detail || "Remediation fehlgeschlagen");
             result.textContent = JSON.stringify({closed: data.closed, scheduled: data.scheduled, evidence: data.evidence, backups: data.backups}, null, 2);
-            button.textContent = data.closed ? "Geschlossen" : data.scheduled ? "Eingeplant" : "Geprüft – weiter offen";
+            button.textContent = data.closed ? window.t("rem.closed") : data.scheduled ? window.t("rem.scheduled") : window.t("rem.still_open");
             button.disabled = !data.closed && !data.scheduled ? false : true;
           }).catch(err => {
             result.textContent = String(err.message || err);

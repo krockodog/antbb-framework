@@ -192,10 +192,10 @@
   function buildBadges() {
     badgeHost.innerHTML = ""; items.length = 0;
     const add = (el, hub, f) => { items.push({ el, hub, f }); badgeHost.appendChild(el); };
-    add(mkBadge("red", { name: "ROTE KÖNIGIN", title: "Absolute Herrscherin · All and One", skills: [`${red.length} Soldaten`] }, true), "red", p => ({ x: p.x, y: p.y - 34 }));
+    add(mkBadge("red", { name: window.t("ants3d.red_name"), title: window.t("ants3d.red_title"), skills: [window.t("ants3d.soldiers", {n: red.length})] }, true), "red", p => ({ x: p.x, y: p.y - 34 }));
     add(mkBadge("red", { name: "Scout", title: "Kniend", skills: ["recon-master"] }, false), "scout", p => ({ x: p.x, y: p.y + 10 }));
-    add(mkBadge("blue", { name: "Blaue Königin", title: "Verteidigung", skills: [`${blue.length} Soldaten`] }, true), "blue", p => ({ x: p.x, y: p.y - 30 }));
-    add(mkBadge("yellow", { name: "Gelbe Königin", title: "RE · Schmiedin", skills: [`${YELLOW.length} Soldaten`] }, true), "yellow", p => ({ x: p.x, y: p.y - 30 }));
+    add(mkBadge("blue", { name: window.t("ants3d.blue"), title: window.t("ants3d.defense"), skills: [window.t("ants3d.soldiers", {n: blue.length})] }, true), "blue", p => ({ x: p.x, y: p.y - 30 }));
+    add(mkBadge("yellow", { name: window.t("ants3d.yellow"), title: window.t("ants3d.re"), skills: [window.t("ants3d.soldiers", {n: YELLOW.length})] }, true), "yellow", p => ({ x: p.x, y: p.y - 30 }));
     const ring = (list, n, hub, r, spread, rows) => arc(n, 0, 0, r, spread, rows).forEach((o, i) => {
       add(mkBadge(hub.replace("Ring", ""), list[i], false), hub, p => ({ x: p.x + o.x, y: p.y - o.y * 0.6 }));
     });
@@ -273,7 +273,7 @@
 // Stufen: 0 (<1) nichts · 1 (≥1) Hütten · 2 (≥10) Brunnen · 3 (≥50) Steinhäuser · 4 (≥200) Türme · 5 (≥1000) moderne Gebäude.
 // Stufe 0 zeigt bewusst nichts (keine Fake-Bauten).
 (async function knowledgeGrowth() {
-  const STEPS = [[1, "🛖", "Hütten"], [10, "⛲", "Brunnen"], [50, "🏠", "Steinhäuser"], [200, "🏰", "Türme"], [1000, "🏙️", "moderne Gebäude"]];
+  const STEPS = [[1, "🛖", window.t("ants3d.huts")], [10, "⛲", window.t("ants3d.well")], [50, "🏠", window.t("ants3d.stone")], [200, "🏰", window.t("ants3d.towers")], [1000, "🏙️", window.t("ants3d.modern")]];
   let c = {};
   try { c = (await (await fetch("/api/brain/nodes")).json()).counts || {}; } catch (_) { return; }
   const k = ["targets", "runs", "findings", "logs"].reduce((s, n) => s + (Number(c[n]) || 0), 0);
@@ -284,7 +284,7 @@
   if (!stage) return;
   const box = document.createElement("div");
   box.id = "kimi-city-growth";
-  box.title = `Wissen ${k} (Ziele ${c.targets || 0}, Läufe ${c.runs || 0}, Funde ${c.findings || 0}, Logs ${c.logs || 0})`;
+  box.title = window.t("ants3d.knowledge", {k: k, targets: c.targets || 0, runs: c.runs || 0, findings: c.findings || 0, logs: c.logs || 0});
   box.style.cssText = "position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;pointer-events:none;" +
     "font:600 11px system-ui;color:#eef;background:rgba(4,8,18,.72);border:1px solid #d4af6a;border-radius:8px;padding:4px 10px";
   box.textContent = `Stadtausbau Stufe ${stage}/5 · Wissen ${k} · ` + STEPS.slice(0, stage).map(([, i, n]) => `${i} ${n}`).join("  ");

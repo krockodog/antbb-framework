@@ -27,7 +27,7 @@ export async function mountQueenViewer(el, kind = "red", opts = {}) {
   canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
   const gl = canvas.getContext("webgl2", { alpha: true, antialias: true })
           || canvas.getContext("webgl",  { alpha: true, antialias: true });
-  if (!gl) { fallback.textContent = "WebGL nicht verfügbar"; return; }
+  if (!gl) { fallback.textContent = window.t("qv.no_webgl"); return; }
   el.appendChild(canvas);
 
   const renderer = new THREE.WebGLRenderer({ canvas, context: gl, alpha: true, antialias: true });

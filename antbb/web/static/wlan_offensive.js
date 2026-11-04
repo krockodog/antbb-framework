@@ -38,7 +38,7 @@
     let h = "";
     h += `<div class="card" style="border-color:#ff7b6b;">
       <strong>⚖ Rechtshinweis</strong>
-      <p class="hint">${esc(STATUS.legal_notice||"Nur mit ausdrücklicher Autorisierung. §202a-c StGB / CFAA.")}</p>
+      <p class="hint">${esc(STATUS.legal_notice||"" + window.t("wlan.legal_short") + "")}</p>
       <p class="hint">Airgorah-Referenz: <a href="https://github.com/martin-olivier/airgorah" target="_blank" rel="noopener">martin-olivier/airgorah</a>
         (MIT) – Workflow web-nativ, kein GTK-Embed.</p></div>`;
 
@@ -78,7 +78,7 @@
       <p class="hint">${sel
         ? (`<strong>${esc(sel.ssid||"(versteckt)")}</strong> <code>${esc(sel.bssid)}</code>
             · Ch ${sel.channel??"?"} · ${esc(sel.encryption||"?")}`)
-        : "Kein WLAN gewählt – Tab Coverage → Scannen → Zeile anklicken."}</p>
+        : "" + window.t("wlan.off_none") + ""}</p>
       <div class="row" style="flex-wrap:wrap;gap:.4rem;margin-top:.4rem;">
         <input id="ao-bssid" placeholder="Ziel-BSSID"/>
         <input id="ao-ssid" placeholder="Ziel-SSID"/>
@@ -94,7 +94,7 @@
     // Airgorah-Aktionen
     const dis = armed ? "" : "disabled";
     h += `<div class="card"><strong>🗡️ Airgorah-Aktionen (Gate-pflichtig)</strong>
-      <label class="wlan-check" title="Echte Pakete senden – nur eigenes Netz!"><input type="checkbox" id="ao-scharf"> scharf (echte Ausführung, sonst Dry-Run)</label>
+      <label class="wlan-check" title="${window.t("wlan.sharp_title")}"><input type="checkbox" id="ao-scharf"> ${window.t("wlan.sharp")}</label>
       <p class="hint">Browser startet Tools im dry_run (Status/Gate-Test). Scharfer Lauf nur
         CLI/operator mit Hardware+Root. Keine autonomen Ketten.</p>
       <div class="wlan-air-actions">
@@ -115,7 +115,7 @@
     // Credentials
     h += `<div class="card"><strong>Abgefangene Credentials (NUR maskiert)</strong>
       <button type="button" id="co-reload">neu laden</button>
-      <button type="button" id="co-purge">alle löschen (Purge)</button>
+      <button type="button" id="co-purge">${window.t("wlan.purge")}</button>
       <div id="co-list" class="hint"></div></div>`;
 
     root.innerHTML = h;
@@ -160,7 +160,7 @@
     };
 
     root.querySelectorAll("[data-act]").forEach(b=> b.onclick = async ()=>{
-      const out = g("ao-out"); out.textContent=(document.getElementById("ao-scharf")||{}).checked?"läuft SCHARF…":"läuft (dry_run / Gate-Check)…";
+      const out = g("ao-out"); out.textContent=(document.getElementById("ao-scharf")||{}).checked?window.t("wlan.sharp_run"):window.t("wlan.dry");
       const res = await j(`/api/wlan/offensive/${b.dataset.act}`, {method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({bssid:val("ao-bssid"), ssid:val("ao-ssid"),

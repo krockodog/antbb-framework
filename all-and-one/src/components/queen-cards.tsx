@@ -100,7 +100,7 @@ export function QueenCards() {
                 {t("brain.queen")} · {queen}
               </p>
               <h2 className="font-heading mt-3 text-4xl leading-none">{t(`queen.${queen}.name`)}</h2>
-              <p className="mt-2 text-sm tracking-wide opacity-80">{data.kicker}</p>
+              <p className="mt-2 text-sm tracking-wide opacity-80">{t(`queen.${queen}.kicker`)}</p>
               <p className="mt-4 text-sm leading-relaxed text-foreground/85">{t(`queen.${queen}.summary`)}</p>
               <p className="mt-5 text-sm leading-relaxed">
                 <span className="mr-2 text-[0.68rem] tracking-[0.16em] uppercase opacity-60">
