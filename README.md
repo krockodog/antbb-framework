@@ -12,6 +12,75 @@ The German manual is [README.de.md](README.de.md). This file is the English over
 
 Unauthorized probing of other people's systems is a crime (German StGB § 202a–c; the US CFAA). The notice on every page does not replace a human decision.
 
+## Quick start
+
+Fresh clone on Linux (the project is tested on Debian/Ubuntu). The unit file `deploy/antbb.service` runs as `User=antbb` / `Group=antbb`, with `WorkingDirectory=/opt/antbb`, and reads `/opt/antbb/antbb.env`. The `useradd` line is the one in [DEPLOY.md](DEPLOY.md). On Debian/Ubuntu it creates the `antbb` group the unit requires, and `--create-home` creates `/opt/antbb`.
+
+1. Create the unprivileged account (this also creates the `antbb` group the unit requires):
+
+   ```bash
+   sudo useradd --system --create-home --home-dir /opt/antbb --shell /usr/sbin/nologin antbb
+   ```
+
+2. Clone, then copy the tree into `/opt/antbb`. `git clone` cannot target `/opt/antbb` directly because `useradd --create-home` already created that directory. The `rsync` flags are the ones in `DEPLOY.md`:
+
+   ```bash
+   git clone https://github.com/krockodog/antbb-framework.git
+   sudo rsync -a --exclude .git --exclude antbb.env --exclude data ./antbb-framework/ /opt/antbb/
+   ```
+
+3. Create the virtualenv the unit executes (`/opt/antbb/.venv/bin/python`) and install dependencies:
+
+   ```bash
+   sudo python3 -m venv /opt/antbb/.venv
+   sudo /opt/antbb/.venv/bin/pip install -r /opt/antbb/requirements.txt
+   ```
+
+4. Create the env file (mode 600). It is gitignored. Do not commit it.
+
+   ```bash
+   sudo cp /opt/antbb/antbb.env.example /opt/antbb/antbb.env
+   sudo chmod 600 /opt/antbb/antbb.env
+   ```
+
+5. From `/opt/antbb`, generate a hash. The command prompts; it does not take the password as an argument. Username defaults to `admin` when `ANTBB_ADMIN_USER` is unset.
+
+   ```bash
+   cd /opt/antbb
+   sudo .venv/bin/python -m antbb.webauth hash-password
+   ```
+
+6. As root (the file is mode 600), add the printed line to `/opt/antbb/antbb.env` as `ANTBB_ADMIN_PASSWORD_HASH=...`. Then give the tree to `antbb`, or that file stays unreadable by the service user:
+
+   ```bash
+   sudo chown -R antbb:antbb /opt/antbb
+   ```
+
+7. Install and start `antbb.service`, or run the same program by hand.
+
+   Service (`deploy/antbb.service` loads `antbb.env` via `EnvironmentFile`):
+
+   ```bash
+   sudo cp /opt/antbb/deploy/antbb.service /etc/systemd/system/antbb.service
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now antbb
+   ```
+
+   Or, as user `antbb` (this program does not read `antbb.env` by itself, so the file has to be sourced in the same shell):
+
+   ```bash
+   sudo -u antbb bash -c 'cd /opt/antbb && set -a && . ./antbb.env && set +a && exec .venv/bin/python -m api --host 127.0.0.1 --port 1001'
+   ```
+
+8. Open http://127.0.0.1:1001/login
+
+- Nothing starts without `ANTBB_ADMIN_PASSWORD_HASH` (or `ANTBB_ADMIN_PASSWORD`). There is no default password.
+- Do not run it as root. The entry points refuse, and the unit sets `User=antbb`.
+- The bind stays `127.0.0.1` unless you set `ANTBB_EXPOSE=1` on purpose. That opt-in logs a warning.
+- From another machine, use an SSH tunnel (`ssh -L 1001:127.0.0.1:1001 <user>@<host>`) and open the same URL locally. Do not publish the port.
+
+`./run.sh` is a different launcher (`install-and-start.sh`). It also refuses root, a missing hash, and a non-loopback bind without `ANTBB_EXPOSE=1`, and it defaults to port 8000, not 1001.
+
 ## Safety model
 
 These controls are on by default and this change does not weaken them:
@@ -25,7 +94,7 @@ These controls are on by default and this change does not weaken them:
 
 ## Install
 
-Linux, Python 3.11+, and git. Node 20 is only needed to rebuild the hub.
+The first-run path is [Quick start](#quick-start). The block below is only the clone and the virtualenv. Linux, Python 3.11+, and git. Node 20 is only needed to rebuild the hub.
 
 ```bash
 git clone https://github.com/krockodog/antbb-framework.git
