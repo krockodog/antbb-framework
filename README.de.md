@@ -10,16 +10,49 @@ Jedes echte Ergebnis – Ziele, Läufe, Befunde, Logs – mehrt den Reichtum der
 
 > Unbefugtes Ausspähen, Abfangen oder Vorbereiten von Angriffen auf Daten ist strafbar (§ 202a–c StGB; im US-Kontext der CFAA). Aktive Arbeit läuft nur mit bestätigtem Human Oversight und einem konkreten Ziel im Scope. Der Hinweis ersetzt kein Oversight.
 
+## Schnellstart
+
+Dieselben Schritte wie im englischen [Quick start](README.md#quick-start). Die Unit `deploy/antbb.service` läuft als `User=antbb` / `Group=antbb` mit `WorkingDirectory=/opt/antbb` und liest `/opt/antbb/antbb.env`. `useradd --create-home` legt `/opt/antbb` an, deshalb klont man daneben und kopiert mit dem `rsync` aus [DEPLOY.md](DEPLOY.md).
+
+```bash
+sudo useradd --system --create-home --home-dir /opt/antbb --shell /usr/sbin/nologin antbb
+git clone https://github.com/krockodog/antbb-framework.git
+sudo rsync -a --exclude .git --exclude antbb.env --exclude data ./antbb-framework/ /opt/antbb/
+sudo python3 -m venv /opt/antbb/.venv
+sudo /opt/antbb/.venv/bin/pip install -r /opt/antbb/requirements.txt
+sudo cp /opt/antbb/antbb.env.example /opt/antbb/antbb.env
+sudo chmod 600 /opt/antbb/antbb.env
+cd /opt/antbb && sudo .venv/bin/python -m antbb.webauth hash-password
+```
+
+Die ausgegebene Zeile als root in `/opt/antbb/antbb.env` schreiben: `ANTBB_ADMIN_PASSWORD_HASH=...` (kein Passwort ins Kommando). Danach Besitz abgeben, Dienst starten, http://127.0.0.1:1001/login öffnen:
+
+```bash
+sudo chown -R antbb:antbb /opt/antbb
+sudo cp /opt/antbb/deploy/antbb.service /etc/systemd/system/antbb.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now antbb
+```
+
+Direktstart, ebenfalls als `antbb` (`python -m api` liest `antbb.env` nicht selbst):
+
+```bash
+sudo -u antbb bash -c 'cd /opt/antbb && set -a && . ./antbb.env && set +a && exec .venv/bin/python -m api --host 127.0.0.1 --port 1001'
+```
+
+Ohne `ANTBB_ADMIN_PASSWORD_HASH` (oder `ANTBB_ADMIN_PASSWORD`) startet nichts. Nicht als root starten. Bind bleibt `127.0.0.1`, außer `ANTBB_EXPOSE=1` ist absichtlich gesetzt. Fernzugriff über einen SSH-Tunnel (`ssh -L 1001:127.0.0.1:1001 <user>@<host>`), nicht über einen offenen Port. `./run.sh` ist der andere Starter und nutzt standardmäßig Port 8000.
+
 ---
 
 ## Inhalt
 
-1. [Überblick](#überblick)
-2. [Red Queen – Offensive Sicherheit](#red-queen--offensive-sicherheit)
-3. [Blue Queen – Schutz & Hardening](#blue-queen--schutz--hardening)
-4. [Yellow Queen – Reverse Engineering](#yellow-queen--reverse-engineering)
-5. [Gemeinsame Bereiche: Hub, Neuronales Gehirn, Historie, Reports](#gemeinsame-bereiche)
-6. [Architektur](#architektur) · [Installation](#installation) · [Betrieb](#betrieb) · [Sicherheitsmodell](#leitplanken--sicherheitsmodell) · [Roadmap](#roadmap)
+1. [Schnellstart](#schnellstart)
+2. [Überblick](#überblick)
+3. [Red Queen – Offensive Sicherheit](#red-queen--offensive-sicherheit)
+4. [Blue Queen – Schutz & Hardening](#blue-queen--schutz--hardening)
+5. [Yellow Queen – Reverse Engineering](#yellow-queen--reverse-engineering)
+6. [Gemeinsame Bereiche: Hub, Neuronales Gehirn, Historie, Reports](#gemeinsame-bereiche)
+7. [Architektur](#architektur) · [Installation](#installation) · [Betrieb](#betrieb) · [Sicherheitsmodell](#leitplanken--sicherheitsmodell) · [Roadmap](#roadmap)
 
 ---
 
@@ -205,6 +238,8 @@ antbb.service (uvicorn, api.main:app)
 
 ## Installation
 
+Der vollständige Erststart (Benutzer `antbb`, Hash, Dienst) steht im [Schnellstart](#schnellstart). Die folgenden Schritte sind nur Klon, venv und optionale Extras.
+
 Voraussetzungen: **Linux** (getestet auf Debian/Ubuntu), **Python ≥ 3.11**, **Node.js ≥ 20** (nur für den Hub-Build), git. WLAN-Features brauchen eine WLAN-Karte mit Monitor-Modus; Greenbone/optional.
 
 ### 1. Klonen & Umgebung
@@ -219,7 +254,7 @@ python3 -m venv .venv
 ### 2. Konfiguration
 
 ```bash
-cp antbb.env.example antbb.env   # optional manuell; niemals committen (gitignore sicher)
+cp antbb.env.example antbb.env   # chmod 600, niemals committen; der Hash darin ist Pflicht zum Start
 ```
 
 Beim ersten `./run.sh` erscheint ein **KI-/Zugangs-Menü**:
@@ -248,12 +283,13 @@ cd ..
 ### 4. Starten
 
 ```bash
-python -m antbb.webauth hash-password   # Hash nach antbb.env, kein Default-Passwort
-./run.sh                                # oder:
+cd /opt/antbb && .venv/bin/python -m antbb.webauth hash-password
+sudo systemctl enable --now antbb
+# oder, mit gesourcter antbb.env, nicht als root:
 .venv/bin/python -m api --host 127.0.0.1 --port 1001
 ```
 
-Der Dienst läuft als User `antbb`, nur auf `127.0.0.1`. Vollständige Unit: `deploy/antbb.service`. Eine andere Schnittstelle braucht `ANTBB_EXPOSE=1` und loggt eine Warnung. Als root startet der Prozess nicht.
+`./run.sh` startet `install-and-start.sh` und bindet standardmäßig `127.0.0.1:8000`, nicht Port 1001. Der Dienst aus dem Schnellstart ist `antbb.service` (`User=antbb`, nur `127.0.0.1`). Eine andere Schnittstelle braucht `ANTBB_EXPOSE=1` und loggt eine Warnung. Als root startet der Prozess nicht.
 
 Danach im Browser: `http://127.0.0.1:1001` — anmelden, Hub → Königin wählen → Ziel anlegen → Scope pflegen → Oversight → Kolonie starten.
 
