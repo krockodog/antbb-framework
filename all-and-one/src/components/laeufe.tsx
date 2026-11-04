@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useI18n } from "@/i18n/language";
 import { LegalNote } from "@/components/legal-note";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { api } from "@/lib/api";
 import type { Dossier, RunRow } from "@/lib/types";
 
 export function Laeufe() {
+  const { t } = useI18n();
   const [runs, setRuns] = useState<RunRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function Laeufe() {
       })
       .catch((reason: unknown) => {
         if (!alive) return;
-        setError(reason instanceof Error ? reason.message : "Die Läufe sind nicht lesbar.");
+        setError(reason instanceof Error ? reason.message : t("laeufe.unreadable"));
       });
     return () => {
       alive = false;
@@ -37,7 +39,7 @@ export function Laeufe() {
       const next = await api<Dossier>(`/api/queens/yellow/runs/${runId}`);
       setDossier(next);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Das Dossier bleibt zu.");
+      setError(reason instanceof Error ? reason.message : t("laeufe.closed"));
     }
   }
 
@@ -50,10 +52,10 @@ export function Laeufe() {
       <div className="relative z-10 mx-auto max-w-4xl px-5 py-6 md:px-8">
         <SiteHeader />
         <header className="mt-10">
-          <p className="text-[0.72rem] tracking-[0.22em] text-[var(--gold)] uppercase">Gelbe Königin</p>
-          <h1 className="font-heading mt-3 text-5xl">Läufe</h1>
+          <p className="text-[0.72rem] tracking-[0.22em] text-[var(--gold)] uppercase">{t("laeufe.kicker")}</p>
+          <h1 className="font-heading mt-3 text-5xl">{t("laeufe.title")}</h1>
           <p className="mt-4 max-w-2xl text-foreground/75">
-            Jedes Dossier bleibt bei Gelb. Rot und Blau sehen diese Läufe nicht.
+            {t("laeufe.intro")}
           </p>
         </header>
         {error ? (
@@ -61,12 +63,12 @@ export function Laeufe() {
             {error}
           </p>
         ) : null}
-        {runs === null && !error ? <p className="mt-8 text-sm">Läufe werden gelesen.</p> : null}
+        {runs === null && !error ? <p className="mt-8 text-sm">{t("laeufe.reading")}</p> : null}
         {runs && runs.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-white/10 bg-black/25 p-5">
-            <p>Noch kein Lauf. Zuerst auf der Gelben Königin Scope und Oversight setzen.</p>
+            <p>{t("laeufe.empty")}</p>
             <Button className="mt-4" render={<Link href="/yellow" />}>
-              Zur Gelben Königin
+              {t("laeufe.goto")}
             </Button>
           </div>
         ) : null}

@@ -1,17 +1,21 @@
+"use client";
+
 import Link from "next/link";
 
-const LINKS = [
-  { href: "/", label: "Scope-Manager" },
-  { href: "/red", label: "🔴 Red Queen" },
-  { href: "/blue", label: "🛡 Blue Queen" },
-  { href: "/yellow", label: "🟡 Yellow Queen" },
-  { href: "/wlan", label: "📡 WLAN" },
-  { href: "/brain", label: "🧠 Neuronales Gehirn" },
-  { href: "/assets", label: "🔒 Eigene Assets" },
-  { href: "/history", label: "🗂️ Historie" },
-];
+import { LanguageSwitcher, useI18n } from "@/i18n/language";
 
 export function SiteHeader() {
+  const { t } = useI18n();
+  const links = [
+    { href: "/", label: t("nav.scope") },
+    { href: "/red", label: t("nav.red") },
+    { href: "/blue", label: t("nav.blue") },
+    { href: "/yellow", label: t("nav.yellow") },
+    { href: "/wlan", label: t("nav.wlan") },
+    { href: "/brain", label: t("nav.brain") },
+    { href: "/assets", label: t("nav.assets") },
+    { href: "/history", label: t("nav.history") },
+  ];
   return (
     <header className="flex flex-wrap items-center justify-between gap-4">
       <Link href="/" className="group block">
@@ -23,7 +27,7 @@ export function SiteHeader() {
         </span>
       </Link>
       <nav className="flex flex-wrap items-center gap-1 text-sm">
-        {LINKS.map((link) => (
+        {links.map((link) => (
           <Link
             key={link.href}
             href={link.href}
@@ -32,6 +36,7 @@ export function SiteHeader() {
             {link.label}
           </Link>
         ))}
+        <LanguageSwitcher />
       </nav>
     </header>
   );

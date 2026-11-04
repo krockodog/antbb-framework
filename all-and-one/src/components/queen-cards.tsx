@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useI18n } from "@/i18n/language";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -61,6 +62,7 @@ const STATIC: Record<QueenId, QueenSummary> = {
 };
 
 export function QueenCards() {
+  const { t } = useI18n();
   const [rows, setRows] = useState<QueenSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,7 +87,7 @@ export function QueenCards() {
     <div className="mt-12">
       {error ? (
         <p className="mb-4 text-sm text-[var(--gold)]" role="status">
-          Live-Status wartet auf die API. {error}
+          {t("queen.api_down")} {error}
         </p>
       ) : null}
       <div className="grid gap-4 md:grid-cols-3">
@@ -95,16 +97,16 @@ export function QueenCards() {
           return (
             <article key={queen} className="queen-card" data-queen={queen}>
               <p className="text-[0.68rem] tracking-[0.22em] uppercase opacity-80">
-                Königin · {queen === "red" ? "Rot" : queen === "blue" ? "Blau" : "Gelb"}
+                {t("brain.queen")} · {queen}
               </p>
-              <h2 className="font-heading mt-3 text-4xl leading-none">{data.name}</h2>
+              <h2 className="font-heading mt-3 text-4xl leading-none">{t(`queen.${queen}.name`)}</h2>
               <p className="mt-2 text-sm tracking-wide opacity-80">{data.kicker}</p>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/85">{data.summary}</p>
+              <p className="mt-4 text-sm leading-relaxed text-foreground/85">{t(`queen.${queen}.summary`)}</p>
               <p className="mt-5 text-sm leading-relaxed">
                 <span className="mr-2 text-[0.68rem] tracking-[0.16em] uppercase opacity-60">
-                  Live-Status
+                  {t("hub.live_status")}
                 </span>
-                {loading ? "wird gelesen." : data.live_satz}
+                {loading ? t("queen.live_pending") : data.live_satz}
               </p>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {data.soldier_ids.map((id) => (
@@ -117,7 +119,7 @@ export function QueenCards() {
                 href={data.href}
                 className={cn(buttonVariants({ size: "lg" }), "queen-cta mt-6 h-10 px-4")}
               >
-                {data.cta}
+                {t(`queen.${queen}.cta`)}
               </Link>
             </article>
           );

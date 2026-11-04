@@ -1,15 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Reports · All and One{% endblock %}
+{% block title %}{{ t('reports.title') }} · All and One{% endblock %}
 {% block content %}
-<p><a href="/history">← Historie</a></p>
-<h2>Reports</h2>
-<p class="hint">Fester Ablageort je Königin: <code>data/reports/&lt;red|blue|yellow&gt;/</code> (HTML + PDF, PDF-Engine: {{ engine or "keine – nur HTML" }}).</p>
+<p><a href="/history">← {{ t('reports.back') }}</a></p>
+<h2>{{ t('reports.title') }}</h2>
+<p class="hint">{{ t('reports.hint', engine=engine or t('reports.engine_none')) }}</p>
 <section class="card">
-  <h3>Report erzeugen</h3>
+  <h3>{{ t('reports.create') }}</h3>
   <form id="rep-gen" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-    <select name="queen"><option value="red">Red · Ziel-ID</option><option value="blue">Blue · Lauf-ID</option><option value="yellow">Yellow · Fall-ID</option></select>
+    <select name="queen">
+      <option value="red">{{ t('reports.red_id') }}</option>
+      <option value="blue">{{ t('reports.blue_id') }}</option>
+      <option value="yellow">{{ t('reports.yellow_id') }}</option>
+    </select>
     <input name="ref" placeholder="ID" required style="max-width:240px">
-    <button type="submit">PDF erzeugen</button>
+    <button type="submit">{{ t('reports.make') }}</button>
     <span id="rep-out" class="hint"></span>
   </form>
 </section>
@@ -19,7 +23,7 @@
   <ul>
   {% for r in reports[q] %}
     <li><a href="{{ r.url }}" target="_blank">{{ r.name }}</a> <small>· {{ r.kind }} · {{ r.size_kb }} KB · {{ r.when }}</small></li>
-  {% else %}<li>Noch keine Reports.</li>{% endfor %}
+  {% else %}<li>{{ t('reports.empty') }}</li>{% endfor %}
   </ul>
 </section>
 {% endfor %}
@@ -30,14 +34,15 @@
   var q=new URLSearchParams(location.search);
   if(q.get("queen")){f.queen.value=q.get("queen");} if(q.get("ref")){f.ref.value=q.get("ref");}
   f.addEventListener("submit",function(e){
-    e.preventDefault(); o.textContent="erzeuge…";
+    e.preventDefault();
+    o.textContent=window.t("reports.working");
     var b={queen:f.queen.value}; b[key[f.queen.value]]=f.ref.value;
     fetch("/api/reports/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
       .then(function(r){return r.json();}).then(function(d){
-        if(!d.ok){o.textContent="Fehler: "+(d.detail||d.error||"");return;}
-        o.innerHTML=d.pdf?'<a href="'+d.pdf+'" target="_blank">PDF öffnen</a>':'Kein PDF ('+(d.note||'keine Engine')+') – <a href="'+d.html+'" target="_blank">HTML</a>';
+        if(!d.ok){o.textContent=window.t("reports.error")+": "+(d.detail||d.error||"");return;}
+        o.innerHTML=d.pdf?'<a href="'+d.pdf+'" target="_blank">'+window.t("reports.open_pdf")+'</a>':window.t("reports.no_pdf")+' – <a href="'+d.html+'" target="_blank">HTML</a>';
         setTimeout(function(){location.reload();},1500);
-      }).catch(function(){o.textContent="Fehler.";});
+      }).catch(function(){o.textContent=window.t("reports.error");});
   });
 })();
 </script>
