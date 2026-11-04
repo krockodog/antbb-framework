@@ -2506,99 +2506,6 @@ async def _on_startup() -> None:
         svc.store.purge_expired_sessions()
     except Exception:
         pass
-    if webauth_mod.auth_enabled():
-        try:
-            created = webauth_mod.bootstrap_admin(svc.store)
-            if created:
-                # NIE das Passwort loggen – nur den Benutzernamen.
-                print(f"[antbb.auth] Admin '{created}' aus ENV angelegt.")
-        except Exception:
-            pass
-
-
-# ==========================================================================
-#  Optionale Authentifizierung (ANTBB_AUTH=1). Default: AUS (Einzelnutzer).
-# ==========================================================================
-_AUTH_PUBLIC_EXACT = {"/login", "/logout", "/api/health", "/favicon.ico"}
-
-
-def _auth_is_public(path: str) -> bool:
-    if path in _AUTH_PUBLIC_EXACT:
-        return True
-    return path.startswith("/static") or path.startswith("/ws")
-
-
-def _auth_needs_admin(path: str, method: str) -> bool:
-    """Human-only-Aktionen (brain-reset/delete) bleiben strikt admin-geschuetzt."""
-    if not path.startswith("/api/brain"):
-        return False
-    if method == "DELETE":
-        return True
-    if method == "POST" and ("/reset" in path):
-        return True
-    return False
-
-
-@app.middleware("http")
-async def _auth_middleware(request: Request, call_next):
-    if not webauth_mod.auth_enabled():
-        return await call_next(request)
-    path = request.url.path
-    if _auth_is_public(path):
-        return await call_next(request)
-    token = request.cookies.get(webauth_mod.COOKIE_NAME)
-    sess = None
-    try:
-        sess = webauth_mod.session_user(svc.store, token)
-    except Exception:
-        sess = None
-    if not sess:
-        if path.startswith("/api"):
-            return JSONResponse({"error": "Authentifizierung erforderlich"}, status_code=401)
-        return RedirectResponse(url=f"/login?next={path}", status_code=303)
-    # Rollen-Gate fuer human-only-Aktionen
-    if _auth_needs_admin(path, request.method) and sess["role"] != "admin":
-        return JSONResponse(
-            {"error": "Nur Admins duerfen diese human-only-Aktion ausfuehren."},
-            status_code=403)
-    request.state.user = {"username": sess["username"], "role": sess["role"]}
-    return await call_next(request)
-
-
-@app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, next: str = "/", error: str = ""):
-    return templates.TemplateResponse(request, "login.html", {
-        "next": next, "error": error, "disclaimer": DISCLAIMER_TEXT,
-    })
-
-
-@app.post("/login")
-def login_submit(username: str = Form(...), password: str = Form(...),
-                 next: str = Form("/")):
-    row = webauth_mod.authenticate(svc.store, username, password)
-    if not row:
-        return RedirectResponse(
-            url="/login?error=Benutzername+oder+Passwort+falsch", status_code=303)
-    token = webauth_mod.start_session(svc.store, row)
-    dest = next if (next or "").startswith("/") else "/"
-    resp = RedirectResponse(url=dest, status_code=303)
-    resp.set_cookie(webauth_mod.COOKIE_NAME, token, httponly=True,
-                    samesite="lax", max_age=86400 * 7)
-    return resp
-
-
-@app.get("/logout")
-@app.post("/logout")
-def logout(request: Request):
-    token = request.cookies.get(webauth_mod.COOKIE_NAME)
-    if token:
-        try:
-            svc.store.delete_session(token)
-        except Exception:
-            pass
-    resp = RedirectResponse(url="/login", status_code=303)
-    resp.delete_cookie(webauth_mod.COOKIE_NAME)
-    return resp
 
 
 @app.get("/api/auth/status")
@@ -2612,6 +2519,10 @@ def api_auth_status(request: Request):
 # ==========================================================================
 @app.websocket("/ws/feed")
 async def ws_feed(ws: WebSocket):
+    from ..webguard import assert_websocket
+    if not assert_websocket(ws):
+        await ws.close(code=1008)
+        return
     await ws.accept()
     q = FEED_HUB.register()
     try:
@@ -3043,3 +2954,10 @@ def api_reports_generate(payload: Optional[dict] = None):
     except (rs.ReportError, TypeError, ValueError) as exc:
         return JSONResponse({"ok": False, "detail": str(exc)}, status_code=400)
     return JSONResponse(res)
+
+
+# Login, session cookies, CSRF, and the loopback guard. Installed last so
+# every route above is behind it. Health stays public; everything else does not.
+from ..webguard import install as _install_webguard  # noqa: E402
+
+_install_webguard(app, lambda: svc.store)

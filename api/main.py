@@ -259,6 +259,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "extensions": getattr(app.state, "extensions_mount", None),
         }
 
+    from antbb.webguard import install as install_webguard
+
+    # Login routes must be registered before the UI catch-all.
+    install_webguard(app)
     web_root = Path(os.environ.get("ALLONE_WEB_ROOT", Path(__file__).resolve().parents[1] / "all-and-one" / "out"))
     attach_ui(app, web_root)
     return app

@@ -320,7 +320,22 @@ def test_honeypot_agent_starts_canary_only_with_oversight(tmp_path):
         honeypot.stop_canary()
 
 
-def test_hardening_apply_is_gated_and_rechecks(monkeypatch):
+def test_hardening_apply_is_gated_and_rechecks(monkeypatch, tmp_path):
+    # The lockout check reads authorized_keys from the account home. Point it
+    # at a lab key so the test does not depend on the developer machine.
+    home = tmp_path / "home"
+    (home / ".ssh").mkdir(parents=True)
+    (home / ".ssh" / "authorized_keys").write_text(
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILabKeyOnlyNotASecret test@lab\n",
+        encoding="utf-8",
+    )
+
+    class _Pw:
+        pw_dir = str(home)
+        pw_name = "antbb-test"
+
+    monkeypatch.setattr("pwd.getpwuid", lambda _uid: _Pw())
+    monkeypatch.setattr("pwd.getpwnam", lambda _name: _Pw())
     ssh = CheckResult(
         "ssh-password-auth", "SSH PasswordAuthentication", "fail",
         "PasswordAuthentication=yes", "PasswordAuthentication no", "medium",

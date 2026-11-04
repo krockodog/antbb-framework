@@ -34,7 +34,8 @@ with db.conn():  # Schema anlegen (data/yellow.db)
 async def headers(request: Request, call_next):
     resp = await call_next(request)
     resp.headers["X-Content-Type-Options"] = "nosniff"
-    resp.headers["Content-Security-Policy"] = "frame-ancestors http://192.168.2.7:1001 http://127.0.0.1:1001 'self'"
+    origin = getattr(config, "PUBLIC_ORIGIN", "http://127.0.0.1:1001")
+    resp.headers["Content-Security-Policy"] = f"frame-ancestors {origin} 'self'"
     resp.headers["Referrer-Policy"] = "no-referrer"
     return resp
 
@@ -213,7 +214,17 @@ from .. import orchestrator as _orch
 def _orch_dir(case_id: str) -> Path:
     if not CASE_RX.match(case_id):
         raise HTTPException(400, "case_id ungültig")
-    return _orch.case_dir(Path(config.DATA_DIR), case_id)
+    case = None
+    try:
+        case = db.get_case(case_id)
+    except Exception:
+        case = None
+    return _orch.resolve_case_directory(
+        case_id,
+        cases_dir=config.CASES_DIR,
+        data_dir=config.DATA_DIR,
+        case_path=(case or {}).get("case_path") if case else None,
+    )
 
 
 @app.get("/yellow/case/{case_id}/orchestrate/state")
@@ -231,5 +242,20 @@ def orch_step(case_id: str, payload: dict):
         Path(config.DATA_DIR), case_id,
         str(payload.get("action") or ""),
         bool(payload.get("oversight_ok")),
+        directory=d,
     )
     return JSONResponse(result)
+
+
+def _install_platform_guard() -> None:
+    """Same login wall as the main console when this app is served alone."""
+    import sys
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from antbb.webguard import install
+
+    install(app)
+
+
+_install_platform_guard()

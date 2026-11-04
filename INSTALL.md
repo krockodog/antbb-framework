@@ -17,6 +17,8 @@ bash install-and-start.sh
 Ausgabe z. B. `Startseite: http://127.0.0.1:8000/`  
 `./run.sh` ist ein Wrapper. Port: `ANTBB_PORT=1001 bash install-and-start.sh`
 
+The web UI binds to **127.0.0.1** only. Another interface needs `ANTBB_EXPOSE=1` and logs a warning. The process refuses to start as root and refuses to start until `ANTBB_ADMIN_PASSWORD_HASH` is set (no default password; `python -m antbb.webauth hash-password`). On a TTY the installer asks once and stores only the hash in `antbb.env` (chmod 600).
+
 ## KI-/Zugangs-Menü beim Start (interaktiv)
 
 `./run.sh` / `install-and-start.sh` fragt:

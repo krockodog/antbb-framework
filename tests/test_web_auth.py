@@ -9,9 +9,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ["ANTBB_NO_LLM"] = "1"
-os.environ["ANTBB_AUTH"] = "1"
-os.environ["ANTBB_ADMIN_USER"] = "rootadmin"
-os.environ["ANTBB_ADMIN_PASSWORD"] = "AdminPass!234"
 os.environ["ANTBB_DB"] = "/tmp/antbb_test_webauth_mw.db"
 if os.path.exists("/tmp/antbb_test_webauth_mw.db"):
     os.remove("/tmp/antbb_test_webauth_mw.db")
@@ -22,6 +19,28 @@ from antbb import webauth
 
 
 def run():
+    from antbb.store import Store
+
+    os.environ["ANTBB_AUTH"] = "1"
+    os.environ["ANTBB_ADMIN_USER"] = "rootadmin"
+    os.environ["ANTBB_ADMIN_PASSWORD"] = "AdminPass!234"
+    db = "/tmp/antbb_test_webauth_mw.db"
+    if os.path.exists(db):
+        os.remove(db)
+    previous = svc.store
+    svc.store = Store(db)
+    try:
+        _run_body()
+    finally:
+        svc.store.close()
+        svc.store = previous
+        os.environ.pop("ANTBB_AUTH", None)
+        os.environ.pop("ANTBB_ADMIN_USER", None)
+        os.environ.pop("ANTBB_ADMIN_PASSWORD", None)
+        os.environ.pop("ANTBB_ADMIN_PASSWORD_HASH", None)
+
+
+def _run_body():
     with TestClient(app) as client:
         client.follow_redirects = False
         # unauth -> HTML redirect, API 401, aber /login + static frei
@@ -53,9 +72,11 @@ def run():
         # normaler Lesezugriff: viewer -> 200
         assert client.get("/api/targets", headers=vhdr).status_code == 200
 
-    # Aufraeumen der Test-Env, damit andere Tests im selben Prozess nicht erben
-    os.environ.pop("ANTBB_AUTH", None)
     print("[test_web_auth] OK — Redirect/401, Login, Session, Rollen-Gate.")
+
+
+def test_web_auth_flow():
+    run()
 
 
 if __name__ == "__main__":

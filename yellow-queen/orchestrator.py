@@ -35,6 +35,38 @@ def case_dir(data_root: Path, case_id: str) -> Path:
     return d
 
 
+def resolve_case_directory(case_id: str, *, cases_dir: Path, data_dir: Path,
+                           case_path: str | None = None) -> Path:
+    """Case folder for orchestrate steps.
+
+    Real cases live in ``CASES_DIR/<id>/evidence`` (the queen pipeline).
+    ``DATA_DIR/cases`` is only a legacy fallback when that tree already holds
+    the sample and the canonical folder does not. New work is never created
+    under ``DATA_DIR/cases``.
+    """
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", case_id) or "case"
+    if case_path:
+        path = Path(case_path)
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "evidence").mkdir(parents=True, exist_ok=True)
+        return path
+    canonical = Path(cases_dir) / safe
+    legacy = Path(data_dir) / "cases" / safe
+    if _has_sample(canonical) or not _has_sample(legacy):
+        canonical.mkdir(parents=True, exist_ok=True)
+        (canonical / "evidence").mkdir(parents=True, exist_ok=True)
+        return canonical
+    return legacy
+
+
+def _has_sample(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    if (path / "evidence" / "sample.bin").is_file():
+        return True
+    return _find_case_file(path) is not None
+
+
 def load_state(d: Path) -> dict:
     f = d / "orchestrator.json"
     if f.is_file():
@@ -52,7 +84,10 @@ def save_state(d: Path, state: dict) -> None:
 
 
 def _find_case_file(d: Path) -> Path | None:
-    for sub in ("uploads", "sample", ""):
+    sample_bin = d / "evidence" / "sample.bin"
+    if sample_bin.is_file():
+        return sample_bin
+    for sub in ("evidence", "uploads", "sample", ""):
         root = d / sub if sub else d
         if root.is_dir():
             for p in sorted(root.rglob("*")):
@@ -306,12 +341,12 @@ def next_steps(state: dict) -> list[dict]:
 
 
 def run_step(data_root: Path, case_id: str, action: str,
-             oversight_ok: bool, runner=None) -> dict:
+             oversight_ok: bool, runner=None, directory: Path | None = None) -> dict:
     if not oversight_ok:
         return {"ok": False, "error": "Human-Oversight erforderlich für aktive Analyse."}
     if action not in ("triage", "diec", "unpack", "ghidra", "ghidra-mcp", "frida"):
         return {"ok": False, "error": f"unbekannter Schritt '{action}'"}
-    d = case_dir(data_root, case_id)
+    d = directory if directory is not None else case_dir(data_root, case_id)
     state = load_state(d)
     sample = _find_case_file(d)
     findings = state.get("findings") or {}

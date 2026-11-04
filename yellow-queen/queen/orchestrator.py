@@ -95,7 +95,7 @@ def run_case(case_id: str, gate: GateResult) -> dict[str, Any]:
             "dossier_path": f"/yellow/case/{case_id}/dossier.md", "ledger_path": f"/yellow/case/{case_id}/ledger.md",
             "links": {"case": f"/yellow/case/{case_id}", "dossier": f"/yellow/case/{case_id}/dossier.md", "ledger": f"/yellow/case/{case_id}/ledger.md",
                       "evidence": [f"/yellow/case/{case_id}/evidence/{f}" for r in results for f in r.evidence],
-                      "canonical_brain": "http://192.168.2.7:1001/brain"},
+                      "canonical_brain": neural_brain.CANONICAL_BRAIN},
         }
         neural_brain.write_snapshot(case_id, snap)
 

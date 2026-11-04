@@ -1,0 +1,20 @@
+# The process binds 127.0.0.1. host networking makes that the host loopback
+# on Linux. Do not publish 0.0.0.0. Set the admin hash in antbb.env (gitignored).
+services:
+  antbb:
+    build: .
+    network_mode: host
+    user: "1000:1000"
+    env_file:
+      - path: antbb.env
+        required: false
+    environment:
+      ANTBB_HOST: 127.0.0.1
+      ANTBB_PORT: "1001"
+      ALLONE_HOST: 127.0.0.1
+      ALLONE_PORT: "1001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

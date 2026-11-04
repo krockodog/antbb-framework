@@ -40,10 +40,11 @@ All and One - RED-BLUE-Yellow-Ant-Team · install.sh
   --noninteractive   AI-Setup mit Defaults, keine Rueckfragen
   --install-tools    Fehlende System-Tools je Koenigin nachziehen (sudo)
   --dry-run          Alles vorbereiten, aber den Server NICHT starten
-  --host H           Bind-Host (Default: ${HOST})
+  --host H           Bind-Host (Default: ${HOST}; other interfaces need ANTBB_EXPOSE=1)
   --port P           Bind-Port (Default: ${PORT})
   -h | --help        Diese Hilfe
-Env: ANTBB_HOST, ANTBB_PORT, ANTBB_NONINTERACTIVE=1, ANTBB_INSTALL_TOOLS=1
+Env: ANTBB_HOST, ANTBB_PORT, ANTBB_EXPOSE=1, ANTBB_NONINTERACTIVE=1, ANTBB_INSTALL_TOOLS=1
+     ANTBB_ADMIN_PASSWORD_HASH (required to start; no default password)
 USG
 }
 

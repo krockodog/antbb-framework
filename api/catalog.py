@@ -10,11 +10,11 @@ DESCRIPTION = (
     "über Reverse Engineering bis zum Schutz und Hardening helfen."
 )
 FOOTER = "All and One · Red · Blue · Yellow"
-SURFACE_HOST = "192.168.2.7"
+SURFACE_HOST = "127.0.0.1"
 SURFACE_PORT = 1001
-SURFACE_ORIGIN = "http://192.168.2.7:1001"
+SURFACE_ORIGIN = "http://127.0.0.1:1001"
 ANTBB_UNIT = "antbb.service"
-ANTBB_WORKDIR = "/home/lordix/antbb"
+ANTBB_WORKDIR = "/opt/antbb"
 NOUNS = (
     "Königin",
     "Soldaten",

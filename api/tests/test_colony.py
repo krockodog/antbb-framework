@@ -74,14 +74,14 @@ def test_meta_brand_and_vocabulary(client: TestClient) -> None:
     ):
         assert noun in body["nouns"]
     assert body["surface"] == {
-        "host": "192.168.2.7",
+        "host": "127.0.0.1",
         "port": 1001,
         "process": "one",
-        "origin": "http://192.168.2.7:1001",
+        "origin": "http://127.0.0.1:1001",
     }
     assert body["service"] == {
         "unit": "antbb.service",
-        "working_directory": "/home/lordix/antbb",
+        "working_directory": "/opt/antbb",
     }
     assert body["roles"]["red"] == "Red-Teaming"
     assert body["roles"]["blue"] == "Blue Safety-Teaming"
@@ -453,18 +453,23 @@ def test_one_process_serves_surface(client: TestClient) -> None:
 
 
 def test_docs_use_official_name() -> None:
-    for relative in ("README.md", "DEMO.md", "DEPLOY.md", "docs/wortschatz.md"):
+    for relative in ("README.md", "README.de.md", "DEMO.md", "DEPLOY.md", "docs/wortschatz.md"):
         text = (ROOT / relative).read_text(encoding="utf-8")
         assert PRODUCT in text
         assert "Monster" not in text
         assert "Ameisen-Schwarm" not in text
+    german = (ROOT / "README.de.md").read_text(encoding="utf-8")
+    assert DESCRIPTION in german
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert DESCRIPTION in readme
+    assert "127.0.0.1" in readme
+    assert "default-deny" in readme
+    assert "Oversight" in readme
     deploy = (ROOT / "DEPLOY.md").read_text(encoding="utf-8")
-    assert "http://192.168.2.7:1001" in deploy
-    assert "/home/lordix/antbb" in deploy
+    assert "http://127.0.0.1:1001" in deploy
+    assert "/opt/antbb" in deploy
     assert "antbb.service" in deploy
-    assert "cap_net_bind_service" in deploy
+    assert "User=antbb" in deploy
+    assert "cap_net_bind_service" not in deploy
     assert "Red-Teaming" in deploy
     assert "Yellow Reverse-Teaming" in deploy
     assert "Blue Safety-Teaming" in deploy
@@ -472,9 +477,12 @@ def test_docs_use_official_name() -> None:
     for relative in ("README.md", "DEMO.md", "run.sh", "api/main.py", "api/catalog.py"):
         assert "1020" not in (ROOT / relative).read_text(encoding="utf-8")
     unit = (ROOT / "deploy" / "antbb.service").read_text(encoding="utf-8")
-    assert "WorkingDirectory=/home/lordix/antbb" in unit
+    assert "WorkingDirectory=/opt/antbb" in unit
+    assert "User=antbb" in unit
     assert "ALLONE_PORT=1001" in unit
     assert "--port 1001" in unit
+    assert "127.0.0.1" in unit
+    assert "cap_net_bind_service" not in unit
     assert "1020" not in unit
     assert "1016" not in unit
     hub = (ROOT / "all-and-one" / "src" / "app" / "page.tsx").read_text(encoding="utf-8")

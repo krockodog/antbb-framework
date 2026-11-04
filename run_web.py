@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Startet den antbb-Webserver."""
-import os
-import uvicorn
+"""Start the antbb web UI on 127.0.0.1 as an unprivileged user.
+
+Binding anywhere else requires ANTBB_EXPOSE=1. A password hash is required.
+"""
+from antbb.serve import main
 
 if __name__ == "__main__":
-    host = os.environ.get("ANTBB_WEB_HOST", "127.0.0.1")
-    port = int(os.environ.get("ANTBB_WEB_PORT", "8000"))
-    uvicorn.run("antbb.web.app:app", host=host, port=port, reload=False)
+    main()
