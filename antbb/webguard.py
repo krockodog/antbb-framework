@@ -56,11 +56,15 @@ def _wants_json(request: Request) -> bool:
 
 
 def _public(path: str, method: str) -> bool:
-    if method in {"GET", "HEAD"} and path == "/api/health":
+    if method in {"GET", "HEAD"} and path in {"/api/health", "/healthz"}:
         return True
     if method in {"GET", "HEAD"} and path.startswith("/api/health/"):
         queen = path.removeprefix("/api/health/").strip("/")
         return queen in _HEALTH_QUEENS and "/" not in queen
+    if method in {"GET", "HEAD"}:
+        from . import hosted
+        if hosted.enabled() and hosted.login_asset(path):
+            return True
     if path == "/login" and method in {"GET", "HEAD", "POST"}:
         return True
     if path == "/api/login" and method == "POST":
@@ -72,6 +76,9 @@ def _mode(request: Request) -> str:
     """auth | off | unconfigured."""
     if webauth.auth_enabled():
         return "auth"
+    from . import hosted
+    if hosted.enabled():
+        return "unconfigured"
     host = _server_host(request.scope)
     if host in {"testserver", "testclient"} or os.environ.get("ANTBB_TESTING", "").strip() in {
         "1", "true", "yes", "on",
@@ -81,6 +88,9 @@ def _mode(request: Request) -> str:
 
 
 def cookie_secure(request: Request) -> bool:
+    from . import hosted
+    if hosted.enabled():
+        return True
     if os.environ.get("ANTBB_COOKIE_SECURE", "").strip().lower() in {"1", "true", "yes", "on"}:
         return True
     if request.url.scheme == "https":
@@ -151,12 +161,17 @@ def safe_next(target: str) -> str:
     return value
 
 
+def _samesite() -> str:
+    from . import hosted
+    return "strict" if hosted.enabled() else "lax"
+
+
 def _set_session_cookie(response, request: Request, token: str) -> None:
     response.set_cookie(
         webauth.COOKIE_NAME,
         token,
         httponly=True,
-        samesite="lax",
+        samesite=_samesite(),
         secure=cookie_secure(request),
         max_age=86400 * 7,
         path="/",
@@ -166,7 +181,7 @@ def _set_session_cookie(response, request: Request, token: str) -> None:
         webauth.CSRF_COOKIE,
         csrf,
         httponly=False,
-        samesite="lax",
+        samesite=_samesite(),
         secure=cookie_secure(request),
         max_age=86400 * 7,
         path="/",
@@ -242,6 +257,12 @@ def _attempt_login(store, request: Request, username: str, password: str, nxt: s
         return _fail_login(request, status=403, detail=t("login.error_csrf"), nxt=nxt)
     key = _client_key(request, username)
     limited = webauth.login_rate_limited(key)
+    from . import hosted
+    # Hosted mode also counts failures per username across all client IPs,
+    # so rotating source addresses does not reset the budget.
+    global_key = f"*|{(username or '').strip().lower()}" if hosted.enabled() else None
+    if global_key and webauth.login_rate_limited(global_key, scale=3):
+        limited = True
     row = webauth.authenticate(store, username, password)
     if limited:
         return _fail_login(
@@ -250,11 +271,15 @@ def _attempt_login(store, request: Request, username: str, password: str, nxt: s
         )
     if not row:
         webauth.note_login_failure(key)
+        if global_key:
+            webauth.note_login_failure(global_key)
         return _fail_login(
             request, status=401,
             detail=t("login.error_bad"), nxt=nxt,
         )
     webauth.clear_login_failures(key)
+    if global_key:
+        webauth.clear_login_failures(global_key)
     token = webauth.start_session(store, row)
     dest = safe_next(nxt)
     if request.url.path.startswith("/api") or _wants_json(request):
@@ -358,6 +383,12 @@ def install(app: FastAPI, store_getter: Optional[Callable] = None) -> None:
 
     existing = {getattr(route, "path", None) for route in app.router.routes}
 
+    if "/healthz" not in existing:
+        @app.get("/healthz", include_in_schema=False)
+        def healthz():
+            # Liveness only. No version, no config, no session needed.
+            return {"ok": True}
+
     if "/login" not in existing:
         @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
         def login_page(request: Request, next: str = "/", error: str = ""):
@@ -410,6 +441,11 @@ def install(app: FastAPI, store_getter: Optional[Callable] = None) -> None:
             response.delete_cookie(webauth.COOKIE_NAME, path="/")
             response.delete_cookie(webauth.CSRF_COOKIE, path="/")
             return response
+
+    # Hosted mode (ANTBB_HOSTED=1) goes last so it is the outermost layer:
+    # security headers on every response, strict CSRF, fail closed.
+    from . import hosted
+    hosted.install(app)
 
 
 def assert_websocket(ws) -> bool:

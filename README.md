@@ -349,6 +349,22 @@ curl -s http://127.0.0.1:1001/api/health
 - **Logs:** `journalctl -u antbb -f`.
 - **Bind and account:** the service from the Quick start listens on `127.0.0.1:1001` as user `antbb`. Day-to-day operation does not change that.
 
+## Gehostet betreiben (Oracle Cloud Free / Tailscale Funnel)
+
+Für den Betrieb im Internet gibt es den Hosted-Modus (`ANTBB_HOSTED=1`, im Docker-Image Standard).
+Die App lauscht nur auf `127.0.0.1:1001`; davor sitzt ein TLS-Proxy auf demselben Host.
+
+- **Oracle Cloud Always Free (Ampere A1, arm64) + Caddy + eigene Domain:** `deploy/oracle-free.md`,
+  Host-Setup mit `sudo ANTBB_DOMAIN=<domain> deploy/oracle-setup.sh` (Docker, iptables 80/443, Caddy mit Let's Encrypt).
+- **Optional Tailscale Funnel** (ohne Domain, `*.ts.net`): `deploy/tailscale-funnel.md`, `deploy/funnel.sh on|off|status|url`.
+
+Der Hosted-Modus startet nur mit `ANTBB_ADMIN_PASSWORD_HASH` (erzeugen: `deploy/make-password-hash.sh`),
+lehnt Klartext-Passwort, `ANTBB_EXPOSE=1` und `ANTBB_TESTING=1` ab, setzt Session-Cookies `Secure; HttpOnly; SameSite=Strict`,
+CSP/HSTS/X-Frame-Options/X-Content-Type-Options/Referrer-Policy auf jeder Antwort, prüft CSRF für jede
+schreibende Anfrage, begrenzt Fehlversuche beim Login und verlangt **für jeden Scan** Oversight und mindestens
+einen Scope-Eintrag – serverseitig, nicht nur in der Oberfläche. Ohne Session ist nur `/healthz` erreichbar.
+Prüfen: `ANTBB_TEST_PASSWORD='…' deploy/smoke-hosted.sh https://<domain>`.
+
 ## Guardrails and safety model
 
 1. **Default-deny scope.** Empty means no target and no run.

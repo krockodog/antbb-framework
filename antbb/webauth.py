@@ -155,8 +155,8 @@ def authenticate(store: Store, username: str, password: str):
     return None
 
 
-def login_rate_limited(key: str) -> bool:
-    limit = int(os.environ.get("ANTBB_LOGIN_MAX_ATTEMPTS", "8"))
+def login_rate_limited(key: str, scale: int = 1) -> bool:
+    limit = int(os.environ.get("ANTBB_LOGIN_MAX_ATTEMPTS", "8")) * max(1, scale)
     window = float(os.environ.get("ANTBB_LOGIN_WINDOW", "600"))
     now = time.monotonic()
     stamps = [stamp for stamp in _FAILS.get(key, []) if now - stamp < window]

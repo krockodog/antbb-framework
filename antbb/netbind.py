@@ -128,9 +128,11 @@ def assert_not_root() -> None:
 
 def assert_runtime_safe(host: str | None = None) -> str:
     """Checks used by the official entry points before the socket opens."""
+    from antbb import hosted
     from antbb.webauth import credentials_configured
 
     assert_not_root()
+    hosted.assert_ready()
     if os.environ.get("ANTBB_TESTING", "").strip().lower() in _TRUTHY:
         raise SystemExit(
             "Refusing to start: ANTBB_TESTING=1 is for the test suite only."

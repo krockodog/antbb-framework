@@ -1,0 +1,23 @@
+# Caddy reverse proxy for All and One (antbb), hosted mode.
+# deploy/oracle-setup.sh renders this to /etc/caddy/Caddyfile and replaces
+# __ANTBB_DOMAIN__ (e.g. antbb.example.org). Caddy gets the Let's Encrypt
+# certificate itself (HTTP-01 on :80, TLS-ALPN on :443) and redirects HTTP to HTTPS.
+# The app listens on 127.0.0.1:1001 only; Caddy is the only public listener.
+{
+	# __ACME_EMAIL_LINE__
+	admin localhost:2019
+}
+
+__ANTBB_DOMAIN__ {
+	encode zstd gzip
+	# Caddy sets X-Forwarded-For / -Proto / -Host. uvicorn trusts them only
+	# from 127.0.0.1 (FORWARDED_ALLOW_IPS), which is this proxy.
+	reverse_proxy 127.0.0.1:1001
+	header -Server
+	log {
+		output file /var/log/caddy/antbb-access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

@@ -148,6 +148,8 @@ class AntBBService:
                 "Target ist archiviert (Papierkorb) – bitte zuerst wiederherstellen, "
                 "bevor ein Scan läuft."
             )
+        from .hosted import require_scan_gates
+        require_scan_gates(self.store, target_id)  # Hosted-Modus: harte Gates
         status = self.mode_status(target_id)
         if not status["offensive_allowed"]:
             # Kein Offensiv erlaubt (defensive policy ODER kein Oversight/Scope):
@@ -936,6 +938,14 @@ class AntBBService:
                  emit: Optional[Callable[[dict], None]] = None):
         """Startet die Verteidigungs-Kolonie (Blue Queen). Default: read-only."""
         from .blue_queen import BlueQueen, PHASES as BP
+        from . import hosted
+        if hosted.enabled():
+            from .oversight import OversightError
+            if apply_fixes and oversight_ack is not True:
+                raise OversightError(
+                    "BLOCKIERT (Hosted-Modus): Fixes anwenden braucht Oversight.")
+            if target_id is not None:
+                hosted.require_scan_gates(self.store, target_id)
         queen = BlueQueen(self.store, logger=self.logger, emit=emit, use_llm=False)
         return queen.run_colony_sync(
             target_id=target_id, phases=phases or BP,

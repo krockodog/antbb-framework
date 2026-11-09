@@ -1,4 +1,5 @@
 .git
+.github
 .venv
 venv
 data
@@ -11,7 +12,15 @@ antbb.env
 *.sqlite3
 *.pcap
 *.cap
+*.enc
+*.key
+*.log
 __pycache__
+**/__pycache__
 .pytest_cache
 *.pyc
 .cursor
+all-and-one/node_modules
+all-and-one/.next
+all-and-one/out
+cf_tunnel.*

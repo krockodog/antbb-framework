@@ -1,20 +1,39 @@
-# The process binds 127.0.0.1. host networking makes that the host loopback
-# on Linux. Do not publish 0.0.0.0. Set the admin hash in antbb.env (gitignored).
+# All and One (antbb), hosted mode.
+#
+# The process binds 127.0.0.1:1001. network_mode: host makes that the HOST
+# loopback on Linux, so only a proxy on the same machine reaches it:
+#   - Oracle Cloud Free: Caddy on :80/:443 -> 127.0.0.1:1001 (deploy/oracle-free.md)
+#   - optional: Tailscale Funnel -> 127.0.0.1:1001 (deploy/tailscale-funnel.md)
+# Do not add a "ports:" section and do not publish 0.0.0.0:1001.
+#
+# Secrets: antbb.env (chmod 600, gitignored) holds ANTBB_ADMIN_PASSWORD_HASH
+# and optional provider keys such as MINIMAX_API_KEY. Nothing is in the image.
 services:
   antbb:
-    build: .
+    build:
+      context: .
+    image: antbb-allone:hosted
     network_mode: host
     user: "1000:1000"
     env_file:
       - path: antbb.env
-        required: false
+        required: true
     environment:
+      ANTBB_HOSTED: "1"
       ANTBB_HOST: 127.0.0.1
       ANTBB_PORT: "1001"
       ALLONE_HOST: 127.0.0.1
       ALLONE_PORT: "1001"
+    volumes:
+      - antbb-data:/opt/antbb/data
+    read_only: true
+    tmpfs:
+      - /tmp
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+
+volumes:
+  antbb-data:

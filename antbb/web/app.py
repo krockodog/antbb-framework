@@ -1065,6 +1065,8 @@ def html_scan(target_id: int, active: str = Form("off"), fuzz: str = Form("off")
         if not svc.is_confirmed(target_id):
             from ..oversight import require_oversight
             require_oversight(svc.store, target_id)
+        from ..hosted import require_scan_gates
+        require_scan_gates(svc.store, target_id)  # Hosted-Modus: Oversight + Scope Pflicht
         off = True if o else None
         # Konsistentes, serverseitiges Default-Deny: aktiver/offensiver Lauf ohne
         # ausdrückliche Human-Oversight-Freigabe wird verweigert (nichts gestartet).
@@ -1290,6 +1292,8 @@ def api_scan(target_id: int, payload: Optional[dict] = None):
         if not svc.is_confirmed(target_id):
             from ..oversight import require_oversight
             require_oversight(svc.store, target_id)
+        from ..hosted import require_scan_gates
+        require_scan_gates(svc.store, target_id)  # Hosted-Modus: Oversight + Scope Pflicht
         will_engage = (active_trigger_requested(active=active, fuzz=fuzz,
                                                 offensive=offensive)
                        and svc.mode_status(target_id)["offensive_allowed"])
