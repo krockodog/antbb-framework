@@ -20,6 +20,7 @@
     };
   </script>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/topnav.css?v=20261111">
   <style>
     /* Zufällig gewählter Hintergrund (.webp bevorzugt, .jpg als Fallback) */
     body::before {
@@ -49,27 +50,53 @@
   }
   </script>
 </head>
-<body class="{% block body_class %}{% endblock %}" data-colony="{{ _colony_pick }}">
-  <header>
-    <h1>antbb · All and One</h1>
-    {% set aq = active_queen|default('') %}
-    <nav>
-      <a class="hub-back" href="/" title="{{ t('nav.back_hub') }}">← {{ t('nav.hub') }}</a>
-      · <a href="/">{{ t('nav.scope') }}</a>
-      · {% if aq != 'red' %}<a href="/red">{{ t('nav.red') }}</a> · {% endif %}
-      {% if aq != 'blue' %}<a href="/blue">{{ t('nav.blue') }}</a> · {% endif %}
-      {% if aq != 'yellow' %}<a href="/yellow">{{ t('nav.yellow') }}</a> · {% endif %}
-      <a href="/wlan">{{ t('nav.wlan') }}</a>
-      {% if not blue_view %} · <a href="/brain">{{ t('nav.brain') }}</a>{% endif %}
-      · <a href="/assets">{{ t('nav.assets') }}</a>
-      · <a href="/history">{{ t('nav.history') }}</a>
-      · <span class="lang-switch" aria-label="{{ t('lang.switch') }}">
-          <a href="{{ lang_href('de') }}"{% if current_lang() == 'de' %} aria-current="true"{% endif %}>DE</a>
-          |
-          <a href="{{ lang_href('en') }}"{% if current_lang() == 'en' %} aria-current="true"{% endif %}>EN</a>
-        </span>
-    </nav>
-  </header>
+<body class="{% block body_class %}{% endblock %}" data-colony="{{ _colony_pick }}" data-role="{{ (request.state.user.role if request.state.user else '') }}">
+  {% if legacy_nav is defined and legacy_nav %}{% include "_topnav_legacy.html" %}{% else %}{% include "_topnav.html" %}{% endif %}
+  {% if is_admin() %}
+  <style>
+    .alert-banner{background:#5a1010;border:1px solid #ff5a5a;color:#ffe3e3;padding:.55rem .9rem;margin:.5rem auto;
+      max-width:1200px;border-radius:10px;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+    .alert-banner a{color:#fff;font-weight:bold}
+    .alert-banner[hidden]{display:none}
+  </style>
+  <div id="alert-banner" class="alert-banner" role="alert" hidden>
+    <span class="alert-dot"></span>
+    <span>⚠ <span id="alert-banner-text">{{ t('alerts.banner', n=0) }}</span></span>
+    <a href="/admin/alerts">{{ t('alerts.view') }} →</a>
+    <form method="post" action="/admin/alerts/ack" style="display:inline;margin:0">
+      <input type="hidden" name="next" value="{{ request.url.path }}">
+      <button type="submit">✔ {{ t('alerts.ack') }}</button>
+    </form>
+    <a href="/admin/users">{{ t('nav.admin') }} →</a>
+    <form method="post" action="/admin/attention/seen" style="display:inline;margin:0">
+      <input type="hidden" name="next" value="{{ request.url.path }}">
+      <button type="submit">👁 {{ t('alerts.seen') }}</button>
+    </form>
+  </div>
+  <script>
+  (function(){
+    var banner=document.getElementById("alert-banner"), dot=document.getElementById("alert-dot"),
+        txt=document.getElementById("alert-banner-text");
+    function apply(n){
+      var on=n>0; if(banner) banner.hidden=!on; if(dot) dot.hidden=!on;
+      if(txt) txt.textContent=window.t("alerts.banner",{n:n});
+    }
+    // Abfrage liegt in _topnav.html (gemeinsame Leiste); hier nur das Banner.
+    document.addEventListener("antbb:alerts", function(e){
+      apply((e.detail && e.detail.open) || 0);
+      if(txt && e.detail && e.detail.reasons) txt.textContent = e.detail.reasons;
+    });
+    {% if legacy_nav is defined and legacy_nav %}
+    function poll(){
+      fetch("/api/admin/attention",{credentials:"same-origin",headers:{"Accept":"application/json"}})
+        .then(function(r){return r.ok?r.json():null}).then(function(d){ if(d) apply(d.blink?(d.count||0):0); })
+        .catch(function(){});
+    }
+    poll(); setInterval(poll, 15000);
+    {% endif %}
+  })();
+  </script>
+  {% endif %}
   <main>
     {% block content %}{% endblock %}
   </main>

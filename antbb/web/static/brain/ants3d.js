@@ -10,7 +10,7 @@
   const iframe = document.createElement("iframe");
   iframe.id = "kimi-city-frame";
   iframe.title = "Ameisenmetropole — Neural Brain City";
-  iframe.src = "/static/brain/kimi-city/index.html?embed=1&v=queenpos2";
+  iframe.src = "/static/brain/kimi-city/index.html?embed=1&v=growth5";
   iframe.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:auto;background:transparent;";
   iframe.allow = "fullscreen";
   host.appendChild(iframe);
@@ -268,25 +268,69 @@
   };
 })().catch(e => console.warn("[ants3d] city embed failed:", e));
 
-// ── Gedächtnis-Wachstum (Judith): je mehr echtes Wissen, desto mehr wird gebaut ──
-// Quelle: /api/brain/nodes → counts {targets, runs, findings, logs}. Wissen = Summe.
-// Stufen: 0 (<1) nichts · 1 (≥1) Hütten · 2 (≥10) Brunnen · 3 (≥50) Steinhäuser · 4 (≥200) Türme · 5 (≥1000) moderne Gebäude.
-// Stufe 0 zeigt bewusst nichts (keine Fake-Bauten).
+// ── Gedächtnis-Wachstum (Judith): je mehr echtes Wissen, desto mehr wird gebaut (Siedler/Anno-Stil) ──
+// Quelle: /api/brain/nodes → counts {targets, runs, findings, logs}. Wissen = Summe (nur echte Daten).
+// Stufen: 0 (<1) nichts · 1 (≥1) Hütten · 2 (≥10) Brunnen · 3 (≥50) Steinhäuser
+//         4 (≥200) Kleinstadt: Werkstätten, Marktplätze, Gärten, Teiche/Kanäle, +220 Bewohner
+//         5 (≥1000) Metropole: Türme, Palast/Akademie/Bibliothek, Brücken, Parks, Oasen, Gold/Kristall, Banner, Licht, +660 Bewohner
+// Stufe 0 zeigt bewusst nichts (keine Fake-Bauten). Vorschau nur Admin: /brain?preview_stage=4|5 (klar als VORSCHAU markiert).
 (async function knowledgeGrowth() {
-  const STEPS = [[1, "🛖", window.t("ants3d.huts")], [10, "⛲", window.t("ants3d.well")], [50, "🏠", window.t("ants3d.stone")], [200, "🏰", window.t("ants3d.towers")], [1000, "🏙️", window.t("ants3d.modern")]];
+  const tt = (key, fb) => { try { const v = window.t(key); return v && v !== key ? v : fb; } catch (_) { return fb; } };
+  const L = {
+    stage: tt("ants3d.stage_label", "City stage"), knowledge: tt("ants3d.knowledge_short", "Knowledge"),
+    next: tt("ants3d.next_stage", "next stage at"), max: tt("ants3d.max_stage", "Top stage reached"), preview: tt("ants3d.preview", "PREVIEW (admin)"),
+    s: ["", tt("ants3d.huts", "Huts"), tt("ants3d.well", "Well"), tt("ants3d.stone", "Stone houses"), tt("ants3d.stage4", "Small town"), tt("ants3d.stage5", "Metropolis")],
+    nav: tt("ants3d.queen_nav", "Go to the queens"),
+  };
+  const ICON = ["", "🛖", "⛲", "🏠", "🏘️", "🏙️"];
+  const TH = [1, 10, 50, 200, 1000];
+
+  // Königinnen-Navigation (ersetzt die leere Leiste über der Stadtansicht)
+  const nav = document.createElement("nav");
+  nav.id = "kimi-city-queen-nav";
+  nav.setAttribute("aria-label", L.nav);
+  nav.style.cssText = "position:fixed;left:50%;bottom:46px;transform:translateX(-50%);z-index:5;display:flex;gap:8px;" +
+    "padding:6px 8px;background:rgba(4,8,18,.78);border:1px solid rgba(212,175,106,.35);border-radius:10px;backdrop-filter:blur(6px)";
+  for (const [q, href, col, bg] of [["red", "/red", "#ff6b6b", "rgba(120,16,16,.55)"], ["blue", "/blue", "#6fb3ff", "rgba(16,48,120,.55)"], ["yellow", "/yellow", "#ffd23b", "rgba(110,84,10,.55)"]]) {
+    const a = document.createElement("a");
+    a.href = href; a.className = "queen-nav-" + q;
+    a.textContent = tt("nav." + q, q[0].toUpperCase() + q.slice(1) + " Queen");
+    a.style.cssText = `font:600 12px system-ui,sans-serif;color:${col};background:${bg};border:1px solid ${col};border-radius:7px;padding:6px 14px;text-decoration:none;letter-spacing:.03em`;
+    nav.appendChild(a);
+  }
+  document.body.appendChild(nav);
+
   let c = {};
-  try { c = (await (await fetch("/api/brain/nodes")).json()).counts || {}; } catch (_) { return; }
-  const k = ["targets", "runs", "findings", "logs"].reduce((s, n) => s + (Number(c[n]) || 0), 0);
-  const stage = STEPS.filter(([t]) => k >= t).length;
-  window.__antbbKnowledge = { knowledge: k, stage, counts: c };
+  try { c = (await (await fetch("/api/brain/nodes")).json()).counts || {}; } catch (_) { c = null; }
+  const k = c ? ["targets", "runs", "findings", "logs"].reduce((s, n) => s + (Number(c[n]) || 0), 0) : 0;
+  const real = TH.filter((t) => k >= t).length;
+  // Admin-Vorschau: nur Optik, ändert keine Daten; Gast/Viewer ignoriert den Parameter.
+  const isAdmin = (document.body.dataset.role || "") === "admin";
+  const pv = Number(new URLSearchParams(location.search).get("preview_stage"));
+  const preview = isAdmin && pv >= 1 && pv <= 5 ? pv : 0;
+  const stage = preview || real;
+  window.__antbbKnowledge = { knowledge: k, stage, realStage: real, preview: !!preview, counts: c || {}, thresholds: TH };
   const iframe = document.getElementById("kimi-city-frame");
-  try { iframe && iframe.contentWindow && iframe.contentWindow.postMessage({ type: "antbb-knowledge", knowledge: k, stage }, location.origin); } catch (_) {}
-  if (!stage) return;
+  const post = () => { try { iframe && iframe.contentWindow && iframe.contentWindow.postMessage({ type: "antbb-knowledge", knowledge: k, stage: window.__antbbKnowledge.stage }, location.origin); } catch (_) {} };
+  post();
+  // Die Stadt lädt später als dieser Fetch → bei jedem Ready-Ping erneut senden (idempotent).
+  addEventListener("message", (ev) => {
+    if (!iframe || ev.source !== iframe.contentWindow || ev.origin !== location.origin) return;
+    if (ev.data && (ev.data.type === "kimi-city" || ev.data.type === "kimi-city-growth")) post();
+  });
+  window.__antbbPreview = (n) => { if (!isAdmin) return false; window.__antbbKnowledge.stage = n; try { iframe.contentWindow.postMessage({ type: "antbb-knowledge", knowledge: k, stage: n }, location.origin); } catch (_) {} render(n, true); return true; };
+  if (!c) return;
   const box = document.createElement("div");
   box.id = "kimi-city-growth";
   box.title = window.t("ants3d.knowledge", {k: k, targets: c.targets || 0, runs: c.runs || 0, findings: c.findings || 0, logs: c.logs || 0});
-  box.style.cssText = "position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;pointer-events:none;" +
-    "font:600 11px system-ui;color:#eef;background:rgba(4,8,18,.72);border:1px solid #d4af6a;border-radius:8px;padding:4px 10px";
-  box.textContent = `Stadtausbau Stufe ${stage}/5 · Wissen ${k} · ` + STEPS.slice(0, stage).map(([, i, n]) => `${i} ${n}`).join("  ");
+  box.style.cssText = "position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;pointer-events:auto;cursor:help;white-space:nowrap;" +
+    "font:600 11px system-ui;color:#eef;background:rgba(4,8,18,.78);border:1px solid #d4af6a;border-radius:8px;padding:4px 10px";
   document.body.appendChild(box);
+  function render(st, pre) {
+    const nxt = st < 5 ? `${L.next} ${TH[st]}` : L.max;
+    const built = st ? ICON[st] + " " + L.s[st] : "—";
+    box.textContent = `${pre ? L.preview + " · " : ""}${L.stage} ${st}/5 · ${L.knowledge} ${k} · ${nxt} · ${built}`;
+    box.style.borderColor = pre ? "#ff7b72" : "#d4af6a";
+  }
+  render(stage, !!preview);
 })();

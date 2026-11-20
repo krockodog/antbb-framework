@@ -1,0 +1,31 @@
+{#- Bisherige Leiste, nur noch fuer /brain (neuronales Gehirn behaelt seine
+    eigene Leiste unveraendert). Alle anderen Seiten: _topnav.html. -#}
+  <header>
+    <h1>antbb · All and One</h1>
+    {% set aq = active_queen|default('') %}
+    <nav>
+      <a class="hub-back" href="/" title="{{ t('nav.back_hub') }}">← {{ t('nav.hub') }}</a>
+      · <a href="/">{{ t('nav.scope') }}</a>
+      · {% if aq != 'red' %}<a href="/red">{{ t('nav.red') }}</a> · {% endif %}
+      {% if aq != 'blue' %}<a href="/blue">{{ t('nav.blue') }}</a> · {% endif %}
+      {% if aq != 'yellow' %}<a href="/yellow">{{ t('nav.yellow') }}</a> · {% endif %}
+      {% if hosted_mode() %}
+      <a href="/osint">{{ t('nav.osint') }}</a>
+      {% if can_wlan() %} · <a href="/wlan">{{ t('nav.wlan') }}</a>{% endif %}
+      {% else %}
+      <a href="/wlan">{{ t('nav.wlan') }}</a>
+      {% endif %}
+      {% if not blue_view %} · <a href="/brain">{{ t('nav.brain') }}</a>{% endif %}
+      · <a href="/assets">{{ t('nav.assets') }}</a>
+      · <a href="/history">{{ t('nav.history') }}</a>
+      {% if is_admin() %} · <a href="/admin/users">{{ t('nav.admin') }}</a>{% endif %}
+      {% set _cu = current_user() %}
+      {% if _cu.username %} · <span class="nav-user"><a href="/profile" title="{{ t('nav.profile') }}">👤 {{ _cu.username }}</a>{% if is_admin() %}<span id="alert-dot" class="alert-dot" hidden title="{{ t('alerts.open') }}"></span>{% endif %}</span>
+        · <a href="/logout">{{ t('nav.logout') }}</a>{% endif %}
+      · <span class="lang-switch" aria-label="{{ t('lang.switch') }}">
+          <a href="{{ lang_href('de') }}"{% if current_lang() == 'de' %} aria-current="true"{% endif %}>DE</a>
+          |
+          <a href="{{ lang_href('en') }}"{% if current_lang() == 'en' %} aria-current="true"{% endif %}>EN</a>
+        </span>
+    </nav>
+  </header>

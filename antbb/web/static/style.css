@@ -828,3 +828,25 @@ body.blue-body .sc-pb-chip {
 .dev-kind-unknown { color: #9aa6c3; border-color: #3a4258; background: #0d1017; }
 .dev-fw-old { color: #ff6b6b; }
 .dev-fw-ok { color: #3fffa3; }
+
+
+/* ISMS / Königinnen-PDF-Downloads */
+.isms-downloads { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 0; }
+a.isms-btn, button.isms-btn {
+  display:inline-block; padding:8px 14px; border-radius:8px; border:0;
+  background:#1B3A4B; color:#fff; text-decoration:none; font-weight:600;
+  font-size:14px; cursor:pointer;
+}
+a.isms-btn.secondary { background:#2E5A73; }
+a.isms-btn.ghost { background:transparent; color:#1B3A4B; border:1px solid #1B3A4B; }
+.isms-form { display:grid; gap:12px; margin-top:16px; max-width:52rem; }
+.isms-field { display:flex; flex-direction:column; gap:4px; font-weight:600; }
+.isms-field input, .isms-field textarea {
+  font-weight:400; padding:8px 10px; border:1px solid #c5ccd1; border-radius:6px;
+  font-family:inherit; font-size:14px;
+}
+.isms-card .disclaimer, .isms-downloads-card .disclaimer {
+  background:#FFF6D6; border:1px solid #C9A227; padding:8px 12px; margin:8px 0;
+  font-size:14px;
+}
+.isms-downloads-card { margin: 12px 0; }

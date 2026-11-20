@@ -24,3 +24,6 @@ all-and-one/node_modules
 all-and-one/.next
 all-and-one/out
 cf_tunnel.*
+
+# Host-Secrets nie ins Image (Leck-Audit 2026-11-11)
+secrets/

@@ -10,8 +10,16 @@ Sicherheit:
   * Session ueber ein zufaelliges, serverseitig gespeichertes Token
     (secrets.token_urlsafe) in einem HttpOnly-Cookie. Kein Secret im Cookie-Wert
     ausser dem opaken Token.
-  * Rollen: admin | viewer. Human-only-Aktionen (brain-reset/delete) bleiben
-    strikt admin-geschuetzt.
+  * Rollen: admin | member | viewer | guest_user.
+      - admin: alles inkl. Benutzerverwaltung/Einladungen (/admin, /api/users).
+      - member: Operator – Ziele anlegen, Scope setzen, Oversight, Tests
+        starten (Red/Blue/Yellow/OSINT). KEIN User-Management, keine
+        Policy/Papierkorb-Aktionen.
+      - member_plus: wie member plus WLAN-Kanal (Laptop-Umfang). Offensiv-WLAN
+        nur mit den bestehenden Gates. KEIN User-Management.
+      - viewer und guest_user sind die Gast-Nutzrolle (Deny-by-Default-
+        Allowlist in hosted/webguard).
+    Human-only-Aktionen (brain-reset/delete) bleiben strikt admin-geschuetzt.
   * Admin-Bootstrap nur aus ENV oder CLI – NICHT hartkodiert.
   * Fehlender Benutzer laeuft trotzdem durch PBKDF2 (konstantzeitiger Vergleich).
 """
@@ -25,7 +33,7 @@ import sys
 import time
 from typing import Optional
 
-from .store import Store
+from .store import USER_ROLES, Store
 
 COOKIE_NAME = "antbb_session"
 CSRF_COOKIE = "antbb_csrf"
@@ -123,6 +131,45 @@ def _dummy_material() -> tuple[str, str, int]:
     return _DUMMY_HASH, _DUMMY_SALT, _DUMMY_ITER
 
 
+# ---- Rollen-Helfer ----------------------------------------------------------
+ROLES = USER_ROLES
+OPS_ROLES = frozenset({"admin", "member", "member_plus"})
+WLAN_ROLES = frozenset({"admin", "member_plus"})
+
+
+def _norm_role(role: Optional[str]) -> str:
+    return (role or "").strip().lower()
+
+
+def is_admin(role: Optional[str]) -> bool:
+    return _norm_role(role) == "admin"
+
+
+def is_member(role: Optional[str]) -> bool:
+    return _norm_role(role) == "member"
+
+
+def is_member_plus(role: Optional[str]) -> bool:
+    return _norm_role(role) == "member_plus"
+
+
+def can_wlan(role: Optional[str]) -> bool:
+    """WLAN-Kanal im Hosted-Modus: admin oder member_plus."""
+    return _norm_role(role) in WLAN_ROLES
+
+
+def can_authorize_scope(role: Optional[str]) -> bool:
+    """Formale Scope-Autorisierung (neue Scope-Policy-Felder, authorized_by,
+    rules_of_engagement): admin oder member_plus. Einfaches member darf weiterhin
+    nur Basis-Scope-Eintraege (kind/value) anlegen, aber nicht formal autorisieren."""
+    return _norm_role(role) in {"admin", "member_plus"}
+
+
+def can_ops(role: Optional[str]) -> bool:
+    """admin ODER member: Scope/Oversight/Ziele/Scans. Oversight-Gates bleiben."""
+    return _norm_role(role) in OPS_ROLES
+
+
 # ---- Nutzerverwaltung -----------------------------------------------------
 def create_user(store: Store, username: str, password: str,
                 role: str = "viewer") -> int:
@@ -136,6 +183,30 @@ def create_user(store: Store, username: str, password: str,
 def set_password(store: Store, username: str, password: str) -> None:
     h, salt, it = hash_password(password)
     store.update_user_password(username, h, salt, pw_iter=it)
+
+
+PASSWORD_MIN_LEN = 12
+
+
+def change_own_password(store: Store, username: str, current: str,
+                        new: str, confirm: str) -> Optional[str]:
+    """Eigenes Passwort aendern. Gibt Fehler-Key (i18n) oder None zurueck.
+
+    Prueft das aktuelle Passwort ueber authenticate(). Klartext wird nie
+    geloggt oder gespeichert.
+    """
+    if authenticate(store, username, current or "") is None:
+        return "profile.pw.err_current"
+    if len(new or "") < PASSWORD_MIN_LEN:
+        return "profile.pw.err_short"
+    if new != confirm:
+        return "profile.pw.err_mismatch"
+    if (new or "").strip().lower() == (username or "").strip().lower():
+        return "profile.pw.err_username"
+    if new == current:
+        return "profile.pw.err_same"
+    set_password(store, username, new)
+    return None
 
 
 def authenticate(store: Store, username: str, password: str):
@@ -177,9 +248,78 @@ def reset_login_throttle() -> None:
     _FAILS.clear()
 
 
+# ---- 2FA (TOTP) -------------------------------------------------------------
+PENDING_COOKIE = "antbb_2fa"
+_PENDING: dict[str, dict] = {}
+PENDING_TTL = 300.0
+PENDING_MAX_FAILS = 5
+
+
+def totp_enabled(row) -> bool:
+    try:
+        return bool(row and "totp_enabled" in row.keys() and row["totp_enabled"])
+    except Exception:
+        return False
+
+
+def start_pending_2fa(username: str, nxt: str = "/") -> str:
+    """Kurzlebiges, serverseitig gehaltenes Pending-Token (zufaellig, 5 min)."""
+    now = time.monotonic()
+    for k in [k for k, v in _PENDING.items() if v["exp"] < now]:
+        _PENDING.pop(k, None)
+    token = secrets.token_urlsafe(32)
+    _PENDING[token] = {"username": username, "exp": now + PENDING_TTL,
+                       "fails": 0, "next": nxt or "/"}
+    return token
+
+
+def get_pending_2fa(token: Optional[str]) -> Optional[dict]:
+    if not token:
+        return None
+    entry = _PENDING.get(token)
+    if not entry or entry["exp"] < time.monotonic():
+        _PENDING.pop(token or "", None)
+        return None
+    return entry
+
+
+def drop_pending_2fa(token: Optional[str]) -> None:
+    _PENDING.pop(token or "", None)
+
+
+def verify_second_factor(store: Store, username: str, code: str) -> Optional[str]:
+    """Prueft TOTP (mit Replay-Schutz) oder einen Recovery-Code.
+
+    Gibt "totp" / "recovery" zurueck oder None. Secrets/Codes werden nie geloggt.
+    """
+    from . import totp as _totp
+    row = store.get_user(username)
+    if not row or not row["active"] or not totp_enabled(row):
+        return None
+    secret = _totp.decrypt(row["totp_secret_enc"] or "")
+    digits = "".join(ch for ch in (code or "") if ch.isdigit())
+    if secret and len(digits) == _totp.DIGITS and len((code or "").strip()) <= 8:
+        step = _totp.verify(secret, digits, row["totp_last_step"])
+        if step is not None and store.set_totp_last_step(username, step):
+            return "totp"
+        return None
+    updated = _totp.use_recovery(row["recovery_hashes"] or "[]", code)
+    if updated is not None:
+        store.set_recovery_hashes(username, updated)
+        return "recovery"
+    return None
+
+
 def start_session(store: Store, row) -> str:
     token = secrets.token_urlsafe(32)
     store.create_session(token, row["username"], row["role"])
+    # Erst-Login merken (nur Zeitstempel, fuer den Admin-Hinweis "neuer Benutzer").
+    try:
+        key = f"user.first_login.{row['username']}"
+        if not store.get_setting(key, ""):
+            store.set_setting(key, f"{time.time():.3f}")
+    except Exception:  # noqa: BLE001 – Login nie daran scheitern lassen
+        pass
     return token
 
 
@@ -189,7 +329,10 @@ def session_user(store: Store, token: Optional[str]):
 
 
 def bootstrap_admin(store: Store) -> Optional[str]:
-    """Legt den Admin aus der Umgebung an oder aktualisiert sein Passwort.
+    """Legt den Admin aus der Umgebung an, falls er noch fehlt.
+
+    Existiert der Benutzer schon, bleibt sein Passwort unveraendert (nur die
+    Rolle admin wird gesichert).
 
     ANTBB_ADMIN_PASSWORD_HASH (pbkdf2_sha256$iter$salt$hash) hat Vorrang vor
     ANTBB_ADMIN_PASSWORD. Der Klartext wird nie geloggt. Ohne Credential
@@ -212,7 +355,11 @@ def bootstrap_admin(store: Store) -> Optional[str]:
     else:
         digest, salt, iterations = hash_password(password)
     if store.get_user(user):
-        store.update_user_password(user, digest, salt, pw_iter=iterations)
+        # Bestehender Admin: Passwort NICHT ueberschreiben. Sonst setzt jeder
+        # Neustart eine Passwortaenderung aus /profile wieder auf den Hash aus
+        # antbb.env zurueck. Nur die Rolle wird auf admin gesichert.
+        # Notfall-Reset weiterhin per CLI:
+        #   ANTBB_NEW_PASSWORD=... python -m antbb.webauth add-user <name> --role admin
         store.set_user_role(user, "admin")
         return user
     store.create_user(user, digest, salt, role="admin", pw_iter=iterations)
@@ -239,8 +386,12 @@ def _cli(argv: Optional[list] = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     au = sub.add_parser("add-user", help="Benutzer anlegen/aktualisieren")
     au.add_argument("username")
-    au.add_argument("--role", choices=["admin", "viewer"], default="viewer")
+    au.add_argument("--role", choices=list(ROLES), default="viewer")
     sub.add_parser("list-users", help="Benutzer auflisten")
+    r2 = sub.add_parser("reset-2fa", help="Notfall: 2FA eines Benutzers abschalten")
+    r2.add_argument("username")
+    ul = sub.add_parser("unlock", help="Notfall: gesperrten Benutzer entsperren")
+    ul.add_argument("username")
     hp = sub.add_parser(
         "hash-password",
         help="PBKDF2-Hash nach stdout (Passwort von stdin oder Rueckfrage)",
@@ -266,7 +417,22 @@ def _cli(argv: Optional[list] = None) -> int:
         if args.cmd == "list-users":
             for u in store.list_users():
                 print(f"{u['username']}\t{u['role']}\t"
-                      f"{'aktiv' if u['active'] else 'inaktiv'}")
+                      f"{'aktiv' if u['active'] else 'inaktiv'}\t"
+                      f"2FA={'an' if u['totp_enabled'] else 'aus'}")
+            return 0
+        if args.cmd == "reset-2fa":
+            if not store.get_user(args.username):
+                print(f"Benutzer '{args.username}' nicht gefunden.", file=sys.stderr)
+                return 2
+            store.disable_totp(args.username)
+            print(f"2FA fuer '{args.username}' zurueckgesetzt.")
+            return 0
+        if args.cmd == "unlock":
+            if not store.get_user(args.username):
+                print(f"Benutzer '{args.username}' nicht gefunden.", file=sys.stderr)
+                return 2
+            store.set_user_disabled(args.username, False)
+            print(f"Benutzer '{args.username}' entsperrt.")
             return 0
         if args.cmd == "add-user":
             pw = os.environ.get("ANTBB_NEW_PASSWORD")

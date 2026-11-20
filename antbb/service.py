@@ -136,7 +136,8 @@ class AntBBService:
                  active: bool = False, fuzz: bool = False,
                  offensive: Optional[bool] = None,
                  oversight_ack: Optional[bool] = None,
-                 use_llm: Optional[bool] = None) -> SwarmResult:
+                 use_llm: Optional[bool] = None,
+                 force_defensive: bool = False) -> SwarmResult:
         """Startet den Schwarm. Wirft OversightError ohne Häkchen (hartes Gate).
 
         `active=True` / `fuzz=True` werden zusätzlich gegen mode_policy geprüft:
@@ -173,6 +174,12 @@ class AntBBService:
             if engage:
                 active = True
                 fuzz = True
+        if force_defensive:
+            # Guest (and any caller that must stay read-only) cannot be
+            # upgraded by mode_policy=auto/offensive.
+            active = False
+            fuzz = False
+            offensive = False
         # -------- Konsistentes Human-Oversight-Gate fuer AKTIVE/OFFENSIVE Laeufe --------
         # Wird ausschliesslich scharf, wenn dieser Lauf wirklich eine aktive/offensive
         # Aktion ausloesen wuerde (active/fuzz/offensive bzw. policy=offensive). Rein
@@ -269,6 +276,31 @@ class AntBBService:
         return {"username": username, "tool": tool,
                 "available": bool(tool), "result_count": len(results),
                 "results": results}
+
+    def run_osint(self, target_id: int, username: Optional[str] = None,
+                  emit: Optional[Callable[[dict], None]] = None,
+                  extras: bool = False):
+        """Passive OSINT soldier only. Hosted gates: Oversight + non-empty scope.
+
+        Never enables active/fuzz/offensive playbooks. Username enumeration is
+        optional and only runs when a handle is supplied.
+        """
+        from .hosted import require_scan_gates
+        from .queen import Queen
+        require_scan_gates(self.store, target_id)
+        params = {}
+        if username:
+            params["username"] = username
+        if extras:
+            # Extras: passiver OSINT-Katalog (Quelle enna, nur Daten).
+            params["extras"] = True
+        queen = Queen(self.store, logger=self.logger, emit=emit, use_llm=False)
+        return queen.run_swarm_sync(
+            target_id, phases=("scan",),
+            active=False, fuzz=False,
+            only_agents=("osint",),
+            task_params=params,
+        )
 
     def wlan_adapters(self) -> dict:
         """Vorhandene WLAN-Adapter + bekannte Hardware-Metadaten (honest-empty)."""
@@ -928,6 +960,7 @@ class AntBBService:
             "playbook_md_count": pb_md,
             "soldiers": blues,
             "soldier_ids": [s.get("name") for s in blues],
+            "overrides": self.store.all_soldier_overrides(),
             "splunk": __import__("antbb.splunk", fromlist=["status"]).status(),
         }
 

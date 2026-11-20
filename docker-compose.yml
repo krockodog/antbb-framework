@@ -24,8 +24,32 @@ services:
       ANTBB_PORT: "1001"
       ALLONE_HOST: 127.0.0.1
       ALLONE_PORT: "1001"
+      # read_only rootfs: keep Yellow case/note writes on the data volume
+      YQ_DATA_DIR: /opt/antbb/data
+      YQ_CASES_DIR: /opt/antbb/data/cases
+      YQ_NOTES_DIR: /opt/antbb/data/notes
+      HOME: /opt/antbb/data/home
+      JAVA_HOME: /usr/lib/jvm/java-25-openjdk-arm64
+      GHIDRA_INSTALL_DIR: /opt/ghidra
+      YQ_TOOLS_PATH: /opt/antbb-tools/bin:/opt/ghidra/support
+      PATH: /opt/antbb-tools/bin:/usr/local/bin:/opt/ghidra/support:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      ANTBB_AI_MODE: ollama
+      ANTBB_LLM_PROVIDER: ollama
+      ANTBB_MAIN_MODEL: qwen3-8b-heretic-hermes
+      ANTBB_FAST_MODEL: qwen3-8b-heretic-hermes
+      # ISMS-/Aktivitätslog (Host, nur lesend; Gruppe gid 1000)
+      ANTBB_HARDENING_LOG_DIR: /opt/antbb/hardening-log
+      # Hermes Agent (Host 127.0.0.1:8642): nur der PFAD zur Key-Datei, nie der Wert
+      HERMES_API_KEY_FILE: /run/secrets/hermes_api_key
     volumes:
       - antbb-data:/opt/antbb/data
+      - /opt/ghidra:/opt/ghidra:ro
+      - /opt/antbb-tools:/opt/antbb-tools:ro
+      - /var/lib/clamav:/var/lib/clamav:ro
+      - /home/ubuntu/antbb-hardening-log:/opt/antbb/hardening-log:ro
+      # Hermes-API-Key: Kopie fuer uid 1000 (600), nur lesend
+      - /home/ubuntu/antbb-secrets/hermes_api.key.antbb:/run/secrets/hermes_api_key:ro
     read_only: true
     tmpfs:
       - /tmp

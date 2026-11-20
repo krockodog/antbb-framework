@@ -93,11 +93,16 @@ class Queen:
                 self.llm = None
 
     # ---- Phasen-Planung: welche Agenten-Klassen gehören zu welcher Phase ----
-    def _agents_for_phase(self, phase: str, ctx: AgentContext):
-        return [cls(ctx) for cls in WORKER_AGENTS if phase in cls.phases]
+    def _agents_for_phase(self, phase: str, ctx: AgentContext, only_agents=None):
+        agents = [cls(ctx) for cls in WORKER_AGENTS if phase in cls.phases]
+        if only_agents:
+            allow = set(only_agents)
+            agents = [a for a in agents if a.name in allow]
+        return agents
 
     async def run_swarm(self, target_id: int, phases: tuple[str, ...] = PHASES,
-                         active: bool = False, fuzz: bool = False) -> SwarmResult:
+                         active: bool = False, fuzz: bool = False,
+                         only_agents=None, task_params=None) -> SwarmResult:
         """Startet den Schwarm für ein Target. Erzwingt Oversight + Scope.
 
         `active` schaltet die TIEFE, aktive Verifikations-Phase frei. Default
@@ -203,13 +208,14 @@ class Queen:
         for phase in phases:
             if phase == "verify" and not effective_active:
                 continue
-            agents = self._agents_for_phase(phase, ctx)
+            agents = self._agents_for_phase(phase, ctx, only_agents=only_agents)
             if not agents:
                 continue
             ctx.log(f"👑 Phase '{phase}': dispatche {len(agents)} Ameisen parallel.")
             task = Task(
                 phase=phase, target_id=target_id, target_name=target["name"],
                 assets=assets, context_findings=list(collected),
+                params=dict(task_params or {}),
             )
             # Agenten-Gruppe parallel laufen lassen
             results = await asyncio.gather(*(a.run(task) for a in agents))
@@ -274,6 +280,9 @@ class Queen:
         return added
 
     def run_swarm_sync(self, target_id: int, phases: tuple[str, ...] = PHASES,
-                        active: bool = False, fuzz: bool = False) -> SwarmResult:
+                        active: bool = False, fuzz: bool = False,
+                        only_agents=None, task_params=None) -> SwarmResult:
         """Synchroner Wrapper für CLI."""
-        return asyncio.run(self.run_swarm(target_id, phases, active=active, fuzz=fuzz))
+        return asyncio.run(self.run_swarm(
+            target_id, phases, active=active, fuzz=fuzz,
+            only_agents=only_agents, task_params=task_params))

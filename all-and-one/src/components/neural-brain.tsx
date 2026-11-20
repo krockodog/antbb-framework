@@ -346,12 +346,12 @@ export function NeuralBrain({ focus }: { focus: QueenId | null }) {
               </p>
             </div>
           )}
-          <Link
+          <a
             href={selected.queen === "yellow" ? "/yellow" : `/${selected.queen}`}
             className={cn(buttonVariants({ size: "lg" }), "mt-5 inline-flex h-10 px-4")}
           >
             {t(`queen.${selected.queen}.cta`)}
-          </Link>
+          </a>
         </aside>
       ) : null}
       <p className="sr-only">{FOOTER}</p>
@@ -371,9 +371,9 @@ function FilterLink({
   const active = current === queen;
   const href = queen ? `/brain?queen=${queen}` : "/brain?queen=all";
   return (
-    <Link href={href} className={`brain-chip ${active ? "is-on" : ""}`} data-queen={queen ?? "all"}>
+    <a href={href} className={`brain-chip ${active ? "is-on" : ""}`} data-queen={queen ?? "all"}>
       {label}
-    </Link>
+    </a>
   );
 }
 

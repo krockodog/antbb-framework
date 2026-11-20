@@ -13,6 +13,7 @@ import re
 import threading
 import time
 from typing import Any, Optional
+from urllib.parse import quote
 
 from fastapi import (FastAPI, Form, HTTPException, Request, WebSocket,
                      WebSocketDisconnect)
@@ -34,6 +35,9 @@ from ..reports import CHAIN_STEPS, ReportDraft, empty_chain
 from ..service import AntBBService
 from ..oauth import OAuthError, TokenStore, provider_from_config
 
+class ScanCancelled(Exception):
+    """Cooperative cancel of an in-flight swarm run."""
+
 BASE = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
 
@@ -51,7 +55,94 @@ templates.env.globals["lang_href"] = lang_href
 templates.env.globals["current_lang"] = current_lang
 templates.env.globals["i18n_catalog"] = catalog_for
 
-app = FastAPI(title="antbb – Ameisen-Schwarm Bug-Bounty (lokal)")
+def _hosted_mode() -> bool:
+    from .. import hosted as _hosted
+    return _hosted.enabled()
+
+templates.env.globals["hosted_mode"] = _hosted_mode
+
+from jinja2 import pass_context as _jinja_pass_context
+
+@_jinja_pass_context
+def _tmpl_is_admin(ctx) -> bool:
+    req = ctx.get("request")
+    user = getattr(getattr(req, "state", None), "user", None) or {}
+    return (user.get("role") or "") == "admin"
+
+@_jinja_pass_context
+def _tmpl_is_guest(ctx) -> bool:
+    from .. import hosted as _hosted
+    req = ctx.get("request")
+    user = getattr(getattr(req, "state", None), "user", None) or {}
+    return _hosted.is_guest(user.get("role"))
+
+@_jinja_pass_context
+def _tmpl_can_ops(ctx) -> bool:
+    """admin ODER member: Scope/Oversight/Ziel anlegen/Scan-Optionen."""
+    req = ctx.get("request")
+    user = getattr(getattr(req, "state", None), "user", None) or {}
+    return webauth_mod.can_ops(user.get("role"))
+
+templates.env.globals["is_admin"] = _tmpl_is_admin
+templates.env.globals["can_ops"] = _tmpl_can_ops
+templates.env.globals["can_operate"] = _tmpl_can_ops
+
+@_jinja_pass_context
+def _tmpl_can_authorize_scope(ctx) -> bool:
+    """Formale Scope-Autorisierung (neue Scope-Policy): admin oder member_plus."""
+    req = ctx.get("request")
+    user = getattr(getattr(req, "state", None), "user", None) or {}
+    role = user.get("role") or ""
+    if webauth_mod.can_authorize_scope(role):
+        return True
+    from .. import hosted as _hosted
+    return (not _hosted.enabled()) and (not webauth_mod.auth_enabled())
+
+templates.env.globals["can_authorize_scope"] = _tmpl_can_authorize_scope
+
+@_jinja_pass_context
+def _tmpl_can_kill(ctx) -> bool:
+    """Globaler Kill Switch + Reset: admin oder member_plus."""
+    req = ctx.get("request")
+    user = getattr(getattr(req, "state", None), "user", None) or {}
+    role = (user.get("role") or "").strip().lower()
+    if role in ("admin", "member_plus"):
+        return True
+    from .. import hosted as _hosted
+    return (not _hosted.enabled()) and (not webauth_mod.auth_enabled())
+
+templates.env.globals["can_kill"] = _tmpl_can_kill
+
+
+@_jinja_pass_context
+def _tmpl_can_wlan(ctx) -> bool:
+    """WLAN-Menue: lokal immer; hosted nur admin + member_plus."""
+    from .. import hosted as _hosted
+    req = ctx.get("request")
+    user = getattr(getattr(req, "state", None), "user", None) or {}
+    return (not _hosted.enabled()) or webauth_mod.can_wlan(user.get("role"))
+
+
+@_jinja_pass_context
+def _tmpl_is_member(ctx) -> bool:
+    req = ctx.get("request")
+    user = getattr(getattr(req, "state", None), "user", None) or {}
+    return webauth_mod.is_member(user.get("role")) or webauth_mod.is_member_plus(user.get("role"))
+
+
+@_jinja_pass_context
+def _tmpl_current_user(ctx) -> dict:
+    req = ctx.get("request")
+    return dict(getattr(getattr(req, "state", None), "user", None) or {})
+
+
+templates.env.globals["can_wlan"] = _tmpl_can_wlan
+templates.env.globals["is_member"] = _tmpl_is_member
+templates.env.globals["current_user"] = _tmpl_current_user
+templates.env.globals["is_guest"] = _tmpl_is_guest
+
+app = FastAPI(title="antbb – Ameisen-Schwarm Bug-Bounty (lokal)",
+              docs_url=None, redoc_url=None, openapi_url=None)  # keine API-Doku nach aussen
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 
 svc = AntBBService()
@@ -59,7 +150,7 @@ svc = AntBBService()
 # ---- On-device Scan-Zustand (kein Fernzugriff; nur lokaler Prozess) ----
 LIVE_FEED: list[dict] = []
 SCAN_STATE: dict[str, Any] = {
-    "status": "idle",          # idle | running | done | error
+    "status": "idle",          # idle | running | done | error | cancelled
     "target_id": None,
     "run_id": None,
     "started_at": None,
@@ -67,6 +158,9 @@ SCAN_STATE: dict[str, Any] = {
     "error": None,
     "severity": {},
     "finding_count": 0,
+    "started_by": "",
+    "started_by_role": "",
+    "cancel_requested": False,
 }
 _SCAN_LOCK = threading.Lock()
 
@@ -252,18 +346,25 @@ def _record_run_history(target_id: int, active: bool = False, fuzz: bool = False
         except Exception:
             pass
     dur = (finished - started) if (started and finished) else None
+    started_by = SCAN_STATE.get("started_by") or ""
     svc.store.add_run_history(
         run_id=rid, target_id=target_id, target_name=tname, mode=mode,
         active=bool(active), fuzz=bool(fuzz), offensive=bool(offensive),
         status=status, finding_count=fc, severity=sev, error=error,
         started_at=started, finished_at=finished, duration=dur,
+        started_by=started_by,
+        owner_user=(SCAN_STATE.get("owner_user") or None),
     )
 
 
 def _start_scan_async(target_id: int, active: bool, fuzz: bool,
                       phases: Optional[tuple] = None,
                       offensive: Optional[bool] = None,
-                      oversight_ack: Optional[bool] = None) -> dict:
+                      oversight_ack: Optional[bool] = None,
+                      started_by: str = "",
+                      started_by_role: str = "",
+                      force_defensive: bool = False,
+                      owner_user: str = "") -> dict:
     """Startet einen Scan in einem Daemon-Thread. Nur interne Service-Calls."""
     with _SCAN_LOCK:
         if SCAN_STATE["status"] == "running":
@@ -274,15 +375,30 @@ def _start_scan_async(target_id: int, active: bool, fuzz: bool,
             "status": "running", "target_id": target_id, "run_id": None,
             "started_at": time.time(), "finished_at": None, "error": None,
             "severity": {}, "finding_count": 0,
+            "started_by": started_by or "",
+            "started_by_role": started_by_role or "",
+            "owner_user": owner_user or "",
+            "cancel_requested": False,
         })
 
     def _emit(ev: dict) -> None:
+        if SCAN_STATE.get("cancel_requested"):
+            raise ScanCancelled("Lauf vom Nutzer abgebrochen.")
         _push_feed(ev)
+
+    def _release_guest_slot() -> None:
+        from .. import hosted as _hosted
+        if _hosted.is_guest(started_by_role):
+            try:
+                _hosted.guest_rate_leave(started_by or _hosted.GUEST_ACTOR)
+            except Exception:
+                pass
 
     def _worker() -> None:
         try:
             kw = {"emit": _emit, "active": active, "fuzz": fuzz,
-                  "offensive": offensive, "oversight_ack": oversight_ack}
+                  "offensive": offensive, "oversight_ack": oversight_ack,
+                  "force_defensive": force_defensive}
             if phases:
                 kw["phases"] = phases
             result = svc.run_scan(target_id, **kw)
@@ -320,6 +436,20 @@ def _start_scan_async(target_id: int, active: bool, fuzz: bool,
                                     error=str(exc))
             except Exception:
                 pass
+        except ScanCancelled as exc:
+            with _SCAN_LOCK:
+                SCAN_STATE.update({
+                    "status": "cancelled", "error": str(exc),
+                    "finished_at": time.time(),
+                })
+            _push_feed({"ts": time.time(), "msg": f"⏹ {exc}"})
+            _finish_agents("blocked")
+            try:
+                _record_run_history(target_id, active=active, fuzz=fuzz,
+                                    offensive=offensive, status="cancelled",
+                                    error=str(exc))
+            except Exception:
+                pass
         except Exception as exc:
             with _SCAN_LOCK:
                 SCAN_STATE.update({
@@ -334,7 +464,13 @@ def _start_scan_async(target_id: int, active: bool, fuzz: bool,
                                     error=str(exc))
             except Exception:
                 pass
+        finally:
+            _release_guest_slot()
 
+    if started_by:
+        _push_feed({"ts": time.time(),
+                    "msg": f"👤 Lauf gestartet von {started_by}"
+                           + (" — gestartet von Gast" if started_by == "Gast" else "")})
     threading.Thread(target=_worker, daemon=True, name="antbb-scan").start()
     return {"ok": True, "status": "running", "target_id": target_id}
 
@@ -359,7 +495,7 @@ def landing(request: Request):
 @app.get("/red", response_class=HTMLResponse)
 def index(request: Request):
     targets = []
-    for t in svc.list_targets():
+    for t in _visible_targets(request):
         d = _rowdict(t)
         d["confirmed"] = svc.is_confirmed(t["id"])
         d["scope_count"] = len(svc.list_scopes(t["id"]))
@@ -411,7 +547,23 @@ def target_page(request: Request, target_id: int):
         "mode": mode,
         "disclaimer": DISCLAIMER_TEXT,
         "scan_state": dict(SCAN_STATE),
+        "gov_policy": _gov_policy_ctx(target_id),
+        "gov_techniques": _gov_mod().TECHNIQUES,
+        "gov_critical": _gov_mod().CRITICAL_TECHNIQUES,
+        "gov_halted": _gov_mod().is_halted(svc.store),
     })
+
+
+def _gov_mod():
+    from .. import governance as _g
+    return _g
+
+
+def _gov_policy_ctx(target_id: int):
+    try:
+        return _gov_mod().get_policy(svc.store, target_id)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 
@@ -517,6 +669,94 @@ def wlan_page(request: Request, target_id: Optional[int] = None):
     })
 
 
+def _osint_tool_rows() -> list[dict]:
+    """Passive OSINT CLIs the hosted page lists. Honest presence only."""
+    import shutil, subprocess
+    names = [
+        "theHarvester", "amass", "subfinder", "holehe", "sherlock", "maigret",
+        "dnsx", "whois", "exiftool", "waybackurls", "gau", "spiderfoot",
+        "trufflehog", "gitleaks",
+    ]
+    rows = []
+    for name in names:
+        path = shutil.which(name)
+        version = ""
+        if path:
+            try:
+                r = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=8)
+                line = (r.stdout or r.stderr or "").strip().splitlines()
+                version = (line[0] if line else "")[:120]
+            except Exception:
+                version = path
+        rows.append({"id": name, "path": path or "", "version": version, "present": bool(path)})
+    return rows
+
+
+@app.get("/osint", response_class=HTMLResponse)
+def osint_page(request: Request, message: str = ""):
+    """Hosted-mode OSINT desk: tool status + Oversight/Scope-gated runs."""
+    user = getattr(request.state, "user", None) or {}
+    is_admin = user.get("role") == "admin"
+    targets = []
+    for row in _visible_targets(request):
+        d = _rowdict(row)
+        d["oversight"] = svc.is_confirmed(row["id"])
+        d["scope_count"] = len(svc.list_scopes(row["id"]))
+        targets.append(d)
+    from .. import extras_osint as _extras
+    return templates.TemplateResponse(request, "osint.html", {
+        "tools": _osint_tool_rows(),
+        "extras": _extras.catalog(),
+        "targets": targets,
+        "message": message,
+        "disclaimer": DISCLAIMER_TEXT,
+    })
+
+
+@app.post("/osint/run", include_in_schema=False)
+def osint_run(request: Request, target_id: int = Form(...), username: str = Form(""),
+              extras: str = Form("")):
+    from fastapi.responses import RedirectResponse
+    from ..oversight import OversightError
+    user = getattr(request.state, "user", None) or {}
+    from .. import hosted as _hosted
+    actor = (username or "").strip() or None
+    if _hosted.is_guest(user.get("role")):
+        actor = _hosted.guest_actor_name(user.get("username"))
+        if svc.get_target(int(target_id)) is None or svc.store.is_archived(int(target_id)):
+            raise HTTPException(403, "Der Gast darf nur bestehende, vom Admin angelegte Ziele nutzen.")
+    elif not webauth_mod.can_ops(user.get("role")) and _hosted.enabled():
+        raise HTTPException(403, i18n_t("osint.need_admin"))
+    try:
+        want_extras = str(extras or "").strip().lower() in {"1", "on", "true", "yes"}
+        if _hosted.is_guest(user.get("role")):
+            want_extras = False  # Extras nur fuer Operatoren (admin/member)
+        result = svc.run_osint(int(target_id), username=actor, extras=want_extras)
+    except OversightError as exc:
+        return RedirectResponse(url=f"/osint?message={quote(str(exc))}", status_code=303)
+    except Exception as exc:
+        return RedirectResponse(url=f"/osint?message={quote(type(exc).__name__ + ': ' + str(exc))}", status_code=303)
+    msg = f"{i18n_t('osint.started')}: run {result.run_id} · findings {len(getattr(result, 'findings', []) or [])}"
+    return RedirectResponse(url=f"/osint?message={quote(msg)}", status_code=303)
+
+
+@app.get("/api/osint/tools")
+def api_osint_tools(request: Request):
+    rows = _osint_tool_rows()
+    user = getattr(request.state, "user", None) or {}
+    if user.get("role") != "admin":
+        # Leck-Audit: interne Pfade/Versionen nur fuer Admins.
+        rows = [{k: v for k, v in dict(r).items() if k not in {"path", "version"}} for r in rows]
+    return {"queen_id": "osint", "tools": rows}
+
+
+@app.get("/api/osint/extras")
+def api_osint_extras(request: Request):
+    """Extras-Katalog (passives OSINT, Quelle enna — nur Daten)."""
+    from .. import extras_osint as _extras
+    return _extras.catalog()
+
+
 @app.get("/brain", response_class=HTMLResponse)
 def brain_page(request: Request):
     """Neuronales Gehirn der Koenigin: rein clientseitiges GPU-Partikelfeld
@@ -543,7 +783,7 @@ def _gb_static_status() -> dict:
 def blue_page(request: Request):
     """Blue Queen – Verteidigungs-Kolonie (Soldaten, Jobs, Splunk-Status)."""
     import time as _t
-    targets = [_rowdict(t) for t in svc.list_targets()]
+    targets = [_rowdict(t) for t in _visible_targets(request)]
     jobs = []
     for j in svc.blue_jobs_list():
         d = _rowdict(j)
@@ -625,10 +865,17 @@ def api_blue():
 
 
 @app.post("/api/blue/run")
-def api_blue_run(payload: Optional[dict] = None):
+def api_blue_run(request: Request, payload: Optional[dict] = None):
     payload = payload or {}
     tid = payload.get("target_id")
     apply_fixes = bool(payload.get("apply_fixes"))
+    from .. import hosted as _hosted
+    user = _request_user(request)
+    if _hosted.is_guest(user.get("role")):
+        apply_fixes = False
+        payload["depth"] = "light"
+        if tid is not None and (svc.get_target(int(tid)) is None or svc.store.is_archived(int(tid))):
+            raise HTTPException(403, "Der Gast darf nur bestehende, vom Admin angelegte Ziele nutzen.")
     ack = payload.get("oversight_ack")
     if ack is not None:
         ack = bool(ack)
@@ -656,8 +903,35 @@ def api_blue_run(payload: Optional[dict] = None):
         raise HTTPException(403, str(exc))
     except Exception as exc:
         return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+    started_by = ""
+    if _hosted.is_guest(user.get("role")):
+        started_by = _hosted.guest_actor_name(user.get("username"))
+    elif user.get("username"):
+        started_by = user.get("username")
+    if started_by:
+        try:
+            tname = ""
+            if tid is not None:
+                tgt = svc.get_target(int(tid))
+                tname = tgt["name"] if tgt else ""
+            svc.store.add_run_history(
+                run_id=result.run_id, target_id=tid, target_name=tname,
+                mode="blue", status="done",
+                finding_count=len(result.findings),
+                severity=result.by_severity(),
+                started_by=started_by,
+                owner_user=user.get("username") or None,
+            )
+            if _hosted.is_guest(user.get("role")):
+                _hosted.audit_guest("blue_run", path="/api/blue/run",
+                                target_id=tid, run_id=result.run_id)
+        except Exception:
+            pass
+    elif user.get("username"):
+        started_by = user.get("username") or ""
     return JSONResponse({
         "ok": True, "run_id": result.run_id, "depth": depth,
+        "started_by": started_by,
         "finding_count": len(result.findings),
         "closed_count": result.closed_count(),
         "severity": result.by_severity(),
@@ -880,10 +1154,15 @@ def form_undo(request: Request):
 
 
 @app.post("/target/add")
-def html_add_target(name: str = Form(...), description: str = Form(""),
+def html_add_target(request: Request, name: str = Form(...), description: str = Form(""),
                     mode_policy: str = Form("auto")):
     tid = svc.add_target(name, description)
-    if mode_policy in ("defensive", "auto", "offensive"):
+    _u = _request_user(request)
+    if _u.get("username"):
+        svc.store.set_target_owner(tid, _u.get("username"))
+    # mode_policy bleibt admin-only; member legt Ziele mit Standard "auto" an.
+    role = (_u.get("role") or "")
+    if mode_policy in ("defensive", "auto", "offensive") and (role == "admin" or not role):
         svc.set_mode_policy(tid, mode_policy)
     return RedirectResponse(f"/target/{tid}", status_code=303)
 
@@ -1026,8 +1305,11 @@ def html_delete_scope(target_id: int, scope_id: int):
 
 
 @app.post("/target/{target_id}/oversight")
-def html_oversight(target_id: int, confirm: str = Form("off"), by: str = Form("web-user")):
-    svc.set_oversight(target_id, confirm == "on", confirmed_by=by)
+def html_oversight(request: Request, target_id: int, confirm: str = Form("off"),
+                   by: str = Form("web-user")):
+    # Nachvollziehbar: angemeldeter Benutzer (admin/member) statt "web-user".
+    who = (_request_user(request).get("username") or "").strip() or by
+    svc.set_oversight(target_id, confirm == "on", confirmed_by=who)
     return RedirectResponse(f"/target/{target_id}", status_code=303)
 
 
@@ -1037,8 +1319,57 @@ def html_set_mode(target_id: int, mode_policy: str = Form("auto")):
     return RedirectResponse(f"/target/{target_id}", status_code=303)
 
 
+
+def _owner_scope(request: Optional[Request]) -> Optional[str]:
+    """None = alles sehen (admin bzw. ohne Auth). Sonst nur Eintraege dieses Users."""
+    user = _request_user(request)
+    role = (user.get("role") or "").strip().lower()
+    if not role or role == "admin":
+        return None
+    return user.get("username") or "\x00"
+
+
+def _visible_targets(request: Optional[Request]):
+    """member/member_plus: nur eigene Ziele. Gast: bisheriger Lesezugriff auf
+    die Admin-Ziele. admin: alle."""
+    user = _request_user(request)
+    role = (user.get("role") or "").strip().lower()
+    if role in ("member", "member_plus"):
+        return svc.store.list_targets_owned(user.get("username") or "\x00")
+    return svc.list_targets()
+
+
+def _request_user(request: Optional[Request] = None) -> dict:
+    if request is None:
+        return {}
+    return getattr(request.state, "user", None) or {}
+
+
+def _guest_scan_kwargs(request: Optional[Request], target_id: int) -> dict:
+    """Stamp actor and, for guests, force a defensive run on an existing target."""
+    from .. import hosted as _hosted
+    user = _request_user(request)
+    role = user.get("role") or ""
+    if not _hosted.is_guest(role):
+        return {
+            "started_by": user.get("username") or "",
+            "started_by_role": role,
+            "force_defensive": False,
+            "owner_user": user.get("username") or "",
+        }
+    target = svc.get_target(target_id)
+    if target is None or svc.store.is_archived(target_id):
+        raise HTTPException(403, "Der Gast darf nur bestehende, vom Admin angelegte Ziele nutzen.")
+    return {
+        "started_by": _hosted.guest_actor_name(user.get("username")),
+        "started_by_role": role,
+        "force_defensive": True,
+        "owner_user": user.get("username") or "",
+    }
+
+
 @app.post("/target/{target_id}/scan")
-def html_scan(target_id: int, active: str = Form("off"), fuzz: str = Form("off"),
+def html_scan(request: Request, target_id: int, active: str = Form("off"), fuzz: str = Form("off"),
               offensive: str = Form("off"), oversight_active: str = Form("off"),
               depth: str = Form("light")):
     """Startet Scan asynchron – Nutzer bleibt in der GUI (Live-Feed).
@@ -1077,13 +1408,54 @@ def html_scan(target_id: int, active: str = Form("off"), fuzz: str = Form("off")
         if will_engage:
             enforce_active_oversight(ack_val, action="offensiver/aktiver Schwarm-Lauf")
         phases = ("recon", "scan", "report") if depth_norm == "light" else None
+        extra = _guest_scan_kwargs(request, target_id)
+        if extra.get("force_defensive"):
+            a, f, off, ack_val = False, False, False, None
+            will_engage = False
+        _gov_check_scan(request, target_id, depth=depth_norm, engaged=will_engage,
+                        fuzz=f, approved=ack)
         _start_scan_async(target_id, active=a, fuzz=f, offensive=off,
-                          oversight_ack=ack_val, phases=phases)
+                          oversight_ack=ack_val, phases=phases, **extra)
+        _gov_audit_scan(request, target_id, depth=depth_norm, engaged=will_engage, fuzz=f,
+                        result="started")
     except OversightError as exc:
         return templates_error(target_id, str(exc))
     except HTTPException as exc:
         return templates_error(target_id, exc.detail)
     return RedirectResponse(f"/target/{target_id}#live", status_code=303)
+
+
+def _gov_check_scan(request, target_id: int, *, depth: str, engaged: bool, fuzz: bool,
+                    approved) -> None:
+    """Governance-Gate (nur verschärfend): Kill Switch, CRITICAL, Testfenster,
+    erlaubte Techniken, Freigabe je Risikostufe. Ablehnung wird auditiert."""
+    from .. import governance as _gov
+    risk, techniques = _gov.classify_scan(depth=depth, engaged=engaged, fuzz=fuzz)
+    try:
+        _gov.enforce_scan(svc.store, target_id, risk=risk, techniques=techniques,
+                          approved=bool(approved))
+    except _gov.GovernanceBlocked as exc:
+        _gov_audit_scan(request, target_id, depth=depth, engaged=engaged, fuzz=fuzz,
+                        result="blocked" if exc.status == 423 else "denied", detail=exc.detail)
+        raise HTTPException(exc.status, exc.detail)
+
+
+def _gov_audit_scan(request, target_id: int, *, depth: str, engaged: bool, fuzz: bool,
+                    result: str, detail: str = "") -> None:
+    from .. import governance as _gov
+    risk, techniques = _gov.classify_scan(depth=depth, engaged=engaged, fuzz=fuzz)
+    user = _request_user(request)
+    t = svc.get_target(target_id)
+    _gov.audit(svc.store, actor=user.get("username") or "local", role=user.get("role") or "",
+               agent="red-swarm", action=("Offensiver Schwarm-Lauf" if engaged else
+                                          f"Defensiver Schwarm-Lauf ({depth})"),
+               target=t["name"] if t is not None else f"#{target_id}", target_id=target_id,
+               risk=risk, result=result,
+               detail=(detail or ("Techniken: " + ", ".join(techniques)))[:300])
+    try:
+        request.state.gov_audited = True
+    except Exception:
+        pass
 
 
 def templates_error(target_id, msg):
@@ -1190,8 +1562,12 @@ def api_capabilities():
 
     Wird bei jedem Abruf frisch aus den Soldaten aufgebaut und ins
     Königin-Gedächtnis persistiert (Single Source of Truth). Keine Secrets.
+    Overrides (abgehakte Aufgaben) kommen separat dazu, damit die Karten den
+    gespeicherten Stand nach einem Reload wieder anzeigen.
     """
-    return JSONResponse(svc.capabilities(rebuild=True))
+    cap = dict(svc.capabilities(rebuild=True))
+    cap["overrides"] = svc.store.all_soldier_overrides()
+    return JSONResponse(cap)
 
 
 @app.get("/api/disclaimer")
@@ -1202,9 +1578,9 @@ def api_disclaimer(request: Request):
 
 
 @app.get("/api/targets")
-def api_targets():
+def api_targets(request: Request):
     out = []
-    for t in svc.list_targets():
+    for t in _visible_targets(request):
         d = _rowdict(t)
         d["confirmed"] = svc.is_confirmed(t["id"])
         d["mode"] = svc.mode_status(t["id"])
@@ -1213,10 +1589,14 @@ def api_targets():
 
 
 @app.post("/api/targets")
-def api_add_target(payload: dict):
+def api_add_target(payload: dict, request: Request):
     tid = svc.add_target(payload["name"], payload.get("description", ""))
+    _u = _request_user(request)
+    if _u.get("username"):
+        svc.store.set_target_owner(tid, _u.get("username"))
     pol = payload.get("mode_policy", "auto")
-    if pol in ("defensive", "auto", "offensive"):
+    role = (_u.get("role") or "")
+    if pol in ("defensive", "auto", "offensive") and (role == "admin" or not role):
         svc.set_mode_policy(tid, pol)
     return {"id": tid, "notice": new_target_notice(payload["name"]),
             "mode": svc.mode_status(tid)}
@@ -1270,7 +1650,7 @@ def api_set_mode(target_id: int, payload: dict):
 
 
 @app.post("/api/targets/{target_id}/scan")
-def api_scan(target_id: int, payload: Optional[dict] = None):
+def api_scan(request: Request, target_id: int, payload: Optional[dict] = None):
     """Startet Scan asynchron (on-device). Antwortet sofort mit status=running."""
     payload = payload or {}
     active = bool(payload.get("active", False))
@@ -1300,11 +1680,55 @@ def api_scan(target_id: int, payload: Optional[dict] = None):
         ack_val = bool(ack) if will_engage else None
         if will_engage:
             enforce_active_oversight(ack_val, action="offensiver/aktiver Schwarm-Lauf")
-        return _start_scan_async(target_id, active=active, fuzz=fuzz, phases=ph,
-                                 offensive=offensive, oversight_ack=ack_val)
+        extra = _guest_scan_kwargs(request, target_id)
+        if extra.get("force_defensive"):
+            active, fuzz, offensive, ack_val = False, False, False, None
+            will_engage = False
+        _gov_check_scan(request, target_id, depth=depth, engaged=will_engage,
+                        fuzz=fuzz, approved=bool(ack))
+        started = _start_scan_async(target_id, active=active, fuzz=fuzz, phases=ph,
+                                    offensive=offensive, oversight_ack=ack_val,
+                                    **extra)
+        _gov_audit_scan(request, target_id, depth=depth, engaged=will_engage, fuzz=fuzz,
+                        result="started")
+        return started
     except OversightError as exc:
         raise HTTPException(403, str(exc))
 
+
+
+
+@app.post("/api/targets/{target_id}/scan/cancel")
+def api_scan_cancel(request: Request, target_id: int):
+    """Cancel the in-flight scan. Guests may cancel only their own run."""
+    from .. import hosted as _hosted
+    user = _request_user(request)
+    with _SCAN_LOCK:
+        if SCAN_STATE.get("status") != "running" or int(SCAN_STATE.get("target_id") or 0) != int(target_id):
+            raise HTTPException(409, "Kein laufender Scan für dieses Ziel.")
+        if _hosted.is_guest(user.get("role")):
+            if not _hosted.is_guest(SCAN_STATE.get("started_by_role")):
+                raise HTTPException(403, "Der Gast darf nur eigene Läufe abbrechen.")
+        SCAN_STATE["cancel_requested"] = True
+    _push_feed({"ts": time.time(),
+                "msg": f"⏹ Abbruch angefordert von {user.get('username') or _hosted.guest_actor_name()}"})
+    if _hosted.is_guest(user.get("role")):
+        try:
+            _hosted.guest_rate_leave(user.get("username") or _hosted.GUEST_ACTOR)
+        except Exception:
+            pass
+        _hosted.audit_guest("run_cancel", path=f"/api/targets/{target_id}/scan/cancel",
+                            target_id=target_id)
+    return {"ok": True, "status": "cancelling", "target_id": target_id}
+
+
+@app.post("/target/{target_id}/scan/cancel")
+def html_scan_cancel(request: Request, target_id: int):
+    try:
+        api_scan_cancel(request, target_id)
+    except HTTPException as exc:
+        return templates_error(target_id, exc.detail)
+    return RedirectResponse(f"/target/{target_id}#live", status_code=303)
 
 @app.get("/api/targets/{target_id}/scan/status")
 def api_scan_status(target_id: int):
@@ -1544,6 +1968,38 @@ def api_soldier_override(name: str, payload: dict):
     oid = svc.set_soldier_override(name, payload.get("playbook", ""),
                                    key, str(payload.get("value", "")))
     return {"ok": True, "id": oid, "soldier": name}
+
+
+@app.post("/api/soldiers/overrides/batch")
+def api_soldier_override_batch(payload: dict):
+    """Mehrere Aufgaben-Haken auf einmal (Alle anwählen: Playbook/Soldat/global).
+
+    Gleiche Override-Semantik wie /api/soldiers/{name}/override, nur gebündelt.
+    Erlaubt sind ausschließlich Aufgaben-Haken (key 'task:…', value done|offen).
+    Ein Haken ist nur eine Checklisten-Markierung: Oversight-/Scope-Gates beim
+    tatsächlichen Start bleiben unverändert (nichts wird hier freigegeben).
+    """
+    items = payload.get("items") if isinstance(payload, dict) else None
+    if not isinstance(items, list) or not items:
+        raise HTTPException(400, "items fehlt.")
+    if len(items) > 2000:
+        raise HTTPException(400, "Zu viele Einträge (max. 2000).")
+    clean = []
+    for it in items:
+        if not isinstance(it, dict):
+            raise HTTPException(400, "Ungültiger Eintrag.")
+        name = str(it.get("soldier") or "").strip()
+        pb = str(it.get("playbook") or "")
+        key = str(it.get("key") or "")
+        val = str(it.get("value") or "")
+        if not name or len(name) > 80 or not key.startswith("task:") or len(key) > 400:
+            raise HTTPException(400, "Nur Aufgaben-Haken (key 'task:…') sind erlaubt.")
+        if val not in ("done", "offen"):
+            raise HTTPException(400, "value muss 'done' oder 'offen' sein.")
+        clean.append((name, pb, key, val))
+    for name, pb, key, val in clean:
+        svc.set_soldier_override(name, pb, key, val)
+    return {"ok": True, "saved": len(clean)}
 
 
 @app.delete("/api/soldiers/{name}/override")
@@ -2680,7 +3136,7 @@ def _fmt_ts(ts) -> str:
 
 
 @app.get("/api/runs")
-def api_runs(target_id: Optional[int] = None, colony: Optional[str] = None):
+def api_runs(request: Request, target_id: Optional[int] = None, colony: Optional[str] = None):
     """Persistente Run-Historie.
 
     colony=offensive → ohne Blue-Queen-Läufe (für /brain).
@@ -2690,7 +3146,7 @@ def api_runs(target_id: Optional[int] = None, colony: Optional[str] = None):
     """
     want = (colony or "").strip().lower()
     out = []
-    for r in svc.store.list_run_history(target_id):
+    for r in svc.store.list_run_history(target_id, owner=_owner_scope(request)):
         d = _rowdict(r)
         rid = str(d.get("run_id") or "").lower()
         mode = str(d.get("mode") or "").lower()
@@ -2709,7 +3165,7 @@ def api_runs(target_id: Optional[int] = None, colony: Optional[str] = None):
 
 
 @app.get("/api/runs/{key}/timeline")
-def api_run_timeline(key: str):
+def api_run_timeline(request: Request, key: str):
     """Zeitraffer-Daten fuer EINEN echten Lauf (Pentest/Bugbounty/WLAN).
 
     key = numerische run_history.id ODER run_id-String.
@@ -2736,6 +3192,17 @@ def api_run_timeline(key: str):
         except Exception:
             row = None
     if row is None:
+        raise HTTPException(404, "Lauf nicht gefunden.")
+    _scope = _owner_scope(request)
+    if _scope is not None and (row["owner_user"] or "") != _scope:
+        # Fremder oder nicht zugeordneter Lauf: wie "nicht vorhanden" behandeln.
+        try:
+            from ..alerts import raise_alert
+            raise_alert(svc.store, "owner_denied", username=_scope,
+                        ip=(request.client.host if request.client else ""),
+                        path=request.url.path)
+        except Exception:
+            pass
         raise HTTPException(404, "Lauf nicht gefunden.")
     run = _rowdict(row)
     run["when"] = _fmt_ts(run.get("created_at"))
@@ -2888,10 +3355,24 @@ def download_export(name: str):
 
 
 @app.get("/history", response_class=HTMLResponse)
-def history_page(request: Request):
+def history_page(request: Request, user: str = ""):
+    """Pro-User-Historie. Nicht-Admins sehen nur eigene Laeufe. admin sieht alle,
+    kann per ?user=<name> filtern; ?user=__none__ = Alt-Eintraege ohne Zuordnung."""
     import json as _json
+    scope = _owner_scope(request)
+    is_admin_view = scope is None
+    owners = svc.store.run_history_owners() if is_admin_view else []
+    sel = (user or "").strip() if is_admin_view else ""
+    if not is_admin_view:
+        owner = scope
+    elif sel == "__none__":
+        owner = svc.store.UNOWNED
+    elif sel:
+        owner = sel
+    else:
+        owner = None
     runs = []
-    for r in svc.store.list_run_history():
+    for r in svc.store.list_run_history(owner=owner):
         d = _rowdict(r)
         d["when"] = _fmt_ts(d.get("created_at"))
         try:
@@ -2901,7 +3382,11 @@ def history_page(request: Request):
             d["severity_str"] = "—"
         runs.append(d)
     return templates.TemplateResponse(request, "history.html", {
-        "runs": runs, "exports": _export_index(), "disclaimer": DISCLAIMER_TEXT,
+        "runs": runs,
+        # Exporte sind Dateien ohne Owner -> nur admin.
+        "exports": _export_index() if is_admin_view else [],
+        "disclaimer": DISCLAIMER_TEXT,
+        "admin_view": is_admin_view, "owners": owners, "sel_user": sel,
     })
 
 
@@ -2972,8 +3457,187 @@ def api_reports_generate(payload: Optional[dict] = None):
     return JSONResponse(res)
 
 
+
+# ---------------------------------------------------------------------------
+# ISO/IEC 27001:2022 ISMS- und Königinnen-Berichte (GET, Gast darf lesen)
+# Organisationsmaske (GET/POST /isms) ist admin-only.
+# ---------------------------------------------------------------------------
+def _isms_user(request: Request) -> dict:
+    return getattr(request.state, "user", None) or {}
+
+
+def _isms_require_admin(request: Request) -> dict:
+    user = _isms_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(403, i18n_t("isms.need_admin"))
+    return user
+
+
+def _isms_pdf_response(kind: str, filename: str):
+    from .. import isms_report as isms
+    bundle = isms.collect_bundle(svc.store)
+    html_doc = isms.render_html(bundle, kind=kind)
+    pdf, engine, note = isms.render_pdf_bytes(html_doc)
+    if pdf:
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    note = note or "Keine PDF-Engine (weasyprint oder wkhtmltopdf) installiert."
+    note_hdr = note[:180].encode("ascii", "replace").decode("ascii")
+    return HTMLResponse(
+        content=html_doc,
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="{filename.replace(".pdf", ".html")}"'),
+            "X-AntBB-PDF-Engine": engine or "missing",
+            "X-AntBB-PDF-Note": note_hdr,
+        },
+        status_code=200,
+    )
+
+
+@app.get("/red/report.pdf")
+def red_report_pdf():
+    """Pentest-Bericht der Roten Königin. Nur bereits sichtbare Funde."""
+    return _isms_pdf_response("red", "antbb-red-report.pdf")
+
+
+@app.get("/blue/report.pdf")
+def blue_report_pdf():
+    """Härtungs-/Abwehrbericht der Blauen Königin."""
+    return _isms_pdf_response("blue", "antbb-blue-report.pdf")
+
+
+@app.get("/yellow/report.pdf")
+def yellow_report_pdf():
+    """RE-Bericht der Gelben Königin."""
+    return _isms_pdf_response("yellow", "antbb-yellow-report.pdf")
+
+
+@app.get("/isms/report.pdf")
+def isms_report_pdf():
+    """Vollständiges ISMS-Paket nach ISO/IEC 27001:2022 (Vorlage)."""
+    return _isms_pdf_response("isms", "antbb-isms-iso27001.pdf")
+
+
+def _isms_table_response(kind: str, fmt: str):
+    from .. import isms_report as isms
+    bundle = isms.collect_bundle(svc.store)
+    if kind == "soa":
+        rows = bundle["soa"]
+        fields = ["id", "title", "theme", "applicable", "justification",
+                  "status", "evidence"]
+        filename = "antbb-isms-soa"
+        sheet = "SoA Annex A"
+    else:
+        rows = bundle["register"]
+        fields = ["title", "queen", "severity", "asset", "threat",
+                  "vulnerability", "likelihood", "impact", "score", "band",
+                  "owner", "treatment", "residual"]
+        filename = "antbb-isms-risikoregister"
+        sheet = "Risikoregister"
+    if fmt == "xlsx":
+        data = isms.export_xlsx(rows, fields, sheet)
+        if not data:
+            raise HTTPException(
+                503,
+                "openpyxl ist nicht installiert. Bitte die CSV-Variante nutzen "
+                f"({filename}.csv).",
+            )
+        return Response(
+            content=data,
+            media_type=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}.xlsx"'
+            },
+        )
+    data = isms.export_csv(rows, fields)
+    return Response(
+        content=data,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'},
+    )
+
+
+@app.get("/isms/soa.csv")
+def isms_soa_csv():
+    return _isms_table_response("soa", "csv")
+
+
+@app.get("/isms/soa.xlsx")
+def isms_soa_xlsx():
+    return _isms_table_response("soa", "xlsx")
+
+
+@app.get("/isms/register.csv")
+def isms_register_csv():
+    return _isms_table_response("register", "csv")
+
+
+@app.get("/isms/register.xlsx")
+def isms_register_xlsx():
+    return _isms_table_response("register", "xlsx")
+
+
+@app.get("/isms", response_class=HTMLResponse)
+def isms_org_form(request: Request, saved: str = ""):
+    """Admin-only: Organisationsdaten und Risikoeigentümer für die ISMS-Vorlage."""
+    from .. import isms_report as isms
+    _isms_require_admin(request)
+    org = isms.load_org(svc.store)
+    return templates.TemplateResponse(request, "isms.html", {
+        "org": org,
+        "fields": isms.ORG_FIELDS,
+        "disclaimer": isms.DISCLAIMER,
+        "placeholder": isms.PLACEHOLDER,
+        "saved": saved == "1",
+        "active_queen": "",
+    })
+
+
+@app.post("/isms")
+async def isms_org_save(request: Request):
+    """Admin-only write of org/risk-owner fields. Never invents missing values."""
+    from .. import isms_report as isms
+    _isms_require_admin(request)
+    form = await request.form()
+    updates = {}
+    for key, _label in isms.ORG_FIELDS:
+        if key in form:
+            updates[key] = str(form.get(key) or "")
+    isms.save_org(svc.store, updates)
+    return RedirectResponse("/isms?saved=1", status_code=303)
+
+
+
 # Login, session cookies, CSRF, and the loopback guard. Installed last so
 # every route above is behind it. Health stays public; everything else does not.
+# Admin-Portal (Benutzer, Einladungen, /invite/<token>) – admin-only bis auf
+# die oeffentliche Einladungsannahme.
+from .admin_portal import register as _register_admin_portal  # noqa: E402
+
+_register_admin_portal(app, templates, lambda: svc.store)
+
+# Admin: Ollama-Status/Modellwahl und Aktivitaets-/ISMS-Log (beide admin-only).
+from .admin_ollama import register as _register_admin_ollama  # noqa: E402
+from .admin_activity import register as _register_admin_activity  # noqa: E402
+from .admin_hermes import register as _register_admin_hermes  # noqa: E402
+
+_register_admin_ollama(app, templates, lambda: svc.store)
+_register_admin_activity(app, templates, lambda: svc.store)
+_register_admin_hermes(app, templates, lambda: svc.store)
+
+# Governance: Statusleiste, Audit-Trail, globaler Kill Switch, Scope-Policy.
+# Nur verschärfend; bestehende Gates bleiben unverändert davor.
+from .governance_routes import install_routes as _gov_routes, install_middleware as _gov_mw  # noqa: E402
+
+_gov_routes(app, svc, running_state=lambda: dict(SCAN_STATE),
+            visible_targets=lambda request: _visible_targets(request))
+_gov_mw(app, lambda: svc.store)
+
 from ..webguard import install as _install_webguard  # noqa: E402
 
 _install_webguard(app, lambda: svc.store)

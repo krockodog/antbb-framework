@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ t('admin.title') }} · antbb{% endblock %}
+{% block content %}
+{% include "_admin_subnav.html" %}
+<section class="card">
+  <h2>🛡 {{ t('admin.title') }} <small>{{ t('admin.sub') }}</small></h2>
+  <p class="hint">{{ t('admin.roles.hint') }}</p>
+  {% if message %}<p class="ok">{{ message }}</p>{% endif %}
+  {% if error %}<p class="blocked">{{ error }}</p>{% endif %}
+  <p><a href="/admin/alerts">🚨 {{ t('alerts.title') }}</a>{% if alert_users.get('') %} · <span class="alert-dot"></span> {{ t('alerts.anon_entry', n=alert_users.get('')) }}{% endif %}
+     · <a href="/history">🗂 {{ t('nav.history') }} ({{ t('history.owner_all') }})</a></p>
+</section>
+
+{% if new_invite %}
+<section class="card ok-border" id="new-invite">
+  <h3>✉ {{ t('admin.invite.created') }}</h3>
+  <p class="hint">{{ t('admin.invite.once') }}</p>
+  <p><strong>{{ t('admin.th.role') }}:</strong> <span class="badge">{{ new_invite.role }}</span>
+    {% if new_invite.username %} · <strong>{{ t('login.user') }}:</strong> <code>{{ new_invite.username }}</code>{% endif %}
+    {% if new_invite.email %} · <strong>{{ t('admin.email') }}:</strong> <code>{{ new_invite.email }}</code>{% endif %}
+    · {{ t('admin.invite.valid_days', n=new_invite.days) }}</p>
+  <p><input id="invite-url" readonly value="{{ new_invite.url }}" style="width:100%;font-family:monospace" onclick="this.select()"></p>
+  <p>
+    <button type="button" onclick="var i=document.getElementById('invite-url');i.select();if(navigator.clipboard){navigator.clipboard.writeText(i.value);}this.textContent='✔ {{ t('admin.copied') }}';">📋 {{ t('admin.copy') }}</button>
+    {% if new_invite.mailto %} · <a href="{{ new_invite.mailto }}">✉ {{ t('admin.mailto') }}</a>{% endif %}
+  </p>
+</section>
+{% endif %}
+
+<section class="card">
+  <h3>➕ {{ t('admin.invite.title') }}</h3>
+  <form method="post" action="/admin/users/invite" class="inline" style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-end">
+    <label>{{ t('admin.email') }} <small>({{ t('idx.optional') }})</small><br>
+      <input name="email" type="email" placeholder="name@example.org" autocomplete="off"></label>
+    <label>{{ t('login.user') }} <small>({{ t('idx.optional') }})</small><br>
+      <input name="username" placeholder="{{ t('admin.username.ph') }}" autocomplete="off"></label>
+    <label>{{ t('admin.th.role') }}<br>
+      <select name="role">
+        {% for r in roles %}<option value="{{ r }}" {% if r == 'member' %}selected{% endif %}>{{ r }} – {{ t('admin.role.' ~ r) }}</option>{% endfor %}
+      </select></label>
+    <label>{{ t('admin.days') }}<br>
+      <input name="days" type="number" min="1" max="30" value="7" style="width:5rem"></label>
+    <label style="display:block"><input type="checkbox" name="confirm_admin" value="on"> {{ t('admin.confirm_admin') }}</label>
+    {% if smtp %}<label style="display:block"><input type="checkbox" name="send_mail" value="on" checked> {{ t('admin.send_mail') }}</label>{% endif %}
+    <button type="submit">✉ {{ t('admin.invite.submit') }}</button>
+  </form>
+  <p class="hint">{% if smtp %}{{ t('admin.smtp.on') }}{% else %}{{ t('admin.smtp.off') }}{% endif %}</p>
+</section>
+
+<section class="card">
+  <h3>👥 {{ t('admin.users') }}</h3>
+  <table>
+    <thead><tr><th>{{ t('login.user') }}</th><th>{{ t('admin.th.role') }}</th><th>{{ t('admin.th.status') }}</th><th>2FA</th><th>{{ t('admin.th.created') }}</th><th>{{ t('admin.th.actions') }}</th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr>
+        <td>{% if alert_users.get(u.username) %}<a href="/admin/alerts" class="alert-dot" title="{{ t('alerts.user_has', n=alert_users.get(u.username)) }}"></a> {% endif %}<code>{{ u.username }}</code>{% if u.username == me %} <small>({{ t('admin.you') }})</small>{% endif %}</td>
+        <td><span class="badge">{{ u.role }}</span></td>
+        <td>{% if u.active %}<span class="ok">{{ t('admin.active') }}</span>{% elif u.disabled_at %}<span class="blocked">⛔ {{ t('admin.locked') }}</span>{% else %}<span class="blocked">{{ t('admin.inactive') }}</span>{% endif %}</td>
+        <td>{% if u.totp_enabled %}<span class="ok">{{ t('admin.2fa.on') }}</span>{% else %}–{% endif %}</td>
+        <td>{{ fmt_ts(u.created_at) }}</td>
+        <td>
+          <form method="post" action="/admin/users/{{ u.username|urlencode }}/role" style="display:inline">
+            <select name="role">{% for r in roles %}<option value="{{ r }}" {% if r == u.role %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+            <button type="submit">{{ t('tgt.save') }}</button>
+          </form>
+          {% if u.username != me %}
+          {% if u.active %}
+          <form method="post" action="/admin/users/{{ u.username|urlencode }}/kick" style="display:inline"
+                onsubmit="return confirm(window.t('admin.kick.confirm',{name:{{ u.username|tojson }}}));">
+            <button type="submit" class="btn-danger">⛔ {{ t('admin.kick') }}</button>
+          </form>
+          {% elif u.disabled_at %}
+          <form method="post" action="/admin/users/{{ u.username|urlencode }}/unlock" style="display:inline">
+            <button type="submit">🔓 {{ t('admin.unlock') }}</button>
+          </form>
+          {% endif %}
+          {% endif %}
+          {% if u.totp_enabled %}
+          <form method="post" action="/admin/users/{{ u.username|urlencode }}/reset-2fa" style="display:inline"
+                onsubmit="return confirm(window.t('admin.2fa.reset.confirm',{name:{{ u.username|tojson }}}));">
+            <button type="submit">{{ t('admin.2fa.reset') }}</button>
+          </form>
+          {% endif %}
+          {% if u.username != me and not u.active and not u.disabled_at %}
+          <form method="post" action="/admin/users/{{ u.username|urlencode }}/active" style="display:inline">
+            <input type="hidden" name="active" value="on">
+            <button type="submit">{{ t('admin.activate') }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h3>🔗 {{ t('admin.invites') }}</h3>
+  <table>
+    <thead><tr><th>Ref</th><th>{{ t('admin.th.role') }}</th><th>{{ t('admin.email') }} / {{ t('login.user') }}</th><th>{{ t('admin.th.status') }}</th><th>{{ t('admin.th.expires') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for i in invites %}
+      <tr>
+        <td><code>{{ i.ref }}</code></td>
+        <td><span class="badge">{{ i.role }}</span></td>
+        <td>{{ i.email or '–' }}{% if i.username %} / <code>{{ i.username }}</code>{% endif %}</td>
+        <td>{% if i.status == 'pending' %}<span class="ok">{{ t('admin.st.pending') }}</span>
+            {% elif i.status == 'used' %}{{ t('admin.st.used') }} ({{ i.used_by }})
+            {% elif i.status == 'revoked' %}<span class="blocked">{{ t('admin.st.revoked') }}</span>
+            {% else %}<span class="blocked">{{ t('admin.st.expired') }}</span>{% endif %}</td>
+        <td>{{ fmt_ts(i.expires_at) }}</td>
+        <td>{% if i.status == 'pending' %}
+          <form method="post" action="/admin/users/invites/{{ i.ref }}/revoke" style="display:inline">
+            <button type="submit" class="btn-danger">{{ t('admin.revoke') }}</button>
+          </form>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="hint">{{ t('admin.invites.empty') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

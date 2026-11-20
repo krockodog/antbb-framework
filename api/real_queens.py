@@ -125,14 +125,14 @@ def _case_count() -> int | None:
 def _live_status(queen_id: str, soldier_ids: list[str]) -> str:
     n = len(soldier_ids)
     if queen_id == "red":
-        return f"Kolonie bereit · {n} Soldaten (echt) · Scope default-deny."
+        return f"Kolonie bereit · {n} aktive Red-Agenten · All agent actions are scope-bound and policy-enforced."
     if queen_id == "blue":
-        return f"Verteidigung bereit · {n} Blue-Soldaten (echt) · Fixes nur mit Oversight."
+        return f"Verteidigung bereit · {n} aktive Blue-Agenten · Fixes nur mit Freigabe (Oversight)."
     if queen_id == "yellow":
         c = _case_count()
         if c is None:
-            return f"RE bereit · {n} Soldaten (echt)."
-        return f"RE bereit · {n} Soldaten (echt) · {c} Fälle."
+            return f"RE bereit · {n} aktive Yellow-Agenten."
+        return f"RE bereit · {n} aktive Yellow-Agenten · {c} Fälle."
     return f"{n} Soldaten."
 
 

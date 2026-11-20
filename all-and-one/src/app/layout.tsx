@@ -30,6 +30,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className={`dark ${sans.variable} ${serif.variable}`}>
+      <head>
+        {/* Gemeinsame obere Leiste (auch auf den FastAPI-Unterseiten) */}
+        <link rel="stylesheet" href="/static/topnav.css?v=20261111" />
+      </head>
       <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );

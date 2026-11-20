@@ -37,13 +37,21 @@ SKIP_EXACT = {
     "/yellow/upload",
 }
 
+# /api/brain (exact) is the All-and-One hub payload and stays skipped.
+# Literal colony routes such as /api/brain/nodes and /api/brain/logs must
+# still be mounted — skipping the whole /api/brain/ prefix 404s the Knoten panel.
 SKIP_PREFIXES = (
     "/yellow/",
     "/api/cases",
     "/api/classify",
     "/api/doctor",
-    "/api/brain/",
 )
+
+# Explicit colony routes under /yellow/ that must stay on the antbb app
+# (the prefix skip would otherwise hide them from the hosted API process).
+YELLOW_COLONY_ALLOW = {
+    "/yellow/report.pdf",
+}
 
 
 def _load_env_file(path: Path) -> None:
@@ -77,7 +85,14 @@ def _dual_static(antbb_static: Path, yellow_static: Path):
             except OSError:
                 continue
             if candidate.is_file():
-                return FileResponse(candidate)
+                media = {
+                    ".glb": "model/gltf-binary",
+                    ".gltf": "model/gltf+json",
+                    ".wasm": "application/wasm",
+                    ".mjs": "application/javascript",
+                    ".js": "application/javascript",
+                }.get(candidate.suffix.lower())
+                return FileResponse(candidate, media_type=media) if media else FileResponse(candidate)
         return HTMLResponse("not found", status_code=404)
 
     return serve
@@ -153,7 +168,10 @@ def attach_colony(app: FastAPI) -> dict[str, Any]:
         if not path or path in SKIP_EXACT:
             report["skipped"].append(path or "?")
             continue
-        if any(path == p or path.startswith(p.rstrip("/") + "/") or path.startswith(p) for p in SKIP_PREFIXES):
+        if path not in YELLOW_COLONY_ALLOW and any(
+            path == p or path.startswith(p.rstrip("/") + "/") or path.startswith(p)
+            for p in SKIP_PREFIXES
+        ):
             report["skipped"].append(path)
             continue
         methods = _methods(route)
@@ -164,30 +182,41 @@ def attach_colony(app: FastAPI) -> dict[str, Any]:
         existing[path] = existing.get(path, frozenset()) | methods
         report["added"].append(path)
 
-    # /red → real colony index (same-origin). Do NOT pass unknown kwargs.
+    # /red is the classic Rote Königin (antbb.web.app.index). The colony
+    # app's "/" is the All-and-One landing, so wrapping that endpoint made
+    # GET /red serve the hub (and Next.js <Link> then prefetched /red.txt).
+    # Older trees that still serve the queen at "/" are the fallback.
+    red_endpoint = None
     index_endpoint = None
     for route in colony.router.routes:
-        if getattr(route, "path", None) == "/" and hasattr(route, "endpoint"):
+        path = getattr(route, "path", None)
+        if path == "/red" and hasattr(route, "endpoint"):
+            red_endpoint = route.endpoint
+        elif path == "/" and hasattr(route, "endpoint"):
             index_endpoint = route.endpoint
-            break
+    queen_endpoint = red_endpoint or index_endpoint
 
     # Ensure chrome FileResponses / prior /red /blue do not shadow colony.
     app.router.routes[:] = [
         r for r in app.router.routes
         if getattr(r, "path", None) not in {"/red", "/blue"}
     ]
-    # Re-add colony /blue if we stripped it
-    for route in list(colony.router.routes):
-        if getattr(route, "path", None) == "/blue":
-            app.router.routes.insert(0, route)
-            break
+    # Re-add colony /blue and /red (prefer the real /red route).
+    for want in ("/blue", "/red"):
+        for route in list(colony.router.routes):
+            if getattr(route, "path", None) == want:
+                app.router.routes.insert(0, route)
+                break
 
-    if index_endpoint is not None:
+    if any(getattr(r, "path", None) == "/red" for r in app.router.routes):
+        report["added"].append("/red -> colony /red (classic queen)")
+        report["red"] = "/red"
+    elif queen_endpoint is not None:
         @app.get("/red", response_class=HTMLResponse, include_in_schema=False)
         def red_colony(request: Request):
-            return index_endpoint(request)
+            return queen_endpoint(request)
 
-        report["added"].append("/red -> colony index (same-origin)")
+        report["added"].append("/red -> colony queen endpoint (same-origin)")
         report["red"] = "/red"
     else:
         @app.get("/red", include_in_schema=False)
@@ -208,6 +237,17 @@ def attach_colony(app: FastAPI) -> dict[str, Any]:
         return RedirectResponse("/red", status_code=302)
 
     report["added"].append("/classic -> /red")
+
+    # insert(0) while iterating colony routes reverses their relative order, so
+    # /api/brain/{target_id} would otherwise sit ahead of literal /nodes and
+    # /logs and 422 them (FastAPI matches in list order). Same fix as
+    # antbb.web.app._reorder_brain_routes.
+    routes = app.router.routes
+    for r in list(routes):
+        if getattr(r, "path", None) == "/api/brain/{target_id}":
+            routes.remove(r)
+            routes.append(r)
+
     report["ok"] = True
     log.info("colony mount ok added=%s", len(report["added"]))
     return report

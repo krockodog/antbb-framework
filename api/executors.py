@@ -217,6 +217,15 @@ def execute(queen_id: str, playbook_id: str, targets: list[str],
             probe_name: str | None, folder: Path) -> dict:
     """Führt die echte Arbeit aus; Fehler werden ehrlich im Dossier vermerkt."""
     try:
+        if queen_id == "red" and playbook_id.startswith("extras-"):
+            from antbb.extras_osint import run_passive, runnable_slugs
+            slug = playbook_id[len("extras-"):]
+            if slug == "osint":
+                return run_passive(targets, None, folder)
+            if slug in runnable_slugs():
+                return run_passive(targets, [slug], folder)
+            return {"executor": "extras-osint", "stub": False,
+                    "note": f"Extras-Werkzeug '{slug}' hat keinen passiven Runner."}
         if queen_id == "red":
             if playbook_id in CLI_TOOLS:
                 return run_cli_tool(playbook_id, targets, folder)

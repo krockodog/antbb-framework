@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Aktivität · Admin · antbb{% endblock %}
+{% block content %}
+{% include "_admin_subnav.html" %}
+<style>.act-wrap{max-width:1200px;margin:0 auto}.act-wrap table{width:100%;border-collapse:collapse;font-size:.85rem}
+.act-wrap td,.act-wrap th{border-bottom:1px solid #262a33;padding:.3rem .4rem;text-align:left;vertical-align:top}
+.act-scroll{overflow-x:auto}.st-running{color:#38e0ff}.st-done{color:#3fb950}.st-failed{color:#f85149}.st-waiting{color:#d29922}</style>
+<div class="act-wrap">
+<section class="card">
+  <h2>📋 Aktivität &amp; ISMS-Log <small id="live-ts" class="hint"></small></h2>
+  <p><a href="/admin/activity/report.pdf?category={{ f.category|urlencode }}&stream={{ f.stream|urlencode }}&result={{ f.result|urlencode }}">⬇ ISMS-Bericht (PDF)</a>
+   · <a href="/admin/activity/export.csv?category={{ f.category|urlencode }}&stream={{ f.stream|urlencode }}&result={{ f.result|urlencode }}">⬇ CSV</a>
+   <small class="hint">· Aktualisierung alle 15 s · Aufbewahrung {{ live.retention_days }} Tage (nur Hinweis, nichts wird gelöscht)</small></p>
+</section>
+<section class="card"><h3>Laufende Aufträge</h3><div class="act-scroll"><table id="t-agents"><tr><th>Auftrag</th><th>Strang</th><th>Status</th><th>gestartet</th><th>aktualisiert</th><th>letzter Schritt</th></tr>
+{% for a in live.agents %}<tr><td>{{ a.title }}</td><td>{{ a.stream }}</td><td class="st-{{ a.status }}">{{ a.status }}</td><td>{{ a.started }}</td><td>{{ a.updated }}</td><td>{{ a.last_step }}</td></tr>{% else %}<tr><td colspan="6">–</td></tr>{% endfor %}</table></div></section>
+<section class="card"><h3>Aktive Sitzungen</h3><div class="act-scroll"><table id="t-sessions"><tr><th>Benutzer</th><th>Rolle</th><th>seit</th><th>zuletzt aktiv</th><th>IP</th><th>Client</th></tr>
+{% for s in live.sessions %}<tr><td>{{ s.username }}</td><td>{{ s.role }}</td><td>{{ fmt_ts(s.since) }}</td><td>{{ fmt_ts(s.last_seen) }}</td><td>{{ s.ip }}</td><td>{{ s.ua }}</td></tr>{% else %}<tr><td colspan="6">–</td></tr>{% endfor %}</table></div></section>
+<section class="card"><h3>Anmelde-Historie</h3><div class="act-scroll"><table id="t-logins"><tr><th>Zeit</th><th>Ereignis</th><th>Benutzer (wie eingegeben)</th><th>IP</th></tr>
+{% for x in live.logins[:50] %}<tr><td>{{ fmt_ts(x.ts) }}</td><td>{{ x.kind }}</td><td>{{ x.username or '' }}</td><td>{{ x.ip }}</td></tr>{% else %}<tr><td colspan="4">–</td></tr>{% endfor %}</table></div></section>
+<section class="card"><h3>Admin-Aktivität</h3><div class="act-scroll"><table id="t-admin"><tr><th>Zeit</th><th>Ereignis</th><th>Benutzer</th><th>Methode</th><th>Pfad</th><th>Status</th><th>Detail</th></tr>
+{% for x in live.admin[:80] %}<tr><td>{{ fmt_ts(x.ts) }}</td><td>{{ x.kind }}</td><td>{{ x.username or '' }}</td><td>{{ x.method }}</td><td><code>{{ x.path }}</code></td><td>{{ x.status or '' }}</td><td>{{ x.detail }}</td></tr>{% else %}<tr><td colspan="7">–</td></tr>{% endfor %}</table></div></section>
+<section class="card"><h3>Änderungsprotokoll (changes.jsonl) <small class="hint">{{ rows|length }} von {{ total }}</small></h3>
+  {% if note %}<p class="hint">{{ note }}</p>{% endif %}
+  <form method="get" action="/admin/activity" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:end">
+    <label>Kategorie<select name="category"><option value="">alle</option>{% for c in cats %}<option{% if c == f.category %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+    <label>Strang<select name="stream"><option value="">alle</option>{% for c in streams %}<option{% if c == f.stream %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+    <label>Ergebnis<select name="result"><option value="">alle</option>{% for c in results %}<option{% if c == f.result %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+    <button type="submit">Filtern</button>
+  </form>
+  <div class="act-scroll"><table><tr><th>Zeit</th><th>Akteur</th><th>Strang</th><th>Kategorie</th><th>Aktion</th><th>Detail</th><th>Annex A</th><th>Risiko vorher → nachher</th><th>Ergebnis</th><th>Backup</th><th>Rückweg</th></tr>
+  {% for r in rows %}<tr><td>{{ r.ts }}</td><td>{{ r.actor }}</td><td>{{ r.stream }}</td><td>{{ r.category }}</td><td>{{ r.action }}</td><td>{{ r.detail }}</td><td>{{ r.iso_control }}</td><td>{{ risk_txt(r.risk_before) }}{% if r.risk_after %} → {{ risk_txt(r.risk_after) }}{% endif %}</td><td>{{ r.result }}</td><td><code>{{ r.backup_ref }}</code></td><td>{{ r.rollback }}</td></tr>
+  {% else %}<tr><td colspan="11">–</td></tr>{% endfor %}</table></div>
+</section>
+</div>
+<script>
+(function(){
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
+  function fill(id, head, rows){ var t=document.getElementById(id); if(!t) return;
+    t.innerHTML=head+(rows.length?rows.join(""):'<tr><td colspan="9">–</td></tr>'); }
+  function tick(){
+    fetch("/api/admin/activity/live",{credentials:"same-origin",headers:{"Accept":"application/json"}})
+      .then(function(r){return r.ok?r.json():null}).then(function(d){ if(!d) return;
+        fill("t-agents","<tr><th>Auftrag</th><th>Strang</th><th>Status</th><th>gestartet</th><th>aktualisiert</th><th>letzter Schritt</th></tr>",
+          (d.agents||[]).map(function(a){return "<tr><td>"+esc(a.title)+"</td><td>"+esc(a.stream)+"</td><td class='st-"+esc(a.status)+"'>"+esc(a.status)+"</td><td>"+esc(a.started)+"</td><td>"+esc(a.updated)+"</td><td>"+esc(a.last_step)+"</td></tr>";}));
+        fill("t-sessions","<tr><th>Benutzer</th><th>Rolle</th><th>seit</th><th>zuletzt aktiv</th><th>IP</th><th>Client</th></tr>",
+          (d.sessions||[]).map(function(s){return "<tr><td>"+esc(s.username)+"</td><td>"+esc(s.role)+"</td><td>"+esc(s.since_h)+"</td><td>"+esc(s.last_seen_h)+"</td><td>"+esc(s.ip)+"</td><td>"+esc(s.ua)+"</td></tr>";}));
+        fill("t-logins","<tr><th>Zeit</th><th>Ereignis</th><th>Benutzer (wie eingegeben)</th><th>IP</th></tr>",
+          (d.logins||[]).slice(0,50).map(function(x){return "<tr><td>"+esc(x.ts_h)+"</td><td>"+esc(x.kind)+"</td><td>"+esc(x.username)+"</td><td>"+esc(x.ip)+"</td></tr>";}));
+        fill("t-admin","<tr><th>Zeit</th><th>Ereignis</th><th>Benutzer</th><th>Methode</th><th>Pfad</th><th>Status</th><th>Detail</th></tr>",
+          (d.admin||[]).slice(0,80).map(function(x){return "<tr><td>"+esc(x.ts_h)+"</td><td>"+esc(x.kind)+"</td><td>"+esc(x.username)+"</td><td>"+esc(x.method)+"</td><td><code>"+esc(x.path)+"</code></td><td>"+esc(x.status||"")+"</td><td>"+esc(x.detail)+"</td></tr>";}));
+        var ts=document.getElementById("live-ts"); if(ts) ts.textContent="· Stand "+new Date().toLocaleTimeString();
+      }).catch(function(){});
+  }
+  setInterval(tick, 15000);
+})();
+</script>
+{% endblock %}

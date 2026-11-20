@@ -5,6 +5,7 @@
   "use strict";
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const TARGETS = window.RQ_TARGETS || [];
+  let OV = {};  // soldier -> {"playbook|key": value} aus /api/capabilities.overrides
   const ICONS = {recon: "🧭", scanning: "🔎", api: "🔌", auth: "🔑", cloud: "☁️", codeaudit: "📜", poc: "💥",
                  llmsec: "🤖", mobile: "📱", infra: "🕸️", osint: "🌍", verify: "✅", analysis: "🧠",
                  reporting: "📄", takeover: "🎯", threatintel: "📰", fuzz: "🌪️", wifi: "📡"};
@@ -48,17 +49,22 @@
     }
     grid.innerHTML = soldiers.map(s => {
       const key = String(s.name || "").replace(/^red-/, "");
+      const ov = (OV[s.name] || []).reduce((m, o) => { m[o.playbook + "|" + o.key] = o.value; return m; }, {});
+      const isDone = (pbName, task) => { const v = ov[pbName + "|task:" + pbName + ":" + task]; return v === "done" || v === "verifiziert"; };
       const pbs = (s.playbooks || []).map(pb => {
         const active = pb.oversight_required || pb.mode === "offensive";
         const items = (pb.task_items || []).map(ti =>
           "<li><label><input type='checkbox' data-pb='" + esc(pb.name) + "' data-task='" + esc(ti.task) + "'" +
-          (ti.checked ? " checked" : "") + "> <span>" + esc(ti.task) + "</span></label></li>").join("");
+          ((ti.checked || isDone(pb.name, ti.task)) ? " checked" : "") + "> <span>" + esc(ti.task) + "</span></label></li>").join("");
         const tools = (pb.tools || []).map(t => "<code>" + esc(t) + "</code>").join("");
         return "<section class='rq-pb" + (pb.oversight_required ? " rq-pb-gated" : "") + "'>" +
           "<div class='rq-pb-head'><h5>" + esc(pb.name) + "</h5>" +
           "<span class='rq-mode" + (active ? " rq-mode-active" : "") + "'>" + (active ? "aktiv" : "defensiv") + "</span>" +
           (pb.oversight_required ? "<span class='rq-lock'>🔒 Oversight</span>" : "") +
-          "<span class='rq-pb-count'>" + (pb.task_items || []).length + " Schritte</span></div>" +
+          "<span class='rq-pb-count'>" + (pb.task_items || []).length + " Schritte</span>" +
+          ((pb.task_items || []).length ? "<label class='rq-sel rq-sel-pb' title='" + esc(window.t("red.sel.pb_title")) + "'>" +
+            "<input type='checkbox' class='rq-pb-all' data-pb='" + esc(pb.name) + "'> " + esc(window.t("red.sel.all")) + "</label>" : "") +
+          "</div>" +
           (pb.description ? "<p class='rq-pb-desc'>" + esc(pb.description) + "</p>" : "") +
           (tools ? "<p class='rq-pb-tools'><span>Tools</span>" + tools + "</p>" : "") +
           (items ? "<ul class='rq-tasks'>" + items + "</ul>" : "") +
@@ -70,6 +76,8 @@
         "<div class='rq-id'><h4>" + esc(s.specialty || s.name) + "</h4><code>" + esc(s.name) + "</code></div>" +
         "<span class='rq-prog' data-prog>0/0</span></div>" +
         "<p class='rq-role'>" + esc(s.role || "") + "</p>" +
+        "<label class='rq-sel rq-sel-card'><input type='checkbox' class='rq-card-all'> " +
+          esc(window.t("red.sel.card")) + "</label>" +
         "<div class='rq-bar'><span data-bar style='width:0%'></span></div>" +
         "<div class='rq-pbs'>" + (pbs || "<p class='hint'>Keine Playbooks.</p>") + "</div>" +
         "<div class='rq-foot'><span>" + (s.playbooks || []).length + " Playbooks · " + (skill.task_count || 0) + " Aufgaben</span>" +
@@ -83,9 +91,23 @@
     });
   }
 
+  function triState(box, all, on) {
+    if (!box) return;
+    box.checked = all > 0 && on === all;
+    box.indeterminate = on > 0 && on < all;
+  }
+
   function refresh(card) {
     const boxes = card.querySelectorAll(".rq-tasks input");
     const done = card.querySelectorAll(".rq-tasks input:checked").length;
+    card.querySelectorAll(".rq-pb").forEach(sec => {
+      const tb = sec.querySelectorAll(".rq-tasks input");
+      const on = sec.querySelectorAll(".rq-tasks input:checked").length;
+      triState(sec.querySelector(".rq-pb-all"), tb.length, on);
+      const cnt = sec.querySelector(".rq-pb-count");
+      if (cnt) cnt.textContent = on + "/" + tb.length + " Schritte";
+    });
+    triState(card.querySelector(".rq-card-all"), boxes.length, done);
     const badge = card.querySelector("[data-prog]");
     if (badge) {
       badge.textContent = done + "/" + boxes.length;
@@ -94,6 +116,60 @@
     const bar = card.querySelector("[data-bar]");
     if (bar) bar.style.width = (boxes.length ? Math.round(100 * done / boxes.length) : 0) + "%";
   }
+
+  /* „Alle anwählen" auf drei Ebenen: Playbook (tri-state), Soldat, global.
+     Ein Haken ist nur eine Checklisten-Markierung (Override). Oversight-/Scope-
+     Gates beim tatsächlichen Start bleiben unverändert – 🔒 bleibt 🔒. */
+  function setStatus(msg, bad) {
+    const el = document.getElementById("rq-sel-status");
+    if (el) { el.textContent = msg || ""; el.classList.toggle("blocked", !!bad); }
+  }
+  function bulkSet(boxes, on) {
+    const changed = [];
+    boxes.forEach(cb => { if (cb.checked !== on) { cb.checked = on; changed.push(cb); } });
+    const cards = new Set(changed.map(cb => cb.closest(".rq-scard")));
+    cards.forEach(c => c && refresh(c));
+    if (!changed.length) return Promise.resolve(0);
+    const items = changed.map(cb => ({
+      soldier: cb.closest(".rq-scard").dataset.name, playbook: cb.dataset.pb,
+      key: "task:" + cb.dataset.pb + ":" + cb.dataset.task, value: on ? "done" : "offen"}));
+    setStatus(window.t("red.sel.saving", {n: items.length}));
+    const chunks = [];
+    for (let i = 0; i < items.length; i += 500) chunks.push(items.slice(i, i + 500));
+    return chunks.reduce((p, chunk) => p.then(() => fetch("/api/soldiers/overrides/batch", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({items: chunk})
+    }).then(r => { if (!r.ok) throw new Error(r.status); })), Promise.resolve())
+      .then(() => { setStatus(window.t("red.sel.saved", {n: items.length})); return items.length; })
+      .catch(err => {
+        changed.forEach(cb => { cb.checked = !on; });
+        cards.forEach(c => c && refresh(c));
+        setStatus(window.t("red.sel.error", {err: String(err && err.message || err)}), true);
+      });
+  }
+  document.addEventListener("change", ev => {
+    const el = ev.target;
+    if (!el.matches) return;
+    if (el.matches(".rq-pb-all")) {
+      const sec = el.closest(".rq-pb");
+      bulkSet(Array.from(sec.querySelectorAll(".rq-tasks input")), el.checked);
+    } else if (el.matches(".rq-card-all")) {
+      const card = el.closest(".rq-scard");
+      bulkSet(Array.from(card.querySelectorAll(".rq-tasks input")), el.checked);
+    }
+  });
+  function globalSet(on) {
+    const boxes = [];
+    document.querySelectorAll(".rq-scard").forEach(c => {
+      if (!c.hidden) c.querySelectorAll(".rq-tasks input").forEach(cb => boxes.push(cb));
+    });
+    return bulkSet(boxes, on);
+  }
+  const selAll = document.getElementById("rq-select-all");
+  const selNone = document.getElementById("rq-select-none");
+  if (selAll) selAll.addEventListener("click", () => globalSet(true));
+  if (selNone) selNone.addEventListener("click", () => globalSet(false));
+  window.rqGlobalSelect = globalSet;
 
   /* Haken speichern (gleiche Override-API wie Blue) */
   document.addEventListener("change", ev => {
@@ -228,10 +304,11 @@
       log.scrollTop = log.scrollHeight;
     }).catch(() => {});
   }
+  const isGuest = ["viewer", "guest_user"].indexOf(document.body.getAttribute("data-role") || "") >= 0;
   function startRun(targetId, opts) {
     const depth = opts.depth || "light";
-    const active = Boolean(opts.active);
-    const ack = Boolean(opts.ack);
+    const active = isGuest ? false : Boolean(opts.active);
+    const ack = isGuest ? false : Boolean(opts.ack);
     const phases = opts.phases || null;
     const label = opts.label || "Kolonie-Lauf";
     const btn = opts.button || null;
@@ -316,10 +393,37 @@
     });
   }
 
+
+  const cancelBtn = document.getElementById("rq-cancel");
+  if (cancelBtn && form) {
+    cancelBtn.hidden = !isGuest && cancelBtn.hidden;
+    cancelBtn.addEventListener("click", ev => {
+      ev.preventDefault();
+      const targetId = form.target_id && form.target_id.value;
+      if (!targetId) { if (log) log.textContent = window.t("red.need_target"); return; }
+      cancelBtn.disabled = true;
+      fetch("/api/targets/" + targetId + "/scan/cancel", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: "{}"
+      }).then(r => r.json().then(d => ({ok: r.ok, d}))).then(({ok, d}) => {
+        if (log) log.textContent += "\n" + (d.detail || d.status || JSON.stringify(d)) + "\n";
+      }).catch(e => { if (log) log.textContent += "Abbruch-Fehler: " + e.message + "\n"; })
+        .finally(() => { cancelBtn.disabled = false; });
+    });
+    // Show cancel while a scan is running
+    setInterval(() => {
+      fetch("/api/targets/" + (form.target_id && form.target_id.value || "0") + "/scan/status")
+        .then(r => r.json()).then(d => {
+          cancelBtn.hidden = !d || d.status !== "running";
+        }).catch(() => {});
+    }, 3000);
+  }
+
   /* ---------- Daten laden ---------- */
   function loadAll() {
     fetch("/api/capabilities").then(r => r.json()).then(cap => {
       CAP = cap;
+      OV = cap.overrides || {};
       const reds = (cap.soldiers || []).filter(s => s.colony !== "blue");
       const pbN = reds.reduce((n, s) => n + (s.playbooks || []).length, 0);
       const taskN = reds.reduce((n, s) => n + ((s.skill || {}).task_count || 0), 0);

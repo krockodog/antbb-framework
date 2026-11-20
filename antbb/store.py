@@ -18,6 +18,11 @@ DEFAULT_DB_PATH = os.environ.get(
 )
 
 
+# Rollen fuer Web-Benutzer. member = Operator (Scope/Oversight/Scans), kein
+# User-Management. viewer/guest_user = Gast (Deny-by-Default in hosted).
+USER_ROLES = ("admin", "member", "member_plus", "viewer", "guest_user")
+
+
 def _now() -> float:
     return time.time()
 
@@ -237,7 +242,7 @@ CREATE TABLE IF NOT EXISTS users (
     pw_hash    TEXT NOT NULL,             -- PBKDF2-HMAC-SHA256 (hex)
     pw_salt    TEXT NOT NULL,             -- zufaelliges Salz (hex)
     pw_iter    INTEGER NOT NULL DEFAULT 240000,
-    role       TEXT NOT NULL DEFAULT 'viewer',  -- admin | viewer
+    role       TEXT NOT NULL DEFAULT 'viewer',  -- admin | member | member_plus | viewer | guest_user
     active      INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL
 );
@@ -248,6 +253,39 @@ CREATE TABLE IF NOT EXISTS sessions (
     role       TEXT NOT NULL DEFAULT 'viewer',
     created_at REAL NOT NULL,
     expires_at REAL NOT NULL
+);
+
+-- ---- Sicherheits-Alarme (nur Web-UI, nur admin sichtbar) -------------------
+-- Kein E-Mail-/Push-Versand. Quittieren setzt acked_at, nichts wird geloescht.
+CREATE TABLE IF NOT EXISTS alerts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL,             -- login_limited | admin_denied | owner_denied | invite_invalid | ...
+    severity   TEXT NOT NULL DEFAULT 'warn',
+    username   TEXT,                      -- NULL = nicht angemeldet
+    ip         TEXT DEFAULT '',
+    path       TEXT DEFAULT '',
+    detail     TEXT DEFAULT '',
+    created_at REAL NOT NULL,
+    acked_at   REAL,
+    acked_by   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_open ON alerts(acked_at);
+
+-- ---- Einladungen (Admin-Portal) -------------------------------------------
+-- Einladungslink /invite/<token>. Die eingeladene Person waehlt ihr Passwort
+-- selbst. Widerruf ist weich (revoked=1), nichts wird geloescht.
+CREATE TABLE IF NOT EXISTS invites (
+    token      TEXT PRIMARY KEY,          -- secrets.token_urlsafe (nie voll geloggt)
+    ref        TEXT UNIQUE,               -- kurze, oeffentliche Kennung fuer Liste/Widerruf
+    email      TEXT NOT NULL DEFAULT '',  -- optional, lowercased
+    username   TEXT NOT NULL DEFAULT '',  -- optional vorbelegt (dann fest)
+    role       TEXT NOT NULL DEFAULT 'member',
+    created_by TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL,
+    used_at    REAL,
+    used_by    TEXT,
+    revoked    INTEGER NOT NULL DEFAULT 0
 );
 
 -- ---- Opt-in: eigene Assets fuer ungefaehrliche TLS/Header-Checks ----------
@@ -390,6 +428,30 @@ class Store:
             self._conn.execute(
                 "ALTER TABLE findings ADD COLUMN false_positive INTEGER NOT NULL DEFAULT 0"
             )
+        hcols = {r[1] for r in self._conn.execute("PRAGMA table_info(run_history)").fetchall()}
+        if "started_by" not in hcols:
+            self._conn.execute(
+                "ALTER TABLE run_history ADD COLUMN started_by TEXT NOT NULL DEFAULT ''"
+            )
+        # Pro-User-Trennung (additiv, nullable). Alt-Eintraege bleiben NULL =
+        # "ohne Zuordnung" und sind nur fuer admin sichtbar. Kein Backfill.
+        if "owner_user" not in hcols:
+            self._conn.execute("ALTER TABLE run_history ADD COLUMN owner_user TEXT")
+        if "owner_user" not in cols:
+            self._conn.execute("ALTER TABLE targets ADD COLUMN owner_user TEXT")
+        # 2FA (TOTP) + Kick/Sperre – additiv, nullable.
+        ucols = {r[1] for r in self._conn.execute("PRAGMA table_info(users)").fetchall()}
+        for col, ddl in (
+            ("totp_enabled", "INTEGER NOT NULL DEFAULT 0"),
+            ("totp_secret_enc", "TEXT"),
+            ("totp_pending_enc", "TEXT"),
+            ("totp_last_step", "INTEGER"),
+            ("recovery_hashes", "TEXT"),
+            ("disabled_at", "REAL"),
+            ("disabled_by", "TEXT"),
+        ):
+            if col not in ucols:
+                self._conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
 
     # ---------------- Targets ----------------
     def add_target(self, name: str, description: str = "",
@@ -418,6 +480,12 @@ class Store:
         return self._conn.execute(
             "SELECT * FROM targets WHERE name=?", (str(name_or_id),)
         ).fetchone()
+
+    def list_targets_owned(self, owner: str) -> list[sqlite3.Row]:
+        """Aktive Targets eines Benutzers (Pro-User-Trennung fuer member/member_plus)."""
+        return self._conn.execute(
+            "SELECT * FROM targets WHERE archived_at IS NULL AND owner_user=? "
+            "ORDER BY created_at DESC", (owner,)).fetchall()
 
     def list_targets(self, include_archived: bool = False) -> list[sqlite3.Row]:
         """Aktive Targets (Default). Archivierte (Papierkorb) sind ausgeblendet,
@@ -622,12 +690,13 @@ class Store:
 
     def list_users(self):
         return self._conn.execute(
-            "SELECT id, username, role, active, created_at FROM users "
-            "ORDER BY created_at").fetchall()
+            "SELECT id, username, role, active, created_at, "
+            "COALESCE(totp_enabled,0) AS totp_enabled, disabled_at, disabled_by "
+            "FROM users ORDER BY created_at").fetchall()
 
     def create_user(self, username: str, pw_hash: str, pw_salt: str,
                     role: str = "viewer", pw_iter: int = 240000) -> int:
-        role = role if role in ("admin", "viewer") else "viewer"
+        role = role if role in USER_ROLES else "viewer"
         cur = self._conn.execute(
             "INSERT INTO users (username, pw_hash, pw_salt, pw_iter, role, "
             "active, created_at) VALUES (?,?,?,?,?,1,?)",
@@ -643,14 +712,140 @@ class Store:
         self._conn.commit()
 
     def set_user_role(self, username: str, role: str) -> None:
-        role = role if role in ("admin", "viewer") else "viewer"
+        role = role if role in USER_ROLES else "viewer"
         self._conn.execute("UPDATE users SET role=? WHERE username=?",
                            (role, username))
+        # Laufende Sessions sofort auf die neue Rolle ziehen (kein Re-Login noetig,
+        # keine veraltete Admin-Session nach einer Herabstufung).
+        self._conn.execute("UPDATE sessions SET role=? WHERE username=?",
+                           (role, username))
         self._conn.commit()
+
+    def set_user_active(self, username: str, active: bool) -> None:
+        """Weiches Deaktivieren. Inaktive Benutzer verlieren alle Sessions."""
+        self._conn.execute("UPDATE users SET active=? WHERE username=?",
+                           (1 if active else 0, username))
+        if not active:
+            self._conn.execute("DELETE FROM sessions WHERE username=?", (username,))
+        self._conn.commit()
+
+    def set_user_disabled(self, username: str, disabled: bool, by: str = "") -> None:
+        """Kick & Sperre: active=0 + disabled_at, alle Sessions sofort weg.
+        Entsperren setzt active=1. Nichts wird geloescht."""
+        if disabled:
+            self._conn.execute(
+                "UPDATE users SET active=0, disabled_at=?, disabled_by=? WHERE username=?",
+                (_now(), by, username))
+            self._conn.execute("DELETE FROM sessions WHERE username=?", (username,))
+            self._conn.execute(
+                "UPDATE invites SET revoked=1 WHERE created_by=? AND used_at IS NULL",
+                (username,))
+        else:
+            self._conn.execute(
+                "UPDATE users SET active=1, disabled_at=NULL, disabled_by=NULL WHERE username=?",
+                (username,))
+        self._conn.commit()
+
+    # ---- 2FA (Secret nur verschluesselt) ----
+    def set_totp_pending(self, username: str, enc: Optional[str]) -> None:
+        self._conn.execute("UPDATE users SET totp_pending_enc=? WHERE username=?",
+                           (enc, username))
+        self._conn.commit()
+
+    def enable_totp(self, username: str, enc: str, step: int, recovery_json: str) -> None:
+        self._conn.execute(
+            "UPDATE users SET totp_enabled=1, totp_secret_enc=?, totp_pending_enc=NULL, "
+            "totp_last_step=?, recovery_hashes=? WHERE username=?",
+            (enc, int(step), recovery_json, username))
+        self._conn.commit()
+
+    def disable_totp(self, username: str) -> None:
+        self._conn.execute(
+            "UPDATE users SET totp_enabled=0, totp_secret_enc=NULL, totp_pending_enc=NULL, "
+            "totp_last_step=NULL, recovery_hashes=NULL WHERE username=?", (username,))
+        self._conn.commit()
+
+    def set_totp_last_step(self, username: str, step: int) -> bool:
+        """Atomar, Replay-Schutz: nur wenn step groesser als der gespeicherte."""
+        cur = self._conn.execute(
+            "UPDATE users SET totp_last_step=? WHERE username=? AND "
+            "(totp_last_step IS NULL OR totp_last_step < ?)",
+            (int(step), username, int(step)))
+        self._conn.commit()
+        return bool(cur.rowcount)
+
+    def set_recovery_hashes(self, username: str, recovery_json: str) -> None:
+        self._conn.execute("UPDATE users SET recovery_hashes=? WHERE username=?",
+                           (recovery_json, username))
+        self._conn.commit()
+
+    def count_active_admins(self) -> int:
+        r = self._conn.execute(
+            "SELECT COUNT(*) AS c FROM users WHERE role='admin' AND active=1"
+        ).fetchone()
+        return int(r["c"]) if r else 0
 
     def delete_user(self, username: str) -> None:
         self._conn.execute("DELETE FROM users WHERE username=?", (username,))
         self._conn.commit()
+
+    # ---- Einladungen (Token nie voll geloggt) ----
+    def create_invite(self, token: str, ref: str, role: str, created_by: str,
+                      email: str = "", username: str = "",
+                      ttl_seconds: float = 86400 * 7) -> None:
+        role = role if role in USER_ROLES else "member"
+        now = _now()
+        self._conn.execute(
+            "INSERT INTO invites (token, ref, email, username, role, created_by, "
+            "created_at, expires_at, revoked) VALUES (?,?,?,?,?,?,?,?,0)",
+            (token, ref, (email or "").strip().lower(), (username or "").strip(),
+             role, created_by, now, now + float(ttl_seconds)))
+        self._conn.commit()
+
+    def get_invite(self, token: str):
+        if not token:
+            return None
+        return self._conn.execute(
+            "SELECT * FROM invites WHERE token=?", (token,)).fetchone()
+
+    def get_invite_by_ref(self, ref: str):
+        if not ref:
+            return None
+        return self._conn.execute(
+            "SELECT * FROM invites WHERE ref=?", (ref,)).fetchone()
+
+    def list_invites(self, pending_only: bool = False):
+        sql = "SELECT * FROM invites"
+        args: tuple = ()
+        if pending_only:
+            sql += " WHERE revoked=0 AND used_at IS NULL AND expires_at >= ?"
+            args = (_now(),)
+        return self._conn.execute(sql + " ORDER BY created_at DESC", args).fetchall()
+
+    def revoke_invite(self, token: str) -> bool:
+        cur = self._conn.execute(
+            "UPDATE invites SET revoked=1 WHERE token=? AND used_at IS NULL",
+            (token,))
+        self._conn.commit()
+        return bool(cur.rowcount)
+
+    def claim_invite(self, token: str, used_by: str) -> bool:
+        """Atomar: nur ein offenes, gueltiges Invite kann eingeloest werden."""
+        cur = self._conn.execute(
+            "UPDATE invites SET used_at=?, used_by=? WHERE token=? AND revoked=0 "
+            "AND used_at IS NULL AND expires_at >= ?",
+            (_now(), used_by, token, _now()))
+        self._conn.commit()
+        return bool(cur.rowcount)
+
+    def release_invite(self, token: str) -> None:
+        """Claim zuruecknehmen, wenn das Anlegen des Benutzers scheiterte."""
+        self._conn.execute(
+            "UPDATE invites SET used_at=NULL, used_by=NULL WHERE token=?", (token,))
+        self._conn.commit()
+
+    def mark_invite_used(self, token: str, used_by: str) -> bool:
+        return self.claim_invite(token, used_by)
 
     # ---- Sessions (Token nie geloggt) ----
     def create_session(self, token: str, username: str, role: str,
@@ -677,6 +872,14 @@ class Store:
     def delete_session(self, token: str) -> None:
         self._conn.execute("DELETE FROM sessions WHERE token=?", (token,))
         self._conn.commit()
+
+    def delete_user_sessions(self, username: str, keep_token: str = "") -> int:
+        """Alle Sessions eines Benutzers loeschen, optional eine behalten."""
+        cur = self._conn.execute(
+            "DELETE FROM sessions WHERE username=? AND token<>?",
+            (username, keep_token or ""))
+        self._conn.commit()
+        return cur.rowcount or 0
 
     def purge_expired_sessions(self) -> int:
         cur = self._conn.execute(
@@ -749,28 +952,129 @@ class Store:
                         finding_count: int = 0, severity: Optional[dict] = None,
                         error: str = "", started_at: Optional[float] = None,
                         finished_at: Optional[float] = None,
-                        duration: Optional[float] = None) -> int:
+                        duration: Optional[float] = None,
+                        started_by: str = "",
+                        owner_user: Optional[str] = None) -> int:
         cur = self._conn.execute(
             "INSERT INTO run_history (run_id, target_id, target_name, mode, "
             "active, fuzz, offensive, status, finding_count, severity, error, "
-            "started_at, finished_at, duration, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "started_at, finished_at, duration, created_at, started_by, owner_user) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (run_id, target_id, target_name, mode, 1 if active else 0,
              1 if fuzz else 0, 1 if offensive else 0, status, int(finding_count),
              json.dumps(severity or {}), error, started_at, finished_at,
-             duration, _now()))
+             duration, _now(), started_by or "", (owner_user or None)))
         self._conn.commit()
         return cur.lastrowid
 
-    def list_run_history(self, target_id: Optional[int] = None, limit: int = 200):
+    UNOWNED = object()  # Marker: nur Eintraege ohne Owner
+
+    def list_run_history(self, target_id: Optional[int] = None, limit: int = 200,
+                         owner: Any = None):
+        """owner=None: alle (admin). owner="name": nur dessen Laeufe.
+        owner=Store.UNOWNED: nur Alt-Eintraege ohne Zuordnung."""
+        where, args = [], []
         if target_id is not None:
-            return self._conn.execute(
-                "SELECT * FROM run_history WHERE target_id=? "
-                "ORDER BY created_at DESC LIMIT ?",
-                (int(target_id), int(limit))).fetchall()
-        return self._conn.execute(
-            "SELECT * FROM run_history ORDER BY created_at DESC LIMIT ?",
-            (int(limit),)).fetchall()
+            where.append("target_id=?")
+            args.append(int(target_id))
+        if owner is Store.UNOWNED:
+            where.append("(owner_user IS NULL OR owner_user='')")
+        elif owner is not None:
+            where.append("owner_user=?")
+            args.append(str(owner))
+        sql = "SELECT * FROM run_history"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        args.append(int(limit))
+        return self._conn.execute(sql, tuple(args)).fetchall()
+
+    def run_history_owners(self) -> list:
+        rows = self._conn.execute(
+            "SELECT COALESCE(NULLIF(owner_user,''), '') AS o, COUNT(*) AS n "
+            "FROM run_history GROUP BY o ORDER BY o").fetchall()
+        return [(r["o"], int(r["n"])) for r in rows]
+
+    def set_target_owner(self, target_id: int, owner_user: Optional[str]) -> None:
+        self._conn.execute("UPDATE targets SET owner_user=? WHERE id=?",
+                           (owner_user or None, int(target_id)))
+        self._conn.commit()
+
+    def target_owner(self, target_id: int) -> Optional[str]:
+        r = self._conn.execute("SELECT owner_user FROM targets WHERE id=?",
+                               (int(target_id),)).fetchone()
+        return (r["owner_user"] or None) if r else None
+
+    def report_target_id(self, report_id: int) -> Optional[int]:
+        try:
+            r = self._conn.execute("SELECT target_id FROM reports WHERE id=?",
+                                   (int(report_id),)).fetchone()
+        except Exception:
+            return None
+        return int(r["target_id"]) if r and r["target_id"] is not None else None
+
+    # ---------------- Sicherheits-Alarme (nur Web-UI) ----------------
+    def add_alert(self, kind: str, *, username: Optional[str] = None, ip: str = "",
+                  path: str = "", detail: str = "", severity: str = "warn",
+                  dedupe_seconds: float = 300) -> Optional[int]:
+        """Legt einen Alarm an. Gleicher offener Alarm (kind/user/ip/path) im
+        Fenster wird nicht doppelt angelegt (kein Alarm-Flooding)."""
+        since = _now() - float(dedupe_seconds)
+        dup = self._conn.execute(
+            "SELECT id FROM alerts WHERE acked_at IS NULL AND kind=? "
+            "AND COALESCE(username,'')=? AND ip=? AND path=? AND created_at>=?",
+            (kind, username or "", ip or "", (path or "")[:200], since)).fetchone()
+        if dup:
+            return None
+        cur = self._conn.execute(
+            "INSERT INTO alerts (kind, severity, username, ip, path, detail, created_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (kind, severity, username or None, ip or "", (path or "")[:200],
+             (detail or "")[:300], _now()))
+        self._conn.commit()
+        return cur.lastrowid
+
+    def alert_counts_since(self, kinds, since: float) -> dict:
+        """{kind: anzahl} der Alarme dieser Arten seit ``since`` (quittiert oder nicht)."""
+        kinds = list(kinds or [])
+        if not kinds:
+            return {}
+        marks = ",".join("?" for _ in kinds)
+        rows = self._conn.execute(
+            f"SELECT kind, COUNT(*) AS n FROM alerts WHERE created_at>? AND kind IN ({marks}) "
+            "GROUP BY kind", (float(since), *kinds)).fetchall()
+        return {r["kind"]: int(r["n"]) for r in rows}
+
+    def count_open_alerts(self) -> int:
+        r = self._conn.execute(
+            "SELECT COUNT(*) AS c FROM alerts WHERE acked_at IS NULL").fetchone()
+        return int(r["c"]) if r else 0
+
+    def list_alerts(self, open_only: bool = False, limit: int = 200):
+        sql = "SELECT * FROM alerts"
+        if open_only:
+            sql += " WHERE acked_at IS NULL"
+        return self._conn.execute(sql + " ORDER BY created_at DESC LIMIT ?",
+                                  (int(limit),)).fetchall()
+
+    def open_alert_users(self) -> dict:
+        """{username|'' : anzahl} offener Alarme. '' = nicht angemeldet / IP."""
+        rows = self._conn.execute(
+            "SELECT COALESCE(username,'') AS u, COUNT(*) AS n FROM alerts "
+            "WHERE acked_at IS NULL GROUP BY u").fetchall()
+        return {r["u"]: int(r["n"]) for r in rows}
+
+    def ack_alerts(self, acked_by: str, alert_id: Optional[int] = None) -> int:
+        if alert_id is None:
+            cur = self._conn.execute(
+                "UPDATE alerts SET acked_at=?, acked_by=? WHERE acked_at IS NULL",
+                (_now(), acked_by))
+        else:
+            cur = self._conn.execute(
+                "UPDATE alerts SET acked_at=?, acked_by=? WHERE id=? AND acked_at IS NULL",
+                (_now(), acked_by, int(alert_id)))
+        self._conn.commit()
+        return cur.rowcount or 0
 
     # ---------------- Report-Nachträge (Addenda) ----------------
     def add_addendum(self, report_id: int, text: str, author: str = "") -> int:

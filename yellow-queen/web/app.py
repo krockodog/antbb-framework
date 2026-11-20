@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+import os
 from fastapi.templating import Jinja2Templates
 
 from .. import QUEEN_ID, __version__, config, db
@@ -18,9 +19,41 @@ from ..gates import GATE_TEXT_DE, GateError, check
 from ..queen import neural_brain, orchestrator
 
 HERE = Path(__file__).resolve().parent
-app = FastAPI(title="Yellow Queen RE", version=__version__)
+app = FastAPI(title="Yellow Queen RE", version=__version__,
+              docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=str(HERE / "templates"))
+
+def _hosted_mode() -> bool:
+    return os.environ.get("ANTBB_HOSTED", "").strip().lower() in {"1", "true", "yes", "on"}
+
+templates.env.globals["hosted_mode"] = _hosted_mode
+
+
+def _attach_shared_nav() -> bool:
+    """Gemeinsame obere Leiste (antbb _topnav.html) nutzen, wenn die Yellow
+    Queen im All-and-One-Prozess laeuft. Standalone bleibt die eigene Leiste."""
+    import sys
+    mod = sys.modules.get("antbb.web.app")
+    if mod is None:
+        return False
+    try:
+        import jinja2
+        shared = Path(mod.__file__).resolve().parent / "templates"
+        templates.env.loader = jinja2.ChoiceLoader(
+            [templates.env.loader, jinja2.FileSystemLoader(str(shared))])
+        src = mod.templates.env.globals
+        for key in ("t", "is_admin", "current_user", "lang_href", "current_lang", "can_wlan"):
+            if key in src:
+                templates.env.globals[key] = src[key]
+        templates.env.globals["antbb_shared_nav"] = True
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+_attach_shared_nav()
+
 CASE_RX = re.compile(r"^yq-[0-9A-Za-z-]{6,64}$")
 DOC_FILES = {"ledger.md", "dossier.md"}
 
@@ -126,8 +159,15 @@ def _receive(file: UploadFile) -> Path:
         with fd:
             while chunk := file.file.read(1 << 20):
                 size += len(chunk)
-                if size > config.MAX_UPLOAD_BYTES:
-                    raise HTTPException(413, f"Datei zu groß (max. {config.MAX_UPLOAD_BYTES // (1024 * 1024)} MB, YQ_MAX_UPLOAD_MB)")
+                limit = config.MAX_UPLOAD_BYTES
+                try:
+                    from antbb import hosted as _hosted
+                    if _hosted.current_request_is_guest():
+                        limit = min(limit, _hosted.guest_upload_limit_bytes())
+                except Exception:
+                    pass
+                if size > limit:
+                    raise HTTPException(413, f"Datei zu groß (max. {limit // (1024 * 1024)} MB)")
                 fd.write(chunk)
         if size == 0:
             raise HTTPException(400, "Leere Datei")
@@ -193,8 +233,15 @@ def api_snapshot(case: Optional[str] = None):
 
 
 @app.get("/api/doctor")
-def api_doctor(versions: bool = True):
-    return run_doctor(versions)
+def api_doctor(request: Request, versions: bool = True):
+    data = run_doctor(versions)
+    user = getattr(request.state, "user", None) or {}
+    if user.get("role") != "admin" and isinstance(data, dict):
+        # Leck-Audit: interne Pfade/Versionen nur fuer Admins.
+        data = {k: v for k, v in data.items() if k not in {"python", "platform"}}
+        data["tools"] = [{k: v for k, v in dict(t).items() if k not in {"path", "version", "version_line"}}
+                         for t in data.get("tools", [])]
+    return data
 
 
 @app.get("/api/cases")

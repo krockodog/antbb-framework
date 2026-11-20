@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Ollama · Admin · antbb{% endblock %}
+{% block content %}
+{% include "_admin_subnav.html" %}
+<section class="card">
+  <h2>🦙 Ollama (lokal)</h2>
+  {% if message %}<p class="ok">{{ message }}</p>{% endif %}
+  {% if error %}<p class="blocked">{{ error }}</p>{% endif %}
+  <p>Status: {% if st.reachable %}<span class="ok">✔ erreichbar</span> · Version <code>{{ st.version }}</code>{% else %}<span class="blocked">✘ nicht erreichbar</span> <small>({{ st.error }})</small>{% endif %}
+   <small class="hint">· nur intern (127.0.0.1), kein Zugriff von außen</small></p>
+  <h3>Aktives Modell für antbb</h3>
+  <table>
+    <tr><th>Haupt-/Flash-Modell</th><td><code>{{ st.active.main_model }}</code> / <code>{{ st.active.fast_model }}</code></td></tr>
+    <tr><th>Ollama-Provider-Modell</th><td><code>{{ st.active.ollama_provider_model }}</code></td></tr>
+    <tr><th>Quelle</th><td>{{ {'setting':'Admin-Auswahl (DB)','env':'Umgebung (antbb.env)','config':'Konfiguration'}[st.active.source] }}{% if st.active.saved %} · gespeichert: <code>{{ st.active.saved }}</code>{% endif %}</td></tr>
+    <tr><th>Standard-Provider</th><td><code>{{ st.active.default_provider }}</code></td></tr>
+  </table>
+  {% if st.models %}
+  <form method="post" action="/admin/ollama/model" style="margin-top:.8rem">
+    <label>Modell wählen
+      <select name="model">{% for m in st.models %}<option value="{{ m.name }}"{% if m.name == st.active.main_model %} selected{% endif %}>{{ m.name }}</option>{% endfor %}</select>
+    </label>
+    <button type="submit">Als aktives Modell setzen</button>
+  </form>
+  {% endif %}
+</section>
+<section class="card">
+  <h3>Installierte Modelle</h3>
+  <table><tr><th>Name</th><th>Größe</th><th>Parameter</th><th>Quantisierung</th><th></th></tr>
+  {% for m in st.models %}<tr><td><code>{{ m.name }}</code></td><td>{{ m.size_h }}</td><td>{{ m.parameters }}</td><td>{{ m.quantization }}</td>
+    <td><form method="post" action="/admin/ollama/load" style="display:inline"><input type="hidden" name="model" value="{{ m.name }}"><button type="submit">Jetzt laden</button></form>
+        <form method="post" action="/admin/ollama/unload" style="display:inline"><input type="hidden" name="model" value="{{ m.name }}"><button type="submit">Entladen</button></form></td></tr>
+  {% else %}<tr><td colspan="5">–</td></tr>{% endfor %}</table>
+  <h3>Geladen (RAM/VRAM)</h3>
+  <table><tr><th>Name</th><th>Größe</th><th>VRAM</th><th>läuft ab</th></tr>
+  {% for m in st.loaded %}<tr><td><code>{{ m.name }}</code></td><td>{{ m.size_h }}</td><td>{{ m.size_vram_h }}</td><td>{{ m.expires_at }}</td></tr>
+  {% else %}<tr><td colspan="4">Nichts geladen.</td></tr>{% endfor %}</table>
+</section>
+<section class="card">
+  <h3>Host</h3>
+  <p>RAM: {{ st.host.mem_available_h }} frei von {{ st.host.mem_total_h }} · Load: {{ (st.host.load or [])|join(' / ') }} · CPUs: {{ st.host.cpus }}</p>
+  <p class="hint">{{ st.process_note }}</p>
+</section>
+{% endblock %}

@@ -1,0 +1,1141 @@
+{
+ "label": "Extras",
+ "kind": "osint-catalog",
+ "source": "enna src/data/tools.json (nur Daten, App nie gebaut/gestartet)",
+ "source_total": 442,
+ "included_categories": [
+  "osint-general",
+  "osint-social",
+  "subdomain-enum",
+  "threat-intel"
+ ],
+ "extra_slugs": [
+  "cdncheck",
+  "censys-cli",
+  "gau",
+  "shodan-cli",
+  "smap",
+  "uncover",
+  "waybackurls"
+ ],
+ "excluded_categories": [
+  "cloud-recon",
+  "container-security",
+  "crypto-tracing",
+  "dual-use",
+  "exploitation",
+  "forensics",
+  "mobile",
+  "network-recon",
+  "offensive-ops",
+  "password-attack",
+  "phishing",
+  "reverse-engineering",
+  "vulnerability",
+  "web-scanning",
+  "wireless"
+ ],
+ "excluded_entries": [
+  {
+   "slug": "holehe",
+   "reason": "nutzt Passwort-Reset-Funktionen fremder Dienste"
+  },
+  {
+   "slug": "knockpy",
+   "reason": "Wordlist-Brute-Force + Zonentransfer"
+  },
+  {
+   "slug": "twint",
+   "reason": "Scraping ohne API (ToS), Projekt eingestellt"
+  },
+  {
+   "slug": "osintgram",
+   "reason": "Instagram-Private-API / PII-Abgriff"
+  },
+  {
+   "slug": "photon",
+   "reason": "Crawler: kontaktiert das Ziel aktiv"
+  },
+  {
+   "slug": "subjack",
+   "reason": "Subdomain-Takeover"
+  },
+  {
+   "slug": "altdns",
+   "reason": "Permutations-Brute-Force"
+  },
+  {
+   "slug": "dnsrecon",
+   "reason": "Zonentransfer-Versuche (aktiv gegen Ziel-DNS)"
+  },
+  {
+   "slug": "goblin",
+   "reason": "DNS-Brute-Force"
+  },
+  {
+   "slug": "dnsenum",
+   "reason": "DNS-Brute-Force + Zonentransfer"
+  },
+  {
+   "slug": "ghunt",
+   "reason": "laut Beschreibung offensives Google-Framework"
+  },
+  {
+   "slug": "shuffledns",
+   "reason": "aktiver DNS-Brute-Force"
+  },
+  {
+   "slug": "puredns",
+   "reason": "DNS-Brute-Force"
+  },
+  {
+   "slug": "h8mail",
+   "reason": "Breach-/Passwort-Hunting"
+  },
+  {
+   "slug": "thehive",
+   "reason": "Case-Management, kein OSINT"
+  },
+  {
+   "slug": "grr-rapid-response",
+   "reason": "DFIR-Agent, kein OSINT"
+  },
+  {
+   "slug": "kape",
+   "reason": "DFIR-Triage, kein OSINT"
+  },
+  {
+   "slug": "cortex",
+   "reason": "Active-Response-Engine"
+  },
+  {
+   "slug": "osquery",
+   "reason": "Endpoint-Telemetrie, kein OSINT"
+  },
+  {
+   "slug": "wazuh",
+   "reason": "SIEM/XDR, kein OSINT"
+  },
+  {
+   "slug": "sigma",
+   "reason": "Detection-Regeln, kein OSINT"
+  },
+  {
+   "slug": "dnstwist",
+   "reason": "Schlagwort-Filter (offensiv)"
+  },
+  {
+   "slug": "toutatis",
+   "reason": "Instagram-API-Abgriff von E-Mail/Telefon"
+  },
+  {
+   "slug": "telegram-nearby-map",
+   "reason": "Geolokalisierung von Personen"
+  },
+  {
+   "slug": "exiflooter",
+   "reason": "crawlt Ziel-Websites aktiv"
+  },
+  {
+   "slug": "crowdsec",
+   "reason": "IPS, kein OSINT"
+  },
+  {
+   "slug": "snort3",
+   "reason": "IDS/IPS, kein OSINT"
+  },
+  {
+   "slug": "onionscan",
+   "reason": "De-Anonymisierung von Hidden Services"
+  },
+  {
+   "slug": "worldmonitor",
+   "reason": "Installer via git clone && npm install (KI-Aggregation)"
+  },
+  {
+   "slug": "crucix",
+   "reason": "Installer via git clone && npm install (KI-Agent)"
+  },
+  {
+   "slug": "shadowbroker",
+   "reason": "CCTV-/Personen-Tracking"
+  },
+  {
+   "slug": "device-activity-tracker",
+   "reason": "Timing-Angriff auf Messenger (PoC), kein passives OSINT"
+  }
+ ],
+ "tools": [
+  {
+   "id": "extras-gau",
+   "slug": "gau",
+   "name": "gau",
+   "group": "Archive / URL-Historie",
+   "source_category": "web-scanning",
+   "description": "Get All URLs. Fetches known URLs from AlienVault OTX, Wayback Machine, Common Crawl, and URLScan.",
+   "website": "",
+   "github": "https://github.com/lc/gau",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Go",
+   "tags": [
+    "url-discovery",
+    "passive",
+    "multi-source"
+   ],
+   "install_hint": "go install github.com/lc/gau/v2/cmd/gau@latest",
+   "auto_install": false
+  },
+  {
+   "id": "extras-waybackurls",
+   "slug": "waybackurls",
+   "name": "waybackurls",
+   "group": "Archive / URL-Historie",
+   "source_category": "web-scanning",
+   "description": "Fetch all URLs that the Wayback Machine knows about for a domain. Gold mine for hidden endpoints.",
+   "website": "",
+   "github": "https://github.com/tomnomnom/waybackurls",
+   "documentation": "",
+   "license": "",
+   "language": "Go",
+   "tags": [
+    "wayback-machine",
+    "url-discovery",
+    "archive",
+    "tomnomnom"
+   ],
+   "install_hint": "go install github.com/tomnomnom/waybackurls@latest",
+   "auto_install": false
+  },
+  {
+   "id": "extras-amass",
+   "slug": "amass",
+   "name": "Amass",
+   "group": "Domain / Subdomain (passiv)",
+   "source_category": "subdomain-enum",
+   "description": "In-depth attack surface mapping and asset discovery. DNS enumeration, network mapping, OSINT data sources.",
+   "website": "https://owasp.org/www-project-amass/",
+   "github": "https://github.com/owasp-amass/amass",
+   "documentation": "",
+   "license": "",
+   "language": "Go",
+   "tags": [
+    "dns",
+    "attack-surface",
+    "owasp",
+    "asset-discovery"
+   ],
+   "install_hint": "go install -v github.com/owasp-amass/amass/v4/...@master",
+   "auto_install": false
+  },
+  {
+   "id": "extras-assetfinder",
+   "slug": "assetfinder",
+   "name": "Assetfinder",
+   "group": "Domain / Subdomain (passiv)",
+   "source_category": "subdomain-enum",
+   "description": "Find domains and subdomains potentially related to a given domain. Pulls from multiple passive sources.",
+   "website": "",
+   "github": "https://github.com/tomnomnom/assetfinder",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Go",
+   "tags": [
+    "passive",
+    "subdomain",
+    "fast",
+    "tomnomnom"
+   ],
+   "install_hint": "go install github.com/tomnomnom/assetfinder@latest",
+   "auto_install": false
+  },
+  {
+   "id": "extras-cdncheck",
+   "slug": "cdncheck",
+   "name": "cdncheck",
+   "group": "Domain / Subdomain (passiv)",
+   "source_category": "network-recon",
+   "description": "Detect whether an IP belongs to a CDN, cloud provider, or WAF to identify origin servers.",
+   "website": "https://projectdiscovery.io",
+   "github": "https://github.com/projectdiscovery/cdncheck",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Go",
+   "tags": [
+    "cdn",
+    "waf",
+    "cloud",
+    "ip-detection"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-dnsx",
+   "slug": "dnsx",
+   "name": "dnsx",
+   "group": "Domain / Subdomain (passiv)",
+   "source_category": "subdomain-enum",
+   "description": "Fast multi-purpose DNS toolkit. Retries, wildcard filtering, and multiple resolver support.",
+   "website": "https://docs.projectdiscovery.io/tools/dnsx",
+   "github": "https://github.com/projectdiscovery/dnsx",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Go",
+   "tags": [
+    "dns",
+    "resolver",
+    "wildcard",
+    "projectdiscovery"
+   ],
+   "install_hint": "go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest",
+   "auto_install": false
+  },
+  {
+   "id": "extras-findomain",
+   "slug": "findomain",
+   "name": "Findomain",
+   "group": "Domain / Subdomain (passiv)",
+   "source_category": "subdomain-enum",
+   "description": "Cross-platform subdomain enumerator using certificate transparency logs and multiple APIs for fast passive discovery.",
+   "website": "https://findomain.app",
+   "github": "https://github.com/Findomain/Findomain",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Rust",
+   "tags": [
+    "cert-transparency",
+    "subdomain-enum",
+    "passive-recon",
+    "monitoring"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-subfinder",
+   "slug": "subfinder",
+   "name": "Subfinder",
+   "group": "Domain / Subdomain (passiv)",
+   "source_category": "subdomain-enum",
+   "description": "Fast passive subdomain enumeration tool. Uses multiple sources including certificate transparency logs.",
+   "website": "https://projectdiscovery.io",
+   "github": "https://github.com/projectdiscovery/subfinder",
+   "documentation": "https://docs.projectdiscovery.io/tools/subfinder/overview",
+   "license": "MIT",
+   "language": "Go",
+   "tags": [
+    "passive",
+    "certificate-transparency",
+    "projectdiscovery"
+   ],
+   "install_hint": "go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
+   "auto_install": false
+  },
+  {
+   "id": "extras-sublist3r",
+   "slug": "sublist3r",
+   "name": "Sublist3r",
+   "group": "Domain / Subdomain (passiv)",
+   "source_category": "subdomain-enum",
+   "description": "Fast subdomain enumeration tool using OSINT sources for penetration testers.",
+   "website": "",
+   "github": "https://github.com/aboul3la/Sublist3r",
+   "documentation": "",
+   "license": "GPL-2.0",
+   "language": "Python",
+   "tags": [
+    "subdomain",
+    "enumeration",
+    "osint",
+    "dns"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-blackbird",
+   "slug": "blackbird",
+   "name": "Blackbird",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "OSINT tool to search for user accounts across 500+ social networks and websites.",
+   "website": "https://p1ngul1n0.gitbook.io/blackbird/",
+   "github": "https://github.com/p1ngul1n0/blackbird",
+   "documentation": "",
+   "license": "",
+   "language": "Python",
+   "tags": [
+    "username",
+    "social-networks",
+    "account-search",
+    "osint"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-instaloader",
+   "slug": "instaloader",
+   "name": "Instaloader",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "Download Instagram photos, videos, stories, and metadata. Profile archiving and OSINT data extraction.",
+   "website": "https://instaloader.github.io/",
+   "github": "https://github.com/instaloader/instaloader",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "instagram",
+    "scraping",
+    "stories",
+    "metadata"
+   ],
+   "install_hint": "pip install instaloader",
+   "auto_install": false
+  },
+  {
+   "id": "extras-maigret",
+   "slug": "maigret",
+   "name": "Maigret",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "Sherlock fork on steroids. Collects detailed info from 2500+ sites, builds a report with extracted data.",
+   "website": "https://maigret.readthedocs.io",
+   "github": "https://github.com/soxoj/maigret",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "username",
+    "social-media",
+    "data-extraction",
+    "report"
+   ],
+   "install_hint": "pip install maigret",
+   "auto_install": false
+  },
+  {
+   "id": "extras-nexfil",
+   "slug": "nexfil",
+   "name": "NExfil",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "OSINT tool for finding profiles by username across social networks.",
+   "website": "",
+   "github": "https://github.com/thewhiteh4t/nexfil",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "username",
+    "social-media",
+    "osint"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-sherlock",
+   "slug": "sherlock",
+   "name": "Sherlock",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "Hunt down social media accounts by username across 400+ social networks simultaneously.",
+   "website": "https://sherlockproject.xyz",
+   "github": "https://github.com/sherlock-project/sherlock",
+   "documentation": "https://sherlock-project.github.io/",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "username",
+    "social-media",
+    "account-discovery"
+   ],
+   "install_hint": "pip install sherlock-project",
+   "auto_install": false
+  },
+  {
+   "id": "extras-snoop",
+   "slug": "snoop",
+   "name": "Snoop",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "Search for user accounts by nickname across 2500+ sites.",
+   "website": "https://github.com/snooppr/snoop/releases",
+   "github": "https://github.com/snooppr/snoop",
+   "documentation": "",
+   "license": "",
+   "language": "Python",
+   "tags": [
+    "username",
+    "osint",
+    "social-media"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-social-analyzer",
+   "slug": "social-analyzer",
+   "name": "Social Analyzer",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "API, CLI, and web app for analyzing and finding a person's profile across 1000+ social media sites.",
+   "website": "",
+   "github": "https://github.com/qeeqbox/social-analyzer",
+   "documentation": "https://github.com/qeeqbox/social-analyzer#readme",
+   "license": "AGPL-3.0",
+   "language": "Python",
+   "tags": [
+    "profile-analysis",
+    "social-media",
+    "api",
+    "web-ui"
+   ],
+   "install_hint": "pip install social-analyzer",
+   "auto_install": false
+  },
+  {
+   "id": "extras-socialscan",
+   "slug": "socialscan",
+   "name": "socialscan",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "Accurately check email address and username availability across multiple platforms via direct API queries.",
+   "website": "",
+   "github": "https://github.com/iojw/socialscan",
+   "documentation": "",
+   "license": "MPL-2.0",
+   "language": "Python",
+   "tags": [
+    "username-check",
+    "email-check",
+    "availability",
+    "social-media"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-tweetfeed",
+   "slug": "tweetfeed",
+   "name": "TweetFeed",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "Real-time feed of IOCs shared on Twitter by the infosec community. Domains, IPs, URLs, SHA256 hashes.",
+   "website": "https://tweetfeed.live/",
+   "github": "https://github.com/0xDanielLopez/TweetFeed",
+   "documentation": "",
+   "license": "",
+   "language": "Python",
+   "tags": [
+    "ioc",
+    "threat-intel",
+    "twitter",
+    "real-time"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-user-scanner",
+   "slug": "user-scanner",
+   "name": "User-Scanner",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "2-in-1 email and username OSINT suite scanning 195+ vectors with bulk scanning and infostealer log cross-referencing.",
+   "website": "",
+   "github": "https://github.com/kaifcodec/user-scanner",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "username-search",
+    "email-osint",
+    "bulk-scan",
+    "account-discovery"
+   ],
+   "install_hint": "pip install user-scanner",
+   "auto_install": false
+  },
+  {
+   "id": "extras-whatsmyname",
+   "slug": "whatsmyname",
+   "name": "WhatsMyName",
+   "group": "OSINT Social-Media / Username",
+   "source_category": "osint-social",
+   "description": "Username enumeration across hundreds of websites with community-maintained JSON data.",
+   "website": "",
+   "github": "https://github.com/WebBreacher/WhatsMyName",
+   "documentation": "",
+   "license": "",
+   "language": "Python",
+   "tags": [
+    "username",
+    "enumeration",
+    "social-media",
+    "identity"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-changedetection",
+   "slug": "changedetection",
+   "name": "changedetection.io",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Self-hosted website change monitoring and notification tool. Tracks DOM changes, price drops, and content alterations.",
+   "website": "https://changedetection.io",
+   "github": "https://github.com/dgtlmoon/changedetection.io",
+   "documentation": "",
+   "license": "Apache-2.0",
+   "language": "Python",
+   "tags": [
+    "monitoring",
+    "web-changes",
+    "notifications",
+    "self-hosted",
+    "osint"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-emailharvester",
+   "slug": "emailharvester",
+   "name": "EmailHarvester",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Email harvesting from search engines. Supports Google, Bing, Yahoo, and ASK with proxy rotation.",
+   "website": "",
+   "github": "https://github.com/maldevel/EmailHarvester",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Python",
+   "tags": [
+    "email",
+    "search-engine",
+    "harvesting",
+    "proxy"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-exiftool",
+   "slug": "exiftool",
+   "name": "ExifTool",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Read, write, and edit metadata in files. Supports EXIF, GPS, IPTC, XMP, and more across dozens of formats.",
+   "website": "https://exiftool.org/",
+   "github": "https://github.com/exiftool/exiftool",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Perl",
+   "tags": [
+    "metadata",
+    "exif",
+    "gps",
+    "photo"
+   ],
+   "install_hint": "apt install libimage-exiftool-perl",
+   "auto_install": false
+  },
+  {
+   "id": "extras-gitleaks",
+   "slug": "gitleaks",
+   "name": "Gitleaks",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Scan Git repos for hardcoded secrets like passwords, API keys, and tokens. CI/CD ready.",
+   "website": "https://gitleaks.io",
+   "github": "https://github.com/gitleaks/gitleaks",
+   "documentation": "https://github.com/gitleaks/gitleaks#readme",
+   "license": "MIT",
+   "language": "Go",
+   "tags": [
+    "secrets",
+    "git",
+    "ci-cd",
+    "api-keys"
+   ],
+   "install_hint": "brew install gitleaks",
+   "auto_install": false
+  },
+  {
+   "id": "extras-ignorant",
+   "slug": "ignorant",
+   "name": "Ignorant",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Phone number OSINT. Check if a phone number is registered on various platforms without alerting the target.",
+   "website": "",
+   "github": "https://github.com/megadose/ignorant",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Python",
+   "tags": [
+    "phone-osint",
+    "account-lookup",
+    "passive-recon",
+    "social-media",
+    "digital-footprint"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-maltego",
+   "slug": "maltego",
+   "name": "Maltego CE",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Visual link analysis tool for OSINT. Maps relationships between people, companies, domains, and infrastructure.",
+   "website": "https://www.maltego.com/",
+   "github": "",
+   "documentation": "",
+   "license": "",
+   "language": "Java",
+   "tags": [
+    "graph-analysis",
+    "link-analysis",
+    "visual",
+    "transforms"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-maryam",
+   "slug": "maryam",
+   "name": "Maryam",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Modular open-source OSINT framework with search engine scraping, DNS enum, and social media gathering modules.",
+   "website": "",
+   "github": "https://github.com/saeeddhqan/Maryam",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Python",
+   "tags": [
+    "osint-framework",
+    "search-engine",
+    "modular",
+    "intelligence-gathering"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-pagodo",
+   "slug": "pagodo",
+   "name": "pagodo",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Automate Google Hacking Database dorking for passive reconnaissance at scale.",
+   "website": "",
+   "github": "https://github.com/opsdisk/pagodo",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Python",
+   "tags": [
+    "google-dork",
+    "ghdb",
+    "osint",
+    "passive"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-phoneinfoga",
+   "slug": "phoneinfoga",
+   "name": "PhoneInfoga",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Advanced phone number OSINT. Scans phone numbers using free resources to gather standard and disposable info.",
+   "website": "https://sundowndev.github.io/phoneinfoga/",
+   "github": "https://github.com/sundowndev/phoneinfoga",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Go",
+   "tags": [
+    "phone",
+    "lookup",
+    "carrier",
+    "geolocation"
+   ],
+   "install_hint": "go install github.com/sundowndev/phoneinfoga/v2@latest",
+   "auto_install": false
+  },
+  {
+   "id": "extras-recon-ng",
+   "slug": "recon-ng",
+   "name": "Recon-ng",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Full-featured reconnaissance framework. Modular design with a Metasploit-like interface for OSINT gathering.",
+   "website": "",
+   "github": "https://github.com/lanmaster53/recon-ng",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Python",
+   "tags": [
+    "framework",
+    "modular",
+    "api-keys",
+    "reporting"
+   ],
+   "install_hint": "pip install recon-ng",
+   "auto_install": false
+  },
+  {
+   "id": "extras-seekr",
+   "slug": "seekr",
+   "name": "seekr",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Multi-purpose OSINT toolkit with web interface for investigations.",
+   "website": "",
+   "github": "https://github.com/seekr-osint/seekr",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Go",
+   "tags": [
+    "osint",
+    "web-ui",
+    "investigation"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-sn0int",
+   "slug": "sn0int",
+   "name": "sn0int",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Semi-automatic OSINT framework and package manager for gathering intelligence about IPs, emails, domains, and people.",
+   "website": "https://sn0int.readthedocs.io/",
+   "github": "https://github.com/kpcyrd/sn0int",
+   "documentation": "",
+   "license": "GPL-3.0",
+   "language": "Rust",
+   "tags": [
+    "osint-framework",
+    "intelligence",
+    "package-manager",
+    "reconnaissance"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-spiderfoot",
+   "slug": "spiderfoot",
+   "name": "SpiderFoot",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Automated OSINT with 200+ modules. Web UI for scanning IPs, domains, emails, names, and more.",
+   "website": "https://www.spiderfoot.net/",
+   "github": "https://github.com/smicallef/spiderfoot",
+   "documentation": "https://www.spiderfoot.net/documentation/",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "automated",
+    "web-ui",
+    "modules",
+    "all-in-one"
+   ],
+   "install_hint": "pip install spiderfoot",
+   "auto_install": false
+  },
+  {
+   "id": "extras-theharvester",
+   "slug": "theharvester",
+   "name": "theHarvester",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Gathers emails, names, subdomains, IPs, and URLs from multiple public sources for passive recon.",
+   "website": "http://www.edge-security.com/",
+   "github": "https://github.com/laramies/theHarvester",
+   "documentation": "",
+   "license": "",
+   "language": "Python",
+   "tags": [
+    "email",
+    "subdomain",
+    "passive-recon"
+   ],
+   "install_hint": "pip install theHarvester",
+   "auto_install": false
+  },
+  {
+   "id": "extras-trufflehog",
+   "slug": "trufflehog",
+   "name": "TruffleHog",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Find leaked credentials in Git repos, S3 buckets, and filesystems. Regex and entropy-based detection.",
+   "website": "https://trufflesecurity.com",
+   "github": "https://github.com/trufflesecurity/trufflehog",
+   "documentation": "https://trufflesecurity.com/trufflehog",
+   "license": "AGPL-3.0",
+   "language": "Go",
+   "tags": [
+    "secrets",
+    "credentials",
+    "git",
+    "s3"
+   ],
+   "install_hint": "brew install trufflehog",
+   "auto_install": false
+  },
+  {
+   "id": "extras-waybackpack",
+   "slug": "waybackpack",
+   "name": "waybackpack",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Downloads entire website archives from the Wayback Machine. Retrieves historical snapshots for OSINT and content recovery.",
+   "website": "",
+   "github": "https://github.com/jsvine/waybackpack",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "wayback-machine",
+    "web-archive",
+    "historical-data",
+    "content-recovery",
+    "osint"
+   ],
+   "install_hint": "pip install waybackpack",
+   "auto_install": false
+  },
+  {
+   "id": "extras-waybackpy",
+   "slug": "waybackpy",
+   "name": "waybackpy",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "Python wrapper for the Wayback Machine API with CDX search support.",
+   "website": "https://pypi.org/project/waybackpy/",
+   "github": "https://github.com/akamhy/waybackpy",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Python",
+   "tags": [
+    "wayback",
+    "archive",
+    "osint",
+    "api"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-web-check",
+   "slug": "web-check",
+   "name": "web-check",
+   "group": "OSINT allgemein",
+   "source_category": "osint-general",
+   "description": "All-in-one OSINT tool for analysing any website including DNS, SSL, headers, security audit, and performance.",
+   "website": "https://web-check.xyz",
+   "github": "https://github.com/Lissy93/web-check",
+   "documentation": "",
+   "license": "MIT",
+   "language": "TypeScript",
+   "tags": [
+    "website-analysis",
+    "dns",
+    "ssl",
+    "headers",
+    "osint"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-censys-cli",
+   "slug": "censys-cli",
+   "name": "Censys CLI",
+   "group": "Suchmaschinen (Drittanbieter-Index)",
+   "source_category": "network-recon",
+   "description": "Search engine for internet-connected devices. Alternative to Shodan with certificate and host search.",
+   "website": "https://search.censys.io/",
+   "github": "https://github.com/censys/censys-python",
+   "documentation": "",
+   "license": "Apache-2.0",
+   "language": "Python",
+   "tags": [
+    "search-engine",
+    "certificates",
+    "internet-scan",
+    "api"
+   ],
+   "install_hint": "pip install censys",
+   "auto_install": false
+  },
+  {
+   "id": "extras-shodan-cli",
+   "slug": "shodan-cli",
+   "name": "Shodan CLI",
+   "group": "Suchmaschinen (Drittanbieter-Index)",
+   "source_category": "network-recon",
+   "description": "Command-line interface for Shodan, the search engine for internet-connected devices.",
+   "website": "https://www.shodan.io/",
+   "github": "https://github.com/achillean/shodan-python",
+   "documentation": "",
+   "license": "",
+   "language": "Python",
+   "tags": [
+    "iot",
+    "search-engine",
+    "internet-scan",
+    "api"
+   ],
+   "install_hint": "pip install shodan",
+   "auto_install": false
+  },
+  {
+   "id": "extras-smap",
+   "slug": "smap",
+   "name": "Smap",
+   "group": "Suchmaschinen (Drittanbieter-Index)",
+   "source_category": "network-recon",
+   "description": "Passive port scanner using Shodan's database. Nmap-compatible syntax without sending a single packet to the target.",
+   "website": "",
+   "github": "https://github.com/s0md3v/Smap",
+   "documentation": "",
+   "license": "AGPL-3.0",
+   "language": "Go",
+   "tags": [
+    "passive-scanning",
+    "shodan",
+    "stealth",
+    "nmap-compatible",
+    "osint"
+   ],
+   "install_hint": "go install github.com/s0md3v/smap@latest",
+   "auto_install": false
+  },
+  {
+   "id": "extras-uncover",
+   "slug": "uncover",
+   "name": "Uncover",
+   "group": "Suchmaschinen (Drittanbieter-Index)",
+   "source_category": "network-recon",
+   "description": "Quickly discover exposed hosts on the internet using multiple search engines like Shodan, Censys, and Fofa.",
+   "website": "",
+   "github": "https://github.com/projectdiscovery/uncover",
+   "documentation": "",
+   "license": "MIT",
+   "language": "Go",
+   "tags": [
+    "search-engines",
+    "shodan",
+    "censys",
+    "fofa",
+    "discovery"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-intelmq",
+   "slug": "intelmq",
+   "name": "IntelMQ",
+   "group": "Threat-Intel / IOC",
+   "source_category": "threat-intel",
+   "description": "Automated security feed processing framework. Collects, normalizes, and distributes threat intelligence from hundreds of sources.",
+   "website": "https://intelmq.org",
+   "github": "https://github.com/certtools/intelmq",
+   "documentation": "",
+   "license": "AGPL-3.0",
+   "language": "Python",
+   "tags": [
+    "threat-intelligence",
+    "feed-processing",
+    "automation",
+    "cert",
+    "incident-response"
+   ],
+   "install_hint": "pip install intelmq",
+   "auto_install": false
+  },
+  {
+   "id": "extras-intelowl",
+   "slug": "intelowl",
+   "name": "IntelOwl",
+   "group": "Threat-Intel / IOC",
+   "source_category": "threat-intel",
+   "description": "Threat intelligence management platform integrating 100+ analyzers for enriching observables and malware samples.",
+   "website": "https://intelowlproject.github.io",
+   "github": "https://github.com/intelowlproject/IntelOwl",
+   "documentation": "",
+   "license": "AGPL-3.0",
+   "language": "Python",
+   "tags": [
+    "threat-intel",
+    "ioc",
+    "malware-analysis",
+    "soar"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-misp",
+   "slug": "misp",
+   "name": "MISP",
+   "group": "Threat-Intel / IOC",
+   "source_category": "threat-intel",
+   "description": "Open-source threat intelligence and sharing platform. Structured IOC management, feeds, correlation, and STIX/TAXII export.",
+   "website": "https://www.misp-project.org",
+   "github": "https://github.com/MISP/MISP",
+   "documentation": "https://www.misp-project.org/documentation/",
+   "license": "AGPL-3.0",
+   "language": "PHP/Python",
+   "tags": [
+    "threat-intel",
+    "ioc",
+    "sharing",
+    "stix",
+    "taxii",
+    "correlation",
+    "soc"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  },
+  {
+   "id": "extras-opencti",
+   "slug": "opencti",
+   "name": "OpenCTI",
+   "group": "Threat-Intel / IOC",
+   "source_category": "threat-intel",
+   "description": "Cyber threat intelligence platform. Knowledge management for threat data with STIX2 native storage and graph visualization.",
+   "website": "https://opencti.io",
+   "github": "https://github.com/OpenCTI-Platform/opencti",
+   "documentation": "https://docs.opencti.io",
+   "license": "",
+   "language": "TypeScript/Python",
+   "tags": [
+    "threat-intel",
+    "stix2",
+    "knowledge-graph",
+    "neo4j",
+    "threat-actors",
+    "soc"
+   ],
+   "install_hint": "",
+   "auto_install": false
+  }
+ ]
+}

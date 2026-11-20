@@ -4,6 +4,24 @@
 <p><a href="/">← {{ t('common.back') }}</a></p>
 <h2>{{ t('history.heading') }}</h2>
 
+{% if admin_view %}
+<section class="card">
+  <form method="get" action="/history" class="inline">
+    <label>{{ t('history.owner_filter') }}
+      <select name="user" onchange="this.form.submit()">
+        <option value="" {% if not sel_user %}selected{% endif %}>{{ t('history.owner_all') }}</option>
+        {% for o, n in owners %}
+          {% if o %}<option value="{{ o }}" {% if sel_user == o %}selected{% endif %}>{{ o }} ({{ n }})</option>
+          {% else %}<option value="__none__" {% if sel_user == '__none__' %}selected{% endif %}>{{ t('history.owner_none') }} ({{ n }})</option>{% endif %}
+        {% endfor %}
+      </select></label>
+    <noscript><button type="submit">OK</button></noscript>
+  </form>
+</section>
+{% else %}
+<p class="hint">{{ t('history.own_only') }}</p>
+{% endif %}
+
 <section class="card">
   <h3>{{ t('history.runs', n=runs|length) }}</h3>
   <input type="text" id="run-filter" placeholder="{{ t('history.filter') }}" style="max-width:420px;margin:.3rem 0">
@@ -17,7 +35,7 @@
       <tr>
         <td data-ts="{{ r.created_at or 0 }}">{{ r.when }}</td>
         <td>{{ r.target_name }} <small>#{{ r.target_id }}</small></td>
-        <td>{{ r.mode }}{% if r.active %} · active{% endif %}{% if r.fuzz %} · fuzz{% endif %}</td>
+        <td>{{ r.mode }}{% if r.active %} · active{% endif %}{% if r.fuzz %} · fuzz{% endif %}{% if r.started_by == 'Gast' %} · gestartet von Gast{% elif r.started_by %} · {{ r.started_by }}{% endif %}{% if admin_view %} · <small>{% if r.owner_user %}👤 {{ r.owner_user }}{% else %}<span class="blocked">{{ t('history.owner_none') }}</span>{% endif %}</small>{% endif %}</td>
         <td>{{ r.finding_count }}</td>
         <td>{% if r.status == 'done' %}<span class="ok">done</span>
             {% else %}<span class="blocked">{{ r.status }}</span>{% endif %}</td>

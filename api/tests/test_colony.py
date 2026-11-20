@@ -496,3 +496,12 @@ def test_docs_use_official_name() -> None:
     )
     assert FOOTER in brain
     assert "Monster" not in brain
+
+
+def test_governance_critical_playbook_denied(client: TestClient) -> None:
+    _arm(client, "red", "lab.example")
+    r = client.post("/api/queens/red/runs", json={
+        "soldier_id": "x", "playbook_id": "persist-implant", "oversight": True,
+        "targets": ["lab.example"]})
+    assert r.status_code == 403
+    assert "CRITICAL" in r.json()["detail"]

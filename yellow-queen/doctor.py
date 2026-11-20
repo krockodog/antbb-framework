@@ -22,6 +22,8 @@ TOOLS = [
     ("ghidra", ["analyzeHeadless", "analyzeHeadless.bat", "ghidraRun"], None, "Decompiler (headless)"),
     ("capa", ["capa"], ["--version"], "Capabilities"),
     ("floss", ["floss"], ["--version"], "Obfuscated Strings"),
+    ("autopsy", ["autopsy"], ["-h"], "Forensik-GUI/CLI (Sleuth Kit; nur autorisierte Samples)"),
+    ("fls", ["fls"], ["-V"], "Sleuth Kit: Dateisystem-Listing (nur autorisierte Images)"),
     ("objdump", ["objdump"], ["--version"], "Disassembler (binutils)"),
     ("readelf", ["readelf"], ["--version"], "ELF-Header"),
     ("java", ["java"], ["-version"], "Java-Laufzeit (jadx/apktool/ghidra)"),

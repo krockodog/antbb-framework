@@ -21,10 +21,10 @@ def hosted_env(monkeypatch, tmp_path):
     webauth.reset_login_throttle()
 
 
-def _client():
+def _client(db_path=None):
     from antbb.store import Store
-
-    store = Store()
+    import tempfile, os
+    store = Store(db_path or os.environ.get("ANTBB_DB") or tempfile.mktemp(suffix=".db"))
     webauth.bootstrap_admin(store)
     app = FastAPI()
 
@@ -113,3 +113,55 @@ def test_scan_gates_server_side(hosted_env):
         svc.run_scan(tid)
     with pytest.raises(OversightError):
         svc.run_blue(apply_fixes=True)
+
+
+def test_viewer_is_read_only_in_hosted_mode(hosted_env, tmp_path):
+    from antbb.store import Store
+
+    store = Store(str(tmp_path / "viewer-hosted.db"))
+    webauth.bootstrap_admin(store)
+    webauth.create_user(store, "Gast", "Gast", role="viewer")
+    app = FastAPI()
+
+    @app.get("/api/thing")
+    def thing():
+        return {"ok": True}
+
+    @app.post("/api/thing")
+    def post_thing():
+        return {"ok": True}
+
+    @app.post("/api/targets/1/scan")
+    def scan():
+        return {"ok": True}
+
+    @app.post("/api/targets/1/oversight")
+    def oversight():
+        return {"ok": True}
+
+    @app.post("/api/targets/1/scopes")
+    def scopes():
+        return {"ok": True}
+
+    webguard.install(app, store_getter=lambda: store)
+    client = TestClient(app, base_url="https://testserver")
+    origin = {"origin": "https://testserver"}
+
+    login = client.post("/api/login", json={"username": "Gast", "password": "Gast"}, headers=origin)
+    assert login.status_code == 200
+    assert client.get("/api/thing").status_code == 200
+    # Scan is now an allowed guest usage (defensive); programme changes stay 403.
+    from antbb import hosted as _hosted
+    _hosted.reset_guest_rate()
+    r = client.post("/api/targets/1/scan", json={"depth": "light", "active": False}, headers=origin)
+    assert r.status_code == 200, r.text
+    for path in ("/api/thing", "/api/targets/1/oversight", "/api/targets/1/scopes"):
+        r = client.post(path, headers=origin)
+        assert r.status_code == 403, path
+
+    client.post("/logout", headers=origin)
+    admin = client.post("/api/login", json={"username": "admin", "password": PASSWORD}, headers=origin)
+    assert admin.status_code == 200
+    assert client.get("/api/thing").status_code == 200
+    assert client.post("/api/thing", headers=origin).status_code == 200
+    assert client.post("/api/targets/1/scan", headers=origin).status_code == 200

@@ -12,29 +12,30 @@
 
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
-  /* ---- Fortschritt ---- */
-  function refresh(card) {
+  /* ---- Fortschritt + „Alle anwählen" (gemeinsames Modul, Tri-State,
+     Override-Persistenz, Live-Zählwerke). Badge-Farbe (full/part) hier als
+     onRefresh, Gates bleiben unverändert. ---- */
+  function badgeClass(card) {
     const boxes = card.querySelectorAll(".bq-tasks input");
     const done = card.querySelectorAll(".bq-tasks input:checked").length;
     const badge = card.querySelector("[data-prog]");
-    badge.textContent = done + "/" + boxes.length;
-    badge.className = "bq-prog" + (boxes.length && done === boxes.length ? " full" : done ? " part" : "");
-    card.querySelector("[data-bar]").style.width = (boxes.length ? Math.round(100 * done / boxes.length) : 0) + "%";
+    if (badge) badge.className = "bq-prog" + (boxes.length && done === boxes.length ? " full" : done ? " part" : "");
   }
-  cards.forEach(refresh);
-
-  grid.addEventListener("change", ev => {
-    const cb = ev.target;
-    if (!cb.matches(".bq-tasks input")) return;
-    const card = cb.closest(".bq-card");
-    const pb = cb.dataset.pb, task = cb.dataset.task;
-    fetch("/api/soldiers/" + encodeURIComponent(card.dataset.name) + "/override", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({playbook: pb, key: "task:" + pb + ":" + task, value: cb.checked ? "done" : "offen"})
-    }).then(r => { if (!r.ok) throw new Error(r.status); refresh(card); })
-      .catch(() => { cb.checked = !cb.checked; refresh(card); });
-    refresh(card);
-  });
+  if (window.AntbbSelectAll) {
+    window.AntbbSelectAll({
+      grid: grid, card: ".bq-card", pb: ".bq-pb", task: ".bq-tasks input",
+      pbHead: ".bq-pb-head", pbCount: ".bq-pb-count", prog: "[data-prog]", bar: "[data-bar]",
+      stepsWord: (window.t ? window.t("red.sel.steps_word") : "Schritte"),
+      toolbar: ".bq-toolbar", onRefresh: badgeClass,
+    });
+  } else {
+    cards.forEach(c => {
+      const boxes = c.querySelectorAll(".bq-tasks input");
+      const done = c.querySelectorAll(".bq-tasks input:checked").length;
+      const b = c.querySelector("[data-prog]"); if (b) b.textContent = done + "/" + boxes.length;
+      badgeClass(c);
+    });
+  }
 
   /* ---- Filter ---- */
   cards.forEach(c => { c.dataset.search = c.textContent.toLowerCase().replace(/\s+/g, " "); });

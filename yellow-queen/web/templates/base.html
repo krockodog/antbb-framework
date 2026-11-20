@@ -6,6 +6,7 @@
   <title>{% block title %}Yellow Queen{% endblock %} · RE-Orchestratorin · antbb</title>
   <link rel="stylesheet" href="/static/yellow.css">
   <link rel="stylesheet" href="/static/yellow_cards.css?v=2026102501">
+  <link rel="stylesheet" href="/static/topnav.css?v=20261111">
   <style>
     /* Hintergrund wie auf den Kolonie-Seiten (zufälliges Nest-Motiv serverseitig) */
     body::before {
@@ -35,6 +36,9 @@
   </script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
+  {% if antbb_shared_nav is defined and antbb_shared_nav %}
+  {% include "_topnav.html" %}
+  {% else %}
   <header>
     <h1>🐜 antbb · All and One <span class="badge">Yellow Queen</span></h1>
     <nav>
@@ -43,12 +47,17 @@
       <a href="/red">🔴 Red Queen</a> ·
       <a href="/blue">🛡 Blue Queen</a> ·
       <a href="/yellow" class="on">🟡 Yellow Queen</a> ·
+      {% if hosted_mode() %}
+      <a href="/osint">📡 OSINT</a> ·
+      {% else %}
       <a href="/wlan">📡 WLAN · BT · IoT</a> ·
+      {% endif %}
       <a href="/brain">🧠 Neuronales Gehirn</a> ·
       <a href="/assets">🔒 Eigene Assets</a> ·
       <a href="/history">🗂️ Historie</a>
     </nav>
   </header>
+  {% endif %}
   <main>{% block body %}{% endblock %}</main>
   <footer>
     queen_id: {{ queen_id }} · v{{ version }} · Nur autorisierte Samples · Keine Ausführung durch Yellow Queen ·

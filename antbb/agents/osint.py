@@ -39,6 +39,11 @@ class OsintHunterAnt(AntAgent):
                  ["sherlock", "maigret"],
                  "OSINT: Username/Handle ueber soziale Netze enumerieren (sherlock, "
                  "Fallback maigret). Rein lesend, REFERENZ, kein Scraping gefundener Profile."),
+        Playbook("extras-osint", "defensive", False,
+                 ["subfinder", "amass", "theharvester", "waybackurls", "gau",
+                  "assetfinder", "findomain"],
+                 "Extras: passive OSINT-Runner (nur Drittquellen: CT-Logs, Archive, "
+                 "Indizes) gegen Domains im Scope. Nur auf Anforderung (params.extras)."),
     )
 
     async def work(self, task: Task) -> list[AgentFinding]:
@@ -141,6 +146,43 @@ class OsintHunterAnt(AntAgent):
             elif asset.startswith("/"):
                 out += await ka.trufflehog(asset, mode="filesystem", agent=self.name)
         out += await self._username_enum(task, ka)
+        out += await self._extras(task)
+        return out
+
+    async def _extras(self, task):
+        """Extras (passives OSINT). Nur bei params['extras'] und nur fuer
+        Domains, die die Scope-Pruefung (default-deny) bestehen."""
+        params = task.params or {}
+        if not params.get("extras"):
+            return []
+        import asyncio
+        from .. import extras_osint as ex
+        domains = []
+        for asset in task.assets:
+            d = ex.clean_domain(asset)
+            if d and d not in domains and self._in_scope(asset):
+                domains.append(d)
+        if not domains:
+            return []
+        log = lambda m: self.ctx.log(f"[{self.name}] {m}")  # noqa: E731
+        slugs = params.get("extras_tools") or None
+        res = await asyncio.to_thread(ex.run_passive, domains, slugs, None, log)
+        out = []
+        for r in res.get("results", []):
+            if not r.get("result_count") and not r.get("note"):
+                continue
+            out.append(AgentFinding(
+                agent=self.name,
+                title=f"Extras-OSINT {r['tool']}: {r.get('result_count', 0)} Treffer",
+                category="extras-osint", severity="info", asset=r["target"],
+                description=(f"Passiver OSINT-Lauf ({r['tool']}) gegen {r['target']}. "
+                             + (r.get("note") or "Nur Drittquellen, Ziel nicht kontaktiert.")),
+                evidence={"tool": r["tool"], "passive": True,
+                          "result_count": r.get("result_count", 0),
+                          "sample": r.get("sample", [])[:25],
+                          "returncode": r.get("returncode")},
+                dedup_key=f"extras:{r['tool']}:{r['target']}",
+            ))
         return out
 
     async def _username_enum(self, task, ka):

@@ -163,8 +163,27 @@ llm:
       auth_mode: none
       oauth_available: false
       key_env: null
-      default_model: llama3.1
-      fast_model: llama3.2
+      # Auf dem Oracle-Server installiert (ollama list); per ANTBB_MAIN_MODEL /
+      # Admin-Seite /admin/ollama weiterhin umschaltbar.
+      # Gleiches Modell wie Hermes (OLLAMA_MAX_LOADED_MODELS=1 -> kein gegenseitiges
+      # Verdraengen/Kaltladen). Fallback qwen2.5:7b bleibt installiert.
+      default_model: qwen3-8b-heretic-hermes
+      fast_model: qwen3-8b-heretic-hermes
+
+    hermes:
+      # Lokaler Hermes Agent (Nous Research) auf dem Host, NUR 127.0.0.1:8642
+      # (Container: network_mode host). OpenAI-kompatibel, Bearer-Key Pflicht.
+      # Key NIE als Wert in Env/Repo: HERMES_API_KEY_FILE zeigt auf eine
+      # read-only gemountete Datei (siehe llm._read_key). Hermes ist ein Agent
+      # mit Werkzeugen -> nur explizit waehlbar (router.manual_only).
+      base_url: http://127.0.0.1:8642/v1
+      api_style: openai
+      auth_mode: key
+      auth_method: api_key
+      oauth_available: false
+      key_env: HERMES_API_KEY
+      default_model: hermes
+      fast_model: hermes
 
   # Router-Schwellen (nachvollziehbare Regeln, siehe antbb/router.py).
   router:
@@ -172,6 +191,8 @@ llm:
     critical_task_types: [strategy, attack_plan, prioritization, exploit_decision]
     # Komplexitäts-Schwelle (0..1), ab der ein starkes Modell gewählt wird.
     complexity_threshold: 0.5
+    # Provider, die nie automatisch geroutet werden (nur explizit / als Default).
+    manual_only: [hermes]
 
 # ── Scan-Parameter für die ECHTEN, defensiven Module (Recon/Scan/Infra/API) ──
 # Rein defensiv/nicht-destruktiv. Rate-Limiting schützt die Ziele vor Last.

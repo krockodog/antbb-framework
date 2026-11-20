@@ -60,12 +60,15 @@ class ClassifyBody(BaseModel):
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     store = Store(settings)
-    app = FastAPI(title=PRODUCT, version="1.0.0")
+    # Keine /docs, /redoc, /openapi.json nach aussen (Leck-Audit).
+    app = FastAPI(title=PRODUCT, version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store = store
     app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        # Gehostet: keine Cross-Origin-Freigabe (alles laeuft same-origin hinter Caddy).
+        allow_origins=[o for o in os.environ.get("ALLONE_CORS_ORIGINS", "").split(",") if o.strip()]
+        if os.environ.get("ANTBB_HOSTED", "").strip() in {"1", "true", "yes", "on"} else ["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -125,6 +128,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "yellow": "Yellow Reverse-Teaming",
             },
             "ports_documented": {"surface": SURFACE_PORT},
+            "hosted": os.environ.get("ANTBB_HOSTED", "").strip().lower() in {"1", "true", "yes", "on"},
+            "nav_lab": "osint" if os.environ.get("ANTBB_HOSTED", "").strip().lower() in {"1", "true", "yes", "on"} else "wlan",
         }
 
     @app.get("/api/queens")
@@ -187,15 +192,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return store.get_run(queen_id.value, run_id)
 
     @app.post("/api/queens/{queen_id}/runs")
-    def start_run(queen_id: QueenId, body: RunBody) -> dict:
-        return store.start_run(
-            queen_id.value,
-            body.soldier_id,
-            body.playbook_id,
-            body.oversight,
-            body.targets,
-            body.probe_name,
-        )
+    def start_run(queen_id: QueenId, body: RunBody, request: Request) -> dict:
+        from antbb.governance import playbook_risk
+
+        risk = playbook_risk(queen_id.value, body.playbook_id)
+        user = getattr(request.state, "user", None) or {}
+        target = ", ".join(body.targets)[:160]
+
+        def _audit(result: str, detail: str = "") -> None:
+            try:
+                from antbb import governance as _gov
+                _gov.audit(actor=user.get("username") or "local", role=user.get("role") or "",
+                           agent=f"{queen_id.value}:{body.soldier_id}"[:60],
+                           action=f"Playbook {body.playbook_id}", target=target,
+                           scope_ref=f"{queen_id.value}-allowlist", risk=risk, result=result,
+                           detail=detail[:300])
+                request.state.gov_audited = True
+            except Exception:  # noqa: BLE001
+                pass
+
+        try:
+            out = store.start_run(
+                queen_id.value,
+                body.soldier_id,
+                body.playbook_id,
+                body.oversight,
+                body.targets,
+                body.probe_name,
+            )
+        except ColonyError as exc:
+            _audit("denied" if exc.status in (401, 403) else
+                   "refused" if exc.status in (409, 429) else f"http-{exc.status}", exc.detail)
+            raise
+        _audit("started", out.get("run_id", "") if isinstance(out, dict) else "")
+        return out
 
     @app.get("/api/queens/{queen_id}/ledger")
     def ledger(queen_id: QueenId) -> dict:
@@ -258,6 +288,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "yellow": getattr(app.state, "yellow_mount", None),
             "extensions": getattr(app.state, "extensions_mount", None),
         }
+
+    # Governance: Kill Switch blockiert Run-Starts aller Königinnen, auditiert
+    # Starts/Ablehnungen/Freigaben. Vor webguard registriert = innere Schicht,
+    # sieht also request.state.user. Nur verschärfend.
+    try:
+        from antbb.web.governance_routes import install_middleware as _gov_mw
+
+        _gov_mw(app)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("allone").exception("Governance-Middleware fehlgeschlagen: %s", exc)
 
     from antbb.webguard import install as install_webguard
 

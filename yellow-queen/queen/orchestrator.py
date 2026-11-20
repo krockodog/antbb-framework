@@ -141,6 +141,12 @@ def run_case(case_id: str, gate: GateResult) -> dict[str, Any]:
         snapshot("triage", c=c, route=route)
         # Phase 3 – Soldaten
         for sname in route.soldiers:
+            if _governance_halted():
+                blockers.append("KILL SWITCH aktiv: Analyse vom Admin gestoppt.")
+                hop("halt", "kill-switch", "Kill Switch aktiv – weitere Soldaten gestoppt.",
+                    "Der globale Kill Switch stoppt alle Agenten; ich starte keinen weiteren Schritt.",
+                    "Gestoppt vor Soldat " + sname, ["Reset durch den Admin abwarten"], "error")
+                break
             snapshot("static", active=sname, c=c, route=route)
             try:
                 res = REGISTRY[sname](Ctx(sample, ev, c, gate.dynamic))
@@ -207,3 +213,13 @@ def run_case(case_id: str, gate: GateResult) -> dict[str, Any]:
         db.add_event(case_id, "error", f"{type(e).__name__}: {e}")
         snapshot("idle", finished=True)
     return db.get_case(case_id) or {}
+
+
+def _governance_halted() -> bool:
+    """Globaler Kill Switch (antbb.governance). Fehlt das Modul: nie halten."""
+    try:
+        from antbb.governance import halted_flag_file_exists
+    except Exception:  # noqa: BLE001
+        return False
+    import os as _os
+    return halted_flag_file_exists(_os.environ.get("YQ_DATA_DIR"))

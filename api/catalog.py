@@ -645,3 +645,59 @@ def playbook_map(queen_id: str) -> dict[str, dict]:
 
 def soldier_map(queen_id: str) -> dict[str, dict]:
     return {item["soldier_id"]: item for item in SOLDIERS[queen_id]}
+
+
+# --- Extras: passiver OSINT-Katalog (Quelle enna, nur Daten) -----------------
+# Die Rote Königin orchestriert "Extras" über die Soldatin "extras". Ein Lauf
+# geht durch Store.start_run (Oversight + Scope default-deny + Allowlist +
+# Drosselung) und danach durch api.executors -> antbb.extras_osint.run_passive.
+def _register_extras() -> None:
+    try:
+        from antbb.extras_osint import RUNNERS, runnable_slugs
+    except Exception:  # Kolonie-Paket fehlt: Kern bleibt online
+        return
+    slugs = runnable_slugs()
+    if not slugs:
+        return
+    books = [{
+        "playbook_id": "extras-osint",
+        "title": "Extras · OSINT (passiv, alle)",
+        "kind": "osint",
+        "summary": ("Alle passiven Extras-Werkzeuge (" + ", ".join(slugs) + ") gegen Domains "
+                    "auf der Allowlist. Nur Drittquellen (CT-Logs, Archive, Indizes)."),
+        "destructive": False,
+        "requires_oversight": True,
+        "stub": False,
+        "stub_note": "Echt: passive Extras-Runner, Artefakte im Lauf-Ordner.",
+        "needs_probe": False,
+    }]
+    for slug in slugs:
+        books.append({
+            "playbook_id": f"extras-{slug}",
+            "title": f"Extras · {slug}",
+            "kind": "osint",
+            "summary": RUNNERS[slug]["note"],
+            "destructive": False,
+            "requires_oversight": True,
+            "stub": False,
+            "stub_note": "Echt: passiver CLI-Lauf (Timeout, keine Installation).",
+            "needs_probe": False,
+        })
+    known = {b["playbook_id"] for b in PLAYBOOKS["red"]}
+    PLAYBOOKS["red"].extend(b for b in books if b["playbook_id"] not in known)
+    if not any(s["soldier_id"] == "extras" for s in SOLDIERS["red"]):
+        SOLDIERS["red"].append({
+            "soldier_id": "extras",
+            "name": "Extras",
+            "role": "OSINT-Späherin (passiv)",
+            "mode": "wacht",
+            "playbook_ids": [b["playbook_id"] for b in books],
+            "tut": "Extras-OSINT",
+            "live_satz": "Extras liest nur öffentliche Drittquellen und fasst das Ziel nicht an.",
+            "oversight_required": True,
+            "stub": False,
+            "stub_note": "Echt: passive OSINT-Runner, gegatet durch Scope + Oversight.",
+        })
+
+
+_register_extras()

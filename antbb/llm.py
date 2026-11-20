@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -114,12 +115,33 @@ def get_provider(provider: Optional[str] = None) -> ProviderConfig:
     return cfg
 
 
+_THINK_RE = re.compile(r"^\s*<think>.*?</think>\s*", re.S)
+
+
+def _strip_think(text: str) -> str:
+    """Entfernt einen fuehrenden <think>...</think>-Block (auch leer)."""
+    if text and "</think>" in text:
+        return _THINK_RE.sub("", text, count=1)
+    return text
+
+
 def _read_key(cfg: ProviderConfig) -> Optional[str]:
     """Liest den Key NUR aus der Env-Var. Gibt None zurück, wenn nicht gesetzt.
     Der Wert wird niemals geloggt."""
     if not cfg.key_env:
         return None
     val = os.environ.get(cfg.key_env)
+    if not val or not val.strip():
+        # Alternativ: Key aus einer (read-only gemounteten) Datei, deren PFAD in
+        # <KEY_ENV>_FILE steht (z.B. HERMES_API_KEY_FILE). So landet der Wert
+        # nie in der Prozess-Umgebung/Env-Dumps.
+        path = os.environ.get(cfg.key_env + "_FILE", "").strip()
+        if path:
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    val = fh.read(4096)
+            except OSError:
+                val = None
     if (not val or not val.strip()) and cfg.name == "gemini":
         # Google akzeptiert beide Variablennamen.
         val = os.environ.get("GOOGLE_API_KEY")
@@ -230,7 +252,9 @@ class LLMClient:
     """
 
     def __init__(self, provider: Optional[str] = None,
-                 timeout: float = 30.0, retries: int = 2):
+                 timeout: float = 300.0, retries: int = 2):
+        # Timeout 300 s: lokale CPU-Modelle (Hermes/Ollama) brauchen kalt
+        # mehrere Minuten; Cloud-Provider antworten weiterhin schneller.
         self.cfg = get_provider(provider)
         self.timeout = timeout
         self.retries = max(0, retries)
@@ -300,6 +324,9 @@ class LLMClient:
                               error=f"HTTP {resp.status_code}: {_safe_body(resp)}")
         data = resp.json()
         content = (data.get("message") or {}).get("content", "")
+        # Denk-Modelle (Qwen3 u.a.): einen evtl. mitgelieferten <think>-Block nie
+        # in Berichte/Zusammenfassungen uebernehmen.
+        content = _strip_think(content)
         return ChatResult(ok=True, provider=cfg.name, model=mdl, status=200,
                           content=content, raw=data)
 
@@ -355,7 +382,10 @@ class LLMClient:
         import httpx
         last_err = ""
         last_status = None
-        for attempt in range(self.retries + 1):
+        # Hermes ist ein Agent: keine automatische Wiederholung (Lauf kann
+        # bereits Werkzeuge ausgefuehrt haben).
+        retries = 0 if cfg.name == "hermes" else self.retries
+        for attempt in range(retries + 1):
             try:
                 _log.info("[llm] chat → provider=%s model=%s (Versuch %d)",
                           cfg.name, mdl, attempt + 1)
@@ -373,7 +403,7 @@ class LLMClient:
                     break
             except Exception as exc:
                 last_err = f"{type(exc).__name__}: {exc}"
-            if attempt < self.retries:
+            if attempt < retries:
                 import time
                 time.sleep(0.5 * (attempt + 1))
         return ChatResult(ok=False, provider=cfg.name, model=mdl,

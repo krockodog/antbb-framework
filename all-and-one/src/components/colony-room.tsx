@@ -184,8 +184,10 @@ export function ColonyRoom({ queen }: { queen: QueenId }) {
         <span className={`orb orb-${queen}`} />
       </div>
       <div className="grain" aria-hidden="true" />
-      <div className="relative z-10 mx-auto max-w-6xl px-5 py-6 md:px-8">
+      <div className="relative z-10">
         <SiteHeader />
+      </div>
+      <div className="relative z-10 mx-auto max-w-6xl px-5 py-6 md:px-8">
         <header className="mt-10 max-w-3xl">
           <p className="text-[0.72rem] tracking-[0.22em] uppercase opacity-70">
             {t("brain.queen")} · {queen} · {t(`queen.${queen}.kicker`)}

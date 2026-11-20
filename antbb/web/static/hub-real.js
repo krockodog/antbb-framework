@@ -33,12 +33,8 @@
           if(label){ p.appendChild(label); p.appendChild(document.createTextNode(" "+(data.live_satz||""))); }
           else p.textContent=(window.t ? window.t("hub.live_status") : "Live-Status")+" "+(data.live_satz||"");
         });
-        var host=null;
-        card.querySelectorAll("div").forEach(function(d){
-          if(host) return;
-          var c=d.className||"";
-          if(c.indexOf("flex")>=0 && c.indexOf("wrap")>=0) host=d;
-        });
+        // Nur der markierte Soldaten-Container (nicht die Sicherheits-Badges).
+        var host=card.querySelector("[data-soldiers]");
         if(host && Array.isArray(data.soldier_ids)){
           host.innerHTML="";
           data.soldier_ids.slice(0,10).forEach(function(id){

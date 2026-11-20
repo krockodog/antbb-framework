@@ -1,0 +1,9 @@
+{#- Admin-Unternavigation; nur in Admin-Templates eingebunden (serverseitig admin-only). -#}
+{%- set _ap = request.url.path -%}
+<nav class="admin-subnav" style="margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:.6rem">
+  <a href="/admin/users"{% if _ap.startswith('/admin/users') %} aria-current="page"{% endif %}>👥 Benutzer</a>
+  <a href="/admin/alerts"{% if _ap.startswith('/admin/alerts') %} aria-current="page"{% endif %}>🚨 Alarme</a>
+  <a href="/admin/activity"{% if _ap.startswith('/admin/activity') %} aria-current="page"{% endif %}>📋 Aktivität &amp; ISMS-Log</a>
+  <a href="/admin/ollama"{% if _ap.startswith('/admin/ollama') %} aria-current="page"{% endif %}>🦙 Ollama</a>
+  <a href="/admin/hermes"{% if _ap.startswith('/admin/hermes') %} aria-current="page"{% endif %}>☤ Hermes</a>
+</nav>

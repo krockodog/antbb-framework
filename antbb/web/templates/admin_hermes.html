@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Hermes · Admin · antbb{% endblock %}
+{% block content %}
+{% include "_admin_subnav.html" %}
+<style>
+  .hm-log{display:flex;flex-direction:column;gap:.6rem;max-height:60vh;overflow-y:auto;padding:.4rem 0}
+  .hm-msg{padding:.55rem .75rem;border-radius:.6rem;white-space:pre-wrap;word-break:break-word;max-width:100%}
+  .hm-user{align-self:flex-end;background:rgba(120,160,255,.15);border:1px solid rgba(120,160,255,.35)}
+  .hm-bot{align-self:flex-start;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+  .hm-err{align-self:flex-start;border:1px solid rgba(255,90,90,.5);background:rgba(255,90,90,.08)}
+  .hm-tools{font-size:.85em;opacity:.8;margin-top:.35rem}
+  .hm-tools code{white-space:pre-wrap;word-break:break-all}
+  .hm-form{display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;margin-top:.6rem}
+  .hm-form textarea{flex:1 1 16rem;min-height:4.5rem;resize:vertical}
+  .hm-grant{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+</style>
+<section class="card">
+  <h2>☤ Hermes-Chat (lokal)</h2>
+  <p class="hint">Hermes läuft nur intern auf dem Server und nutzt das lokale Ollama-Modell. Der Zugriff ist standardmäßig geschlossen und wird nur für eine begrenzte Zeit freigegeben. Jede Anfrage wird im Aktivitätslog protokolliert. Antworten können auf dieser CPU 10&nbsp;s bis mehrere Minuten dauern (max. {{ timeout // 60 }}&nbsp;min).</p>
+  {% if not configured %}<p class="blocked">Hermes ist nicht konfiguriert (Schlüsseldatei fehlt).</p>{% endif %}
+  <div class="hm-grant">
+    <strong id="hm-state">{% if grant.active %}<span class="ok">Zugriff aktiv</span>{% else %}<span class="blocked">Zugriff geschlossen</span>{% endif %}</strong>
+    <span id="hm-left" class="hint"></span>
+    <label>Dauer <select id="hm-min">{% for m in [15, 30, 60, 120] %}{% if m <= max_minutes %}<option value="{{ m }}"{% if m == default_minutes %} selected{% endif %}>{{ m }} min</option>{% endif %}{% endfor %}</select></label>
+    <button type="button" id="hm-open">Zugriff freigeben</button>
+    <button type="button" id="hm-close">Zugriff beenden</button>
+  </div>
+</section>
+<section class="card">
+  <div id="hm-log" class="hm-log" aria-live="polite"></div>
+  <form id="hm-form" class="hm-form" autocomplete="off">
+    <textarea id="hm-in" maxlength="4000" placeholder="Nachricht an Hermes …" aria-label="Nachricht an Hermes"></textarea>
+    <button type="submit" id="hm-send">Senden</button>
+  </form>
+  <p class="hint">Gefährliche Befehle führt Hermes über diese Oberfläche nicht aus (keine Rückfrage möglich → Ablehnung). Der Schlüssel bleibt auf dem Server.</p>
+</section>
+<script>
+(function(){
+  var exp = {{ (grant.expires_at if grant.active else 0)|int }};
+  var log = document.getElementById("hm-log"), inp = document.getElementById("hm-in"),
+      send = document.getElementById("hm-send"), st = document.getElementById("hm-state"),
+      left = document.getElementById("hm-left");
+  function add(cls, text, tools){
+    var d = document.createElement("div"); d.className = "hm-msg " + cls; d.textContent = text;
+    if (tools && tools.length){
+      var t = document.createElement("div"); t.className = "hm-tools";
+      tools.forEach(function(x){ var c = document.createElement("code");
+        c.textContent = "⚙ " + x.name + " " + (x.arguments||"") + (x.output ? "\n→ " + x.output : "");
+        t.appendChild(c); t.appendChild(document.createElement("br")); });
+      d.appendChild(t);
+    }
+    log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+  }
+  function render(){
+    var s = Math.max(0, Math.floor(exp - Date.now()/1000));
+    st.innerHTML = s > 0 ? '<span class="ok">Zugriff aktiv</span>' : '<span class="blocked">Zugriff geschlossen</span>';
+    left.textContent = s > 0 ? ("noch " + Math.floor(s/60) + ":" + ("0"+(s%60)).slice(-2) + " min") : "";
+    send.disabled = !(s > 0) || busy; inp.disabled = !(s > 0);
+  }
+  var busy = false;
+  function grant(minutes){
+    return fetch("/api/admin/hermes/grant", {method:"POST", credentials:"same-origin",
+      headers:{"Content-Type":"application/json","Accept":"application/json"},
+      body: JSON.stringify({minutes: minutes})})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(g){ if (g){ exp = g.active ? g.expires_at : 0; render(); } });
+  }
+  document.getElementById("hm-open").addEventListener("click", function(){
+    grant(parseInt(document.getElementById("hm-min").value, 10) || 30); });
+  document.getElementById("hm-close").addEventListener("click", function(){ grant(0); });
+  document.getElementById("hm-form").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var msg = inp.value.trim(); if (!msg || busy) return;
+    add("hm-user", msg); inp.value = ""; busy = true; render();
+    var wait = add("hm-bot", "Hermes denkt nach … 0 s"), t0 = Date.now();
+    var timer = setInterval(function(){ wait.textContent = "Hermes denkt nach … " + Math.round((Date.now()-t0)/1000) + " s"; }, 1000);
+    var ctl = new AbortController(), kill = setTimeout(function(){ ctl.abort(); }, {{ timeout + 30 }} * 1000);
+    fetch("/api/admin/hermes/chat", {method:"POST", credentials:"same-origin", signal: ctl.signal,
+      headers:{"Content-Type":"application/json","Accept":"application/json"},
+      body: JSON.stringify({message: msg})})
+      .then(function(r){ return r.json().catch(function(){ return {error: "HTTP " + r.status}; }); })
+      .then(function(d){ wait.remove();
+        if (d.error) add("hm-err", d.error);
+        else add("hm-bot", d.reply + "\n\n⏱ " + d.seconds + " s", d.tools); })
+      .catch(function(){ wait.remove(); add("hm-err", "Keine Antwort (Zeitüberschreitung oder Verbindung)."); })
+      .finally(function(){ clearInterval(timer); clearTimeout(kill); busy = false; render(); inp.focus(); });
+  });
+  inp.addEventListener("keydown", function(e){ if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) document.getElementById("hm-form").requestSubmit(); });
+  render(); setInterval(render, 1000);
+})();
+</script>
+{% endblock %}

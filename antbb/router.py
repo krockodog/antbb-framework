@@ -26,6 +26,8 @@ _CFG = _config.llm_config()
 _ROUTER_CFG = _CFG.get("router", {})
 CRITICAL_TASK_TYPES = set(_ROUTER_CFG.get("critical_task_types", []))
 COMPLEXITY_THRESHOLD = float(_ROUTER_CFG.get("complexity_threshold", 0.5))
+#: Provider, die der Router NIE automatisch waehlt (nur explizit/als Default).
+MANUAL_ONLY = {str(x).lower() for x in (_ROUTER_CFG.get("manual_only") or ["hermes"])}
 
 #: Präferenz-Reihenfolge für starke ("decision") vs. schnelle ("fast") Modelle.
 STRONG_PRIORITY = ["openai", "anthropic", "gemini", "xai", "deepseek",
@@ -58,6 +60,10 @@ def _available() -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for st in llm_mod.status_all():
         name = st["provider"]
+        # Nur explizit waehlbare Provider (z.B. hermes = Agent mit Werkzeugen)
+        # nie automatisch routen – nur wenn sie Default-Provider sind.
+        if name in MANUAL_ONLY and name != llm_mod.DEFAULT_PROVIDER.lower():
+            continue
         usable = st["configured"]
         if name == "ollama":
             usable = bool(st.get("reachable"))

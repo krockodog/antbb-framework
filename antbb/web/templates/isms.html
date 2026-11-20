@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ t('isms.title') }}{% endblock %}
+{% block content %}
+<section class="card isms-card" id="isms-org">
+  <h2>{{ t('isms.title') }}</h2>
+  <p class="hint">{{ t('isms.intro') }}</p>
+  <div class="disclaimer">{{ disclaimer }}</div>
+  {% if saved %}<p class="ok">{{ t('isms.saved') }}</p>{% endif %}
+  <p class="isms-downloads" aria-label="{{ t('isms.downloads') }}">
+    <a class="isms-btn" href="/isms/report.pdf">{{ t('isms.dl.full') }}</a>
+    <a class="isms-btn secondary" href="/isms/soa.csv">{{ t('isms.dl.soa_csv') }}</a>
+    <a class="isms-btn secondary" href="/isms/soa.xlsx">{{ t('isms.dl.soa_xlsx') }}</a>
+    <a class="isms-btn secondary" href="/isms/register.csv">{{ t('isms.dl.reg_csv') }}</a>
+    <a class="isms-btn secondary" href="/isms/register.xlsx">{{ t('isms.dl.reg_xlsx') }}</a>
+  </p>
+  <form method="post" action="/isms" class="isms-form">
+    {% for key, label in fields %}
+    <label class="isms-field">{{ label }}
+      {% if key in ['policy_text', 'roles_text', 'isms_scope', 'context_internal', 'context_external', 'interested_parties', 'audit_programme'] %}
+      <textarea name="{{ key }}" rows="4" placeholder="{{ placeholder }}">{{ org[key] }}</textarea>
+      {% else %}
+      <input type="text" name="{{ key }}" value="{{ org[key] }}" placeholder="{{ placeholder }}">
+      {% endif %}
+    </label>
+    {% endfor %}
+    <button type="submit" class="isms-btn">{{ t('isms.save') }}</button>
+  </form>
+</section>
+{% endblock %}

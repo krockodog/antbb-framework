@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ t('alerts.title') }} · antbb{% endblock %}
+{% block content %}
+{% include "_admin_subnav.html" %}
+<p><a href="/admin/users">← {{ t('admin.title') }}</a></p>
+<section class="card">
+  <h2>🚨 {{ t('alerts.title') }} <small>{{ t('alerts.sub') }}</small></h2>
+  {% if message %}<p class="ok">{{ message }}</p>{% endif %}
+  <p class="hint">{{ t('alerts.ntfy_on') if ntfy else t('alerts.ntfy_off') }}</p>
+  <form method="post" action="/admin/alerts/ack" class="inline">
+    <input type="hidden" name="next" value="/admin/alerts">
+    <button type="submit">✔ {{ t('alerts.ack_all') }}</button>
+  </form>
+  <table>
+    <thead><tr><th>{{ t('history.time') }}</th><th>{{ t('alerts.rule') }}</th><th>{{ t('login.user') }}</th><th>IP</th><th>{{ t('alerts.path') }}</th><th>{{ t('admin.th.status') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for a in alerts %}
+      <tr>
+        <td>{{ fmt_ts(a.created_at) }}</td>
+        <td>{% if not a.acked_at %}<span class="alert-dot"></span> {% endif %}{{ labels.get(a.kind, a.kind) }}{% if a.detail %} <small>{{ a.detail }}</small>{% endif %}</td>
+        <td>{{ a.username or t('alerts.anon') }}</td>
+        <td><code>{{ a.ip }}</code></td>
+        <td><code>{{ a.path }}</code></td>
+        <td>{% if a.acked_at %}{{ t('alerts.acked_by', who=a.acked_by) }}{% else %}<span class="blocked">{{ t('alerts.open') }}</span>{% endif %}</td>
+        <td>{% if not a.acked_at %}<form method="post" action="/admin/alerts/{{ a.id }}/ack" style="display:inline"><button type="submit">✔</button></form>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="hint">{{ t('alerts.empty') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

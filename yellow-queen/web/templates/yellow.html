@@ -37,7 +37,22 @@
   <a href="#yq-upload">Analyse starten</a>
   <a href="#yq-cases">Fälle</a>
   <a href="#yq-doctor">Tool-Doctor</a>
+  <a href="#yq-reports">Berichte</a>
 </nav>
+
+<section class="card yq-card isms-downloads-card" id="yq-reports">
+  <h3>📄 Berichte zum Download</h3>
+  <p class="hint">PDF und Tabellen enthalten nur Daten, die auf den Königinnen-Seiten bereits sichtbar sind. Leere Felder bleiben Platzhalter. Vorlage zur Auditvorbereitung, ersetzt keine Zertifizierung.</p>
+  <p class="isms-downloads">
+    <a class="isms-btn" href="/yellow/report.pdf">Yellow-Bericht (PDF)</a>
+    <a class="isms-btn secondary" href="/isms/report.pdf">ISMS-Gesamt (PDF)</a>
+    <a class="isms-btn secondary" href="/isms/soa.csv">SoA (CSV)</a>
+    <a class="isms-btn secondary" href="/isms/register.csv">Risikoregister (CSV)</a>
+    {% if request.state.user and request.state.user.role == 'admin' %}
+    <a class="isms-btn ghost" href="/isms">Organisationsdaten (Admin)</a>
+    {% endif %}
+  </p>
+</section>
 
 <section class="card yq-card" id="yq-pipeline">
   <h3>⬡ RE-Pipeline <small>jeder Schritt begründet sich selbst</small></h3>
@@ -149,7 +164,8 @@
           <td><b>{{ t.id }}</b></td>
           <td><span class="yq-badge {{ 'ok' if t.present else 'partial' }}">{{ 'da' if t.present else 'fehlt' }}</span></td>
           <td>{{ t.why_de }}</td>
-          <td class="hint"><code>{{ t.path or '–' }}</code></td>
+          {# Pfad nur fuer Admins (Leck-Audit: interne Pfade) #}
+          <td class="hint">{% if is_admin is defined and is_admin() %}<code>{{ t.path or '–' }}</code>{% else %}{{ '✓' if t.path else '–' }}{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>

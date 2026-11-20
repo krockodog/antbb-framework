@@ -13,13 +13,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # damit "fehlender Key -> kein Crash" sauber geprueft wird.
 for env in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
             "GOOGLE_API_KEY", "MINIMAX_API_KEY", "MOONSHOT_API_KEY",
-            "MISTRAL_API_KEY", "DEEPSEEK_API_KEY", "XAI_API_KEY"]:
+            "MISTRAL_API_KEY", "DEEPSEEK_API_KEY", "XAI_API_KEY",
+            "HERMES_API_KEY", "HERMES_API_KEY_FILE"]:
     os.environ.pop(env, None)
 
 from antbb import llm_providers as lp
 
 EXPECTED = {"openai", "anthropic", "gemini", "minimax", "moonshot",
-            "mistral", "deepseek", "xai", "ollama", "qwen"}
+            "mistral", "deepseek", "xai", "ollama", "qwen", "hermes"}
 
 
 def test_registry_loads_all():

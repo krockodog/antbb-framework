@@ -144,10 +144,13 @@ def test_converted_templates_and_scripts_have_no_hardcoded_german():
 
 def test_every_template_has_the_language_switcher():
     base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    # Die Leiste liegt seit der Vereinheitlichung im Partial _topnav.html.
+    assert '{% include "_topnav.html" %}' in base
+    base += (TEMPLATES / "_topnav.html").read_text(encoding="utf-8")
     assert "lang-switch" in base
     assert "lang_href('de')" in base and "lang_href('en')" in base
     for path in TEMPLATES.glob("*.html"):
-        if path.name == "base.html":
-            continue
+        if path.name == "base.html" or path.name.startswith("_"):
+            continue  # Partials (_topnav.html …) werden eingebunden, nicht erweitert
         text = path.read_text(encoding="utf-8")
         assert 'extends "base.html"' in text, path.name

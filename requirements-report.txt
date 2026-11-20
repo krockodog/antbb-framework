@@ -3,3 +3,5 @@
 # den Report EHRLICH als HTML statt PDF – es wird nie ein Fake-PDF geschrieben.
 # System-Libs (Debian/Ubuntu): libpango-1.0-0 libpangocairo-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libffi-dev
 weasyprint>=60
+# SoA / Risikoregister als XLSX (optional; CSV bleibt der Fallback).
+openpyxl>=3.1

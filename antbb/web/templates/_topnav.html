@@ -1,0 +1,61 @@
+{#- Gemeinsame obere Leiste (Red/Blue/Yellow/OSINT/Profil/Admin …).
+    Vorbild: Red-Königin-Seite. Die statische Next-Landing (/) rendert dasselbe
+    Markup in all-and-one/src/components/site-header.tsx; Styles in
+    /static/topnav.css. /brain (neuronales Gehirn) hat bewusst eine eigene Leiste. -#}
+{%- set _p = request.url.path if request else '' -%}
+{%- macro _nl(href, label, prefix=None) -%}
+{%- set _pre = prefix or href -%}
+<a href="{{ href }}"{% if _p == _pre or _p.startswith(_pre ~ '/') %} aria-current="page" class="on"{% endif %}>{{ label }}</a>
+{%- endmacro -%}
+{%- set _cu = current_user() if current_user is defined else {} -%}
+<header class="antbb-topnav">
+  <h1><a href="/" class="antbb-topnav-brand">antbb · All and One</a></h1>
+  <nav aria-label="Hauptnavigation">
+    <a class="hub-back" href="/" title="{{ t('nav.back_hub') }}">← {{ t('nav.hub') }}</a>
+    <span class="sep">·</span> <a href="/">{{ t('nav.scope') }}</a>
+    <span class="sep">·</span> {{ _nl('/red', t('nav.red')) }}
+    <span class="sep">·</span> {{ _nl('/blue', t('nav.blue')) }}
+    <span class="sep">·</span> {{ _nl('/yellow', t('nav.yellow')) }}
+    {% if hosted_mode() %}
+    <span class="sep">·</span> {{ _nl('/osint', t('nav.osint')) }}
+    {% if can_wlan() %}<span class="sep">·</span> {{ _nl('/wlan', t('nav.wlan')) }}{% endif %}
+    {% else %}
+    <span class="sep">·</span> {{ _nl('/wlan', t('nav.wlan')) }}
+    {% endif %}
+    <span class="sep">·</span> <a href="/brain">{{ t('nav.brain') }}</a>
+    <span class="sep">·</span> {{ _nl('/assets', t('nav.assets')) }}
+    <span class="sep">·</span> {{ _nl('/history', t('nav.history')) }}
+    {% if _cu.username %}
+    <span class="antbb-topnav-user">
+      {% if is_admin() %}<span class="sep">·</span> {{ _nl('/admin/users', t('nav.admin'), '/admin') }}{% endif %}
+      <span class="sep">·</span> <span class="nav-user"><a href="/profile" title="{{ t('nav.profile') }}"{% if _p.startswith('/profile') %} aria-current="page" class="on"{% endif %}>👤 {{ _cu.username }}</a>{% if is_admin() %}<span id="alert-dot" class="alert-dot" hidden title="{{ t('alerts.open') }}"></span>{% endif %}</span>
+      <span class="sep">·</span> <a href="/logout">{{ t('nav.logout') }}</a>
+    </span>
+    {% endif %}
+    <span class="sep">·</span> <span class="lang-switch" aria-label="{{ t('lang.switch') }}">
+      <a href="{{ lang_href('de') }}"{% if current_lang() == 'de' %} aria-current="true"{% endif %}>DE</a>
+      |
+      <a href="{{ lang_href('en') }}"{% if current_lang() == 'en' %} aria-current="true"{% endif %}>EN</a>
+    </span>
+  </nav>
+</header>
+{% if _cu.username %}<script src="/static/governance-bar.js?v=2026112001" defer></script>{% endif %}
+{% if _cu.username and is_admin() %}
+<script>
+(function(){
+  if (window.__antbbAlertPoll) return; window.__antbbAlertPoll = true;
+  // Punkt nur bei neuen Benutzern oder kritischen Ereignissen seit dem letzten
+  // Besuch von /admin/users (Logik: admin_portal.attention_status).
+  function poll(){
+    fetch("/api/admin/attention",{credentials:"same-origin",headers:{"Accept":"application/json"}})
+      .then(function(r){return r.ok?r.json():null}).then(function(d){
+        if(!d) return; var dot=document.getElementById("alert-dot");
+        var why=(d.reasons||[]).map(function(x){return x.label+": "+x.count+(x.users&&x.users.length?" ("+x.users.join(", ")+")":"");}).join(" · ");
+        if(dot){ dot.hidden=!d.blink; dot.title=why; dot.setAttribute("aria-label", why); }
+        document.dispatchEvent(new CustomEvent("antbb:alerts",{detail:{open:d.blink?(d.count||0):0, reasons:why}}));
+      }).catch(function(){});
+  }
+  poll(); setInterval(poll, 15000);
+})();
+</script>
+{% endif %}

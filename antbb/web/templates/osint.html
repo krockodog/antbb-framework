@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ t('osint.title') }} · antbb{% endblock %}
+{% block content %}
+<p><a href="/">← {{ t('nav.hub') }}</a></p>
+<h2>{{ t('osint.heading') }} <small>{{ t('osint.sub') }}</small></h2>
+<pre class="notice">{{ t('osint.notice') }}</pre>
+
+<section class="card">
+  <h3>{{ t('osint.tools') }}</h3>
+  <table>
+    <thead><tr><th>Tool</th><th>Status</th><th>Version / path</th></tr></thead>
+    <tbody>
+    {% for tool in tools %}
+      <tr>
+        <td><code>{{ tool.id }}</code></td>
+        <td>{% if tool.present %}<span class="ok">{{ t('osint.present') }}</span>
+            {% else %}<span class="blocked">{{ t('osint.missing') }}</span>{% endif %}</td>
+        {# Version/Pfad nur fuer Admins (Leck-Audit: interne Pfade/Versionen) #}
+        <td class="hint">{% if is_admin() %}{{ tool.version or tool.path or "—" }}{% else %}{{ "✓" if tool.present else "—" }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card" id="extras">
+  <h3>{{ t('extras.heading') }} <small>{{ extras.count }} · {{ t('extras.runnable') }} {{ extras.runnable_count }} · {{ t('osint.present') }} {{ extras.present_count }}</small></h3>
+  <p class="hint">{{ t('extras.sub') }}</p>
+  <table>
+    <thead><tr><th>{{ t('extras.tool') }}</th><th>{{ t('extras.group') }}</th><th>{{ t('extras.mode') }}</th><th>{{ t('extras.desc') }}</th></tr></thead>
+    <tbody>
+    {% for tool in extras.tools %}
+      <tr>
+        <td>{% if tool.github or tool.website %}<a href="{{ tool.github or tool.website }}" rel="noopener noreferrer nofollow" target="_blank">{{ tool.name }}</a>{% else %}{{ tool.name }}{% endif %}</td>
+        <td class="hint">{{ tool.group }}</td>
+        <td>{% if tool.runnable %}{% if tool.present %}<span class="ok">{{ t('extras.passive_run') }}</span>{% else %}<span class="blocked">{{ t('extras.passive_missing') }}</span>{% endif %}{% else %}<span class="hint">{{ t('extras.catalog_only') }}</span>{% endif %}</td>
+        <td class="hint">{{ tool.description }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">{{ t('extras.excluded') }}: {{ extras.excluded_categories | join(', ') }}</p>
+</section>
+
+<section class="card">
+  <h3>{{ t('osint.run') }}</h3>
+  {% if can_ops() or is_guest() %}
+    {% if not targets %}
+      <p class="hint">{{ t('osint.no_targets') }}</p>
+    {% else %}
+      <form method="post" action="/osint/run" class="inline">
+        <label>{{ t('osint.target') }}
+          <select name="target_id" required>
+            {% for trow in targets %}
+              <option value="{{ trow.id }}">{{ trow.name }}
+                {% if trow.oversight and trow.scope_count %}(Oversight · Scope {{ trow.scope_count }})
+                {% else %}(Gates unvollständig){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>{{ t('osint.username') }}
+          <input name="username" placeholder="handle" autocomplete="off">
+        </label>
+        {% if can_ops() %}
+        <label><input type="checkbox" name="extras" value="1"> {{ t('extras.include') }}</label>
+        {% endif %}
+        <button type="submit">{{ t('osint.run') }}</button>
+      </form>
+      <p class="hint">{{ t('osint.need_gates') }}</p>
+    {% endif %}
+  {% else %}
+    <p class="hint">{{ t('osint.need_admin') }}</p>
+  {% endif %}
+  {% if message %}<pre class="notice">{{ message }}</pre>{% endif %}
+</section>
+{% endblock %}

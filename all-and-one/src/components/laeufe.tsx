@@ -49,8 +49,10 @@ export function Laeufe() {
         <span className="orb orb-yellow" />
       </div>
       <div className="grain" aria-hidden="true" />
-      <div className="relative z-10 mx-auto max-w-4xl px-5 py-6 md:px-8">
+      <div className="relative z-10">
         <SiteHeader />
+      </div>
+      <div className="relative z-10 mx-auto max-w-4xl px-5 py-6 md:px-8">
         <header className="mt-10">
           <p className="text-[0.72rem] tracking-[0.22em] text-[var(--gold)] uppercase">{t("laeufe.kicker")}</p>
           <h1 className="font-heading mt-3 text-5xl">{t("laeufe.title")}</h1>

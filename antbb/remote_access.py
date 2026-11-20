@@ -225,6 +225,7 @@ _EXTRA_BIN_DIRS = [
     _os.path.expanduser("~/.local/bin"),
     _os.path.expanduser("~/bin"),
     "/home/lordix/antbb/bin",
+    "/opt/antbb-tools/bin",
 ]
 
 

@@ -116,6 +116,7 @@
         <button data-tab="vault">Vault</button>
       </div>
       <div class="sc-bar"><span data-bar></span></div>
+      <label class="sa-sel sa-sel-card" title="${esc(window.t("red.sel.card"))}"><input type="checkbox" data-card-all> ${esc(window.t("red.sel.card"))}</label>
       <div class="sc-pb-strip" data-pb-strip></div>
       <div class="sc-body" data-body>${window.t("common.loading")}</div>
       <div class="sc-files">
@@ -160,6 +161,8 @@
     badge.className = "sc-badge " + (done===total && total>0 ? "full" : done>0 ? "part" : "");
     const pct = total? Math.round(100*done/total):0;
     el.querySelector("[data-bar]").style.width = pct + "%";
+    const ca = el.querySelector("[data-card-all]");
+    if (ca) { ca.checked = total>0 && done===total; ca.indeterminate = done>0 && done<total; }
   }
 
   function renderPbStrip(name, el) {
@@ -203,6 +206,7 @@
           <label class="pb-en"><input type="checkbox" ${enabled?"checked":""}
             data-pb-enable="${esc(pb.name)}"> ${esc(pb.name)}</label>
           <span class="pb-mode ${pb.mode}">${pb.mode}${pb.oversight_required?" · OVERSIGHT":""}</span>
+          ${(pb.task_items||[]).length?`<label class="sa-sel sa-sel-pb" title="${esc(window.t("red.sel.pb_title"))}"><input type="checkbox" data-pb-all="${esc(pb.name)}"> ${esc(window.t("red.sel.all"))}</label>`:""}
         </div>
         <div class="pb-desc">${esc(pb.description)}</div>
         ${(pb.tools&&pb.tools.length)?'<div class="pb-tools">'+pb.tools.map(t=>'<span class="chip">'+esc(t)+'</span>').join("")+'</div>':''}
@@ -237,6 +241,14 @@
              {playbook:cb.dataset.pbEnable, key:"enabled", value: cb.checked?"true":"false"})
           .then(()=>loadDetail(name)).then(()=>refreshCard(name));
       };
+    });
+    // „Alle"-Haken je Playbook (Tri-State). Override-Markierung, Gates unverändert.
+    body.querySelectorAll("[data-pb-all]").forEach(cb => {
+      const sec = cb.closest(".pb");
+      const tb = sec.querySelectorAll("[data-task]");
+      const on = sec.querySelectorAll("[data-task]:checked").length;
+      cb.checked = tb.length>0 && on===tb.length; cb.indeterminate = on>0 && on<tb.length;
+      cb.onchange = () => bulkSetSoldier(name, cb.dataset.pbAll, cb.checked);
     });
   }
 
@@ -438,6 +450,60 @@
     }).join("") + "</div>"
       + '<p class="hint">' + window.t("sol.blue_phases") + '</p>';
   }
+
+  /* „Alle anwählen" (Karte / Playbook / global) für die Soldaten-/Agenten-Karten
+     („Urseln"). Dieselbe Override-Persistenz (Batch-API) und Live-Zählwerke wie
+     bei Red/Blue. Ein Haken ist nur eine Markierung — Oversight-/Scope-Gates beim
+     Start bleiben UNVERÄNDERT, 🔒 bleibt 🔒. */
+  function saStatus(msg, bad) { const el = document.getElementById("sa-status"); if (el) { el.textContent = msg || ""; el.classList.toggle("blocked", !!bad); } }
+  function bulkSetSoldier(name, pbFilter, on) {
+    const d = DETAIL[name]; if (!d || !d.soldier) return Promise.resolve(0);
+    const {ovmap} = doneCount(d);
+    const items = [];
+    (d.soldier.playbooks||[]).forEach(pb => {
+      if (pbFilter && pb.name !== pbFilter) return;
+      (pb.task_items||[]).forEach(ti => {
+        const cur = ovmap[pb.name+"|"+taskKey(pb.name, ti.task)];
+        const isOn = (cur==="done"||cur==="verifiziert");
+        if (isOn !== on) items.push({soldier:name, playbook:pb.name,
+          key: taskKey(pb.name, ti.task), value: on?"done":"offen"});
+      });
+    });
+    if (!items.length) return Promise.resolve(0);
+    saStatus(window.t("red.sel.saving", {n: items.length}));
+    const chunks = []; for (let i=0;i<items.length;i+=500) chunks.push(items.slice(i,i+500));
+    return chunks.reduce((p,ch)=>p.then(()=>post("/api/soldiers/overrides/batch", {items: ch})
+      .then(r=>{ if (r && r.error) throw new Error(r.error); })), Promise.resolve())
+      .then(()=>loadDetail(name)).then(()=>{ refreshCard(name); saStatus(window.t("red.sel.saved", {n: items.length})); return items.length; })
+      .catch(err=>{ saStatus(window.t("red.sel.error", {err:String(err&&err.message||err)}), true); loadDetail(name).then(()=>refreshCard(name)); });
+  }
+  function soldierNames() { return Array.prototype.slice.call(root.querySelectorAll(".soldier-card"))
+      .filter(c=>c.style.display!=="none").map(c=>c.dataset.name); }
+  function globalSelect(on) {
+    const names = soldierNames();
+    return names.reduce((p,n)=>p.then(()=>DETAIL[n]?Promise.resolve():loadDetail(n)).then(()=>bulkSetSoldier(n, null, on)), Promise.resolve());
+  }
+  document.addEventListener("change", ev => {
+    const cb = ev.target;
+    if (cb && cb.matches && cb.matches("[data-card-all]")) {
+      const card = cb.closest(".soldier-card"); if (card) bulkSetSoldier(card.dataset.name, null, cb.checked);
+    }
+  });
+  (function mountGlobal(){
+    if (document.getElementById("sa-all")) return;
+    const box = document.createElement("div"); box.className = "sa-global";
+    box.innerHTML = "<button type='button' id='sa-all'>☑ "+esc(window.t("red.sel.global_on"))+
+      "</button> <button type='button' id='sa-none'>☐ "+esc(window.t("red.sel.global_off"))+
+      "</button> <span id='sa-status' class='sa-status' role='status'></span>" +
+      "<span class='hint' style='flex-basis:100%'>🔒 "+esc(window.t("red.sel.note"))+"</span>";
+    const tb = document.querySelector(".soldier-toolbar");
+    if (tb) tb.appendChild(box);
+    else if (filterBox) filterBox.insertAdjacentElement("afterend", box);
+    else return;
+    box.querySelector("#sa-all").onclick = ()=>globalSelect(true);
+    box.querySelector("#sa-none").onclick = ()=>globalSelect(false);
+    function esc(x){return String(x==null?"":x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+  })();
 
   api("/api/soldiers").then(reg => {
     REG = reg;

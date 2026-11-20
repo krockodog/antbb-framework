@@ -2,7 +2,7 @@
 {% block title %}{{ t('idx.title') }}{% endblock %}
 {% block body_class %}red-body{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/red_cards.css?v=2026102501">
+<link rel="stylesheet" href="/static/red_cards.css?v=2026112001">
 {% set tr = t %}
 <section class="rq-hero" aria-label="Red Queen">
   <div class="rq-hero-glow" aria-hidden="true"></div>
@@ -17,6 +17,14 @@
     <div class="rq-hero-copy">
       <p class="rq-kicker">{{ tr('idx.kicker') }}</p>
       <h2>Red Queen <span class="rq-sub">{{ tr('idx.sub') }}</span></h2>
+      <p class="rq-lede gov-red-def">{{ tr('gov.red.def') }}</p>
+      <p class="gov-badges" aria-label="Security guarantees">
+        <span class="gov-badge">{{ tr('gov.badge.auth') }}</span>
+        <span class="gov-badge">{{ tr('gov.badge.scope') }}</span>
+        <span class="gov-badge">{{ tr('gov.badge.nodestruct') }}</span>
+        <span class="gov-badge">{{ tr('gov.badge.approval') }}</span>
+      </p>
+      <p class="rq-lede gov-red-risk">{{ tr('gov.red.risk') }}</p>
       <p class="rq-lede">{{ tr('idx.lede') }}</p>
       <p class="rq-motto">{{ tr('idx.motto') }}</p>
     </div>
@@ -39,7 +47,22 @@
   <a href="#rq-findings">{{ tr('idx.findings') }}</a>
   <a href="#rq-runs">{{ tr('idx.runs.title') }}</a>
   <a href="#rq-remote">{{ tr('idx.jump.remote') }}</a>
+  <a href="#rq-reports">{{ tr('isms.nav.reports') }}</a>
 </nav>
+
+<section class="card rq-card isms-downloads-card" id="rq-reports">
+  <h3>📄 {{ tr('isms.downloads') }}</h3>
+  <p class="hint">{{ tr('isms.downloads.hint') }}</p>
+  <p class="isms-downloads">
+    <a class="isms-btn" href="/red/report.pdf">{{ tr('isms.dl.red') }}</a>
+    <a class="isms-btn secondary" href="/isms/report.pdf">{{ tr('isms.dl.full') }}</a>
+    <a class="isms-btn secondary" href="/isms/soa.csv">{{ tr('isms.dl.soa_csv') }}</a>
+    <a class="isms-btn secondary" href="/isms/register.csv">{{ tr('isms.dl.reg_csv') }}</a>
+    {% if request.state.user and request.state.user.role == 'admin' %}
+    <a class="isms-btn ghost" href="/isms">{{ tr('isms.nav.org') }}</a>
+    {% endif %}
+  </p>
+</section>
 
 <section class="card rq-card" id="rq-phases">
   <h3>⬡ {{ tr('idx.phases.title') }} <small>{{ tr('idx.phases.sub') }}</small></h3>
@@ -65,6 +88,7 @@
         <option value="intense">{{ tr('idx.depth.intense') }}</option>
       </select>
     </label>
+    {% if can_ops() %}
     <label class="rq-check">
       <input type="checkbox" name="active" id="rq-active" value="1">
       {{ tr('idx.active') }}
@@ -73,7 +97,9 @@
       <input type="checkbox" name="oversight_ack" id="rq-ack" value="1">
       {{ t('oversight.active_steps') }}
     </label>
+    {% endif %}
     <button type="submit" class="rq-go">🐜🎯 {{ tr('idx.go') }}</button>
+    <button type="button" class="rq-skill-btn" id="rq-cancel" hidden>⏹ {{ tr('idx.menu.title') }} abbrechen</button>
   </form>
   <pre id="rq-run-log" class="feed rq-feed" aria-live="polite"></pre>
 </section>
@@ -123,7 +149,13 @@
   <div class="rq-toolbar">
     <input type="search" id="rq-soldier-filter" class="rq-filter"
            placeholder="{{ tr('idx.filter.ph') }}" autocomplete="off">
+    {% if can_ops() %}
+    <button type="button" class="rq-skill-btn" id="rq-select-all">☑ {{ tr('red.sel.global_on') }}</button>
+    <button type="button" class="rq-skill-btn" id="rq-select-none">☐ {{ tr('red.sel.global_off') }}</button>
+    {% endif %}
+    <span class="hint" id="rq-sel-status" role="status" aria-live="polite"></span>
   </div>
+  <p class="hint">🔒 {{ tr('red.sel.note') }}</p>
   <div id="rq-soldier-cards" class="rq-grid">
     <p class="hint">{{ tr('idx.soldiers.loading') }}</p>
   </div>
@@ -138,7 +170,7 @@
 
 <section class="card rq-card" id="rq-targets">
   <h3>🧭 {{ tr('idx.targets.title') }}
-    <small><a href="/trash" title="{{ tr('idx.trash.title') }}">🗑 {{ tr('idx.trash') }}{% if archived_count %} ({{ archived_count }}){% endif %}</a></small>
+    {% if is_admin() %}<small><a href="/trash" title="{{ tr('idx.trash.title') }}">🗑 {{ tr('idx.trash') }}{% if archived_count %} ({{ archived_count }}){% endif %}</a></small>{% endif %}
   </h3>
   <p class="hint">{{ tr('idx.targets.hint') }}</p>
   <div class="rq-wrap">
@@ -161,10 +193,12 @@
           </td>
           <td>
             <a href="/target/{{ tgt.id }}">{{ tr('idx.open') }} →</a>
+            {% if is_admin() %}
             <form method="post" action="/target/{{ tgt.id }}/archive" style="display:inline"
                   onsubmit='return confirm(window.t("idx.archive.confirm", {name: {{ tgt.name|tojson }}}));'>
               <button type="submit" class="rq-skill-btn" title="{{ tr('idx.archive.title') }}">🗑 {{ tr('idx.archive') }}</button>
             </form>
+            {% endif %}
           </td>
         </tr>
       {% else %}
@@ -173,10 +207,12 @@
       </tbody>
     </table>
   </div>
-  <h4>{{ tr('idx.new') }}</h4>
+  {% if can_ops() %}
+  <h4 id="new-scope">{{ tr('idx.new') }}</h4>
   <form method="post" action="/target/add" class="rq-form">
     <label class="rq-field">{{ tr('idx.th.name') }} <input name="name" required placeholder="{{ tr('idx.name.ph') }}" class="rq-field-input"></label>
     <label class="rq-field">{{ tr('idx.desc') }} <input name="description" placeholder="{{ tr('idx.optional') }}" class="rq-field-input"></label>
+    {% if is_admin() %}
     <label class="rq-field">mode_policy
       <select name="mode_policy">
         <option value="auto" selected>{{ tr('idx.policy.auto') }}</option>
@@ -184,8 +220,10 @@
         <option value="offensive">{{ tr('idx.policy.off') }}</option>
       </select>
     </label>
+    {% endif %}
     <button type="submit" class="rq-go">{{ tr('idx.create') }}</button>
   </form>
+  {% endif %}
 </section>
 
 <section class="card rq-card" id="rq-findings">
@@ -206,6 +244,7 @@
   <div id="rq-runs-list">{{ tr('common.loading') }}</div>
 </section>
 
+{% if is_admin() %}
 <section class="card rq-card" id="rq-remote">
   <h3>🔐 {{ tr('idx.remote.title') }} <small>{{ tr('idx.remote.sub') }}</small></h3>
   <p class="hint">{{ tr('idx.remote.hint', url=remote.local_url) }}</p>
@@ -290,11 +329,12 @@
   }
   </script>
 </section>
+{% endif %}
 
 <script>
 window.RQ_TARGETS = {{ targets|tojson }};
 </script>
-<script src="/static/red_cards.js?v=2026102501"></script>
+<script src="/static/red_cards.js?v=2026112002"></script>
 
 <style>
 .qv-slot,.rq-qv{width:min(340px,42vw);height:300px;margin:8px 0 4px;flex:0 0 auto;border:1px solid rgba(255,59,59,.4);

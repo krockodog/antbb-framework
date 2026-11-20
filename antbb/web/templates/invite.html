@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ t('invite.title') }} · antbb{% endblock %}
+{% block content %}
+<section class="card" style="max-width:460px;margin:2rem auto">
+  <h2>✉ {{ t('invite.title') }}</h2>
+  {% if error %}<p class="blocked">{{ error }}</p>{% endif %}
+  {% if valid %}
+  <p>{{ t('invite.role') }} <span class="badge">{{ role }}</span></p>
+  <p class="hint">{{ t('invite.hint', n=min_pw) }}</p>
+  <form method="post" action="/invite/{{ token }}">
+    {% if fixed_username %}
+      <label>{{ t('login.user') }}<input value="{{ fixed_username }}" readonly></label>
+    {% else %}
+      <label>{{ t('login.user') }}<input name="username" required autofocus autocomplete="username"
+        pattern="[A-Za-z0-9][A-Za-z0-9._@\-]{2,63}"></label>
+    {% endif %}
+    <label>{{ t('login.password') }}<input name="password" type="password" required minlength="{{ min_pw }}" autocomplete="new-password"></label>
+    <label>{{ t('invite.confirm') }}<input name="password_confirm" type="password" required minlength="{{ min_pw }}" autocomplete="new-password"></label>
+    <button type="submit">{{ t('invite.submit') }}</button>
+  </form>
+  {% else %}
+  <p class="blocked">{{ t('invite.invalid') }}</p>
+  <p><a href="/login">{{ t('login.title') }} →</a></p>
+  {% endif %}
+  <p class="hint">{{ t('legal.not_substitute') }} {{ t('scope.default_deny') }}</p>
+</section>
+{% endblock %}

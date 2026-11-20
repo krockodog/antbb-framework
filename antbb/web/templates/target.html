@@ -65,10 +65,12 @@
 </section>
 
 <!-- ======================= AUTORISIERTES WLAN-OFFENSIV-MODUL ======================= -->
+{% if is_admin() %}
 <section class="card" id="wlan-offensive-section">
   <h3>🗡️ {{ tr('tgt.wlan.off') }} <small>{{ tr('tgt.wlan.off.sub') }}</small></h3>
   <div id="wlan-offensive-view">{{ tr('common.loading') }}</div>
 </section>
+{% endif %}
 
 <section class="card mode-card">
   <h3>{{ tr('tgt.mode') }} 🛡️</h3>
@@ -86,6 +88,7 @@
   <p class="hint">{{ tr('tgt.inscope', n=mode.in_scope_count) }}
     {% if mode.oversight %}<span class="ok">✔</span>{% else %}<span class="blocked">✘</span>{% endif %}
   </p>
+  {% if is_admin() %}
   <form method="post" action="/target/{{ target.id }}/mode" class="inline">
     <label>mode_policy
       <select name="mode_policy">
@@ -96,6 +99,7 @@
     </label>
     <button type="submit">{{ tr('tgt.policy.save') }}</button>
   </form>
+  {% endif %}
 </section>
 
 <section class="card {% if confirmed %}ok-border{% else %}blocked-border{% endif %}">
@@ -104,12 +108,14 @@
     {% if confirmed %}<span class="ok">✔ {{ tr('tgt.oversight.by', who=oversight.confirmed_by) }}</span>
     {% else %}<span class="blocked">✘ {{ tr('tgt.oversight.blocked') }}</span>{% endif %}
   </p>
+  {% if can_ops() %}
   <form method="post" action="/target/{{ target.id }}/oversight">
     <label><input type="checkbox" name="confirm" value="on" {% if confirmed %}checked{% endif %}>
       {{ tr('oversight.confirm') }}</label>
     <input type="hidden" name="by" value="web-user">
     <button type="submit">{{ tr('tgt.save') }}</button>
   </form>
+  {% endif %}
 </section>
 
 <section class="card">
@@ -121,26 +127,93 @@
       <tr><td>{{ s.id }}</td><td>{{ s.kind }}</td><td><code>{{ s.value }}</code></td>
       <td>{% if s.allowed %}<span class="ok">in-scope</span>{% else %}<span class="blocked">out-of-scope</span>{% endif %}</td>
       <td>
+        {% if can_ops() %}
         <form method="post" action="/target/{{ target.id }}/scope/{{ s.id }}/delete" style="display:inline">
           <button type="submit" class="btn-danger">{{ tr('tgt.remove') }}</button>
         </form>
+        {% endif %}
       </td></tr>
     {% else %}
       <tr><td colspan="5">{{ tr('tgt.scope.empty') }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
+  {% if can_ops() %}
   <form method="post" action="/target/{{ target.id }}/scope/add" class="inline">
     <select name="kind"><option>domain</option><option>ip</option><option>path</option><option>url</option></select>
     <input name="value" required placeholder="{{ tr('tgt.scope.ph') }}">
     <label><input type="checkbox" name="allowed" value="on" checked> in-scope</label>
     <button type="submit">+ {{ tr('tgt.add') }}</button>
   </form>
+  {% endif %}
 </section>
+
+{% if gov_policy %}{% set P = gov_policy %}
+<section class="card {% if gov_halted or P.kill_switch %}blocked-border{% else %}ok-border{% endif %}" id="policy">
+  <h3>🛡 {{ tr('gov.pol.title') }} <small>(scope-{{ target.id }} · {{ tr('gov.pol.stricter') }})</small></h3>
+  <p class="hint">{{ tr('gov.pol.hint') }}</p>
+  <p>{{ tr('gov.pol.status') }}:
+    {% if gov_halted %}<span class="blocked">HALTED ({{ tr('gov.pol.global_kill') }})</span>
+    {% elif P.kill_switch %}<span class="blocked">HALTED ({{ tr('gov.pol.scope_kill') }})</span>
+    {% else %}<span class="ok">{{ tr('gov.pol.active') }}</span>{% endif %}
+    · {{ tr('gov.status.max_risk') }}: <b>{{ P.max_allowed_risk }}</b>
+    · {{ tr('gov.status.authorization') }}:
+    {% if confirmed and P.authorized_by and P.authorization_document %}<span class="ok">{{ tr('gov.status.auth.verified') }}</span>
+    {% elif confirmed %}<span class="warn">{{ tr('gov.status.auth.oversight_only') }}</span>
+    {% else %}<span class="blocked">{{ tr('gov.status.auth.unverified') }}</span>{% endif %}
+    {% if P.updated_by %}<small> · {{ tr('gov.pol.last') }}: {{ P.updated_by }}</small>{% endif %}
+  </p>
+  {% if can_authorize_scope() %}
+  <form method="post" action="/target/{{ target.id }}/policy" class="gov-policy-form">
+    <div class="gov-grid">
+      <label>target_domains<br><input name="target_domains" value="{{ P.target_domains|join(', ') }}" placeholder="example.com, *.example.com"></label>
+      <label>allowed_ips / allowed_cidrs<br><input name="allowed_cidrs" value="{{ P.allowed_cidrs|join(', ') }}" placeholder="203.0.113.0/24"></label>
+      <label>allowed_ports<br><input name="allowed_ports" value="{{ P.allowed_ports }}" placeholder="80,443"></label>
+      <label>max_requests_per_minute<br><input type="number" min="1" max="600" name="max_requests_per_minute" value="{{ P.max_requests_per_minute }}"></label>
+      <label>max_concurrent_agents<br><input type="number" min="0" max="64" name="max_concurrent_agents" value="{{ P.max_concurrent_agents }}"></label>
+      <label>test_window · start<br><input type="datetime-local" name="test_window_start" value="{{ P.test_window_start[:16] }}"></label>
+      <label>test_window · end<br><input type="datetime-local" name="test_window_end" value="{{ P.test_window_end[:16] }}"></label>
+      <label>authorized_by<br><input name="authorized_by" maxlength="120" value="{{ P.authorized_by }}"></label>
+      <label>authorization_document<br><input name="authorization_document" maxlength="300" value="{{ P.authorization_document }}"></label>
+      <label>emergency_contact<br><input name="emergency_contact" maxlength="200" value="{{ P.emergency_contact }}"></label>
+      <label>audit_retention ({{ tr('gov.pol.days') }})<br><input type="number" min="30" max="3650" name="audit_retention_days" value="{{ P.audit_retention_days }}"></label>
+      <label>kill_switch (scope)<br><select name="kill_switch"><option value="0" {% if not P.kill_switch %}selected{% endif %}>READY</option><option value="1" {% if P.kill_switch %}selected{% endif %}>HALTED</option></select></label>
+    </div>
+    <fieldset><legend>allowed_techniques</legend>
+      {% for key, tq in gov_techniques.items() %}
+      <label class="gov-tech"><input type="checkbox" name="allowed_techniques" value="{{ key }}" {% if key in P.allowed_techniques %}checked{% endif %}>
+        {{ tq.label }} <small class="risk risk-{{ tq.risk|lower }}">{{ tq.risk }}</small></label>
+      {% endfor %}
+      <p class="hint">{{ tr('gov.pol.critical') }}: {{ gov_critical.values()|join(', ') }}.</p>
+    </fieldset>
+    <fieldset><legend>approval_required_for</legend>
+      {% for lv in ['SAFE','LOW','MEDIUM'] %}
+      <label class="gov-tech"><input type="checkbox" name="approval_required_for" value="{{ lv }}" {% if lv in P.approval_required_for %}checked{% endif %}> {{ lv }}</label>
+      {% endfor %}
+      <label class="gov-tech"><input type="checkbox" checked disabled> HIGH ({{ tr('gov.pol.always') }})</label>
+      <input type="hidden" name="approval_required_for" value="HIGH">
+    </fieldset>
+    <label>rules_of_engagement<br><textarea name="rules_of_engagement" rows="3" maxlength="4000" style="width:100%">{{ P.rules_of_engagement }}</textarea></label>
+    <button type="submit">{{ tr('gov.pol.save') }}</button>
+  </form>
+  {% else %}
+  <p class="hint">{{ tr('gov.status.allowed') }}: {% for k in P.allowed_techniques %}{{ gov_techniques[k].label }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  {% endif %}
+</section>
+<style>
+.gov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.6rem;margin:.6rem 0}
+.gov-grid input,.gov-grid select{width:100%}
+.gov-tech{display:inline-flex;gap:.3rem;align-items:center;margin:.2rem .8rem .2rem 0}
+.risk{font-size:.7em;padding:0 .35em;border-radius:3px;border:1px solid currentColor}
+.risk-safe,.risk-low{color:#4ade80}.risk-medium{color:#facc15}.risk-high{color:#fb923c}.risk-critical{color:#f87171}
+.warn{color:#facc15}
+</style>
+{% endif %}
 
 <section class="card" id="swarm">
   <h3>{{ tr('tgt.swarm') }} 👑 <small>({{ tr('tgt.swarm.sub') }})</small></h3>
   <form method="post" action="/target/{{ target.id }}/scan" id="scan-form">
+    {% if can_ops() %}
     <label style="display:block;margin:.5rem 0;font-weight:bold">
       <input type="checkbox" name="offensive" value="on"
         {% if mode.offensive_allowed %}checked{% else %}disabled{% endif %}>
@@ -170,16 +243,20 @@
       </label>
       <p class="hint">{{ tr('tgt.gate.hint') }}</p>
     </div>
-    
+    {% endif %}
+
     <fieldset id="scan-depth-box" style="margin:.6rem 0;padding:.55rem .7rem;border:1px solid rgba(240,180,90,.4);border-radius:10px">
       <legend style="padding:0 .35rem;color:#f0b45a;font-size:.8rem">{{ tr('tgt.depth') }}</legend>
       <p class="hint" id="scan-depth-reason">{{ tr('tgt.depth.reason') }}</p>
-      <label style="margin-right:1rem"><input type="radio" name="depth" value="light" id="scan-depth-light"> {{ tr('tgt.depth.light') }}</label>
-      <label><input type="radio" name="depth" value="intense" id="scan-depth-intense" checked> {{ tr('tgt.depth.intense') }}</label>
+      <label style="margin-right:1rem"><input type="radio" name="depth" value="light" id="scan-depth-light" {% if is_guest() %}checked{% endif %}> {{ tr('tgt.depth.light') }}</label>
+      <label><input type="radio" name="depth" value="intense" id="scan-depth-intense" {% if not is_guest() %}checked{% endif %}> {{ tr('tgt.depth.intense') }}</label>
     </fieldset>
 
     <button type="submit" {% if not confirmed %}disabled title="{{ tr('tgt.oversight.missing') }}"{% endif %}>
       🐜 {{ tr('tgt.start') }}</button>
+  </form>
+  <form method="post" action="/target/{{ target.id }}/scan/cancel" id="scan-cancel-form" style="display:inline">
+    <button type="submit">⏹ Abbrechen</button>
   </form>
   <script>
   (function(){
@@ -401,7 +478,8 @@ window.ANTBB = {
 };
 </script>
 <script>window.ANTBB_TARGET_ID = {{ target.id }};</script>
-<script src="/static/soldiers.js"></script>
+<script src="/static/select-all.js?v=2026112001"></script>
+<script src="/static/soldiers.js?v=2026112001"></script>
 <script src="/static/rating.js"></script>
 <script src="/static/wlan.js"></script>
 <script src="/static/wlan_offensive.js"></script>

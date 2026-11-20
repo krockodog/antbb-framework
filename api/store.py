@@ -79,6 +79,11 @@ def _clean_allow(raw: list[str]) -> list[str]:
     return cleaned
 
 
+def _risk_of(queen_id: str, seed: dict) -> str:
+    from antbb.governance import playbook_risk
+    return playbook_risk(queen_id, seed.get("playbook_id", ""), bool(seed.get("destructive")))
+
+
 class Store:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -214,6 +219,7 @@ class Store:
             "stub": True,
             "stub_note": seed["stub_note"],
             "needs_probe": seed["needs_probe"],
+            "risk": _risk_of(queen_id, seed),
         }
 
     def queen_summary(self, queen_id: str) -> dict:
@@ -364,6 +370,9 @@ class Store:
         probe_name: str | None,
     ) -> dict:
         lowered = playbook_id.lower()
+        from antbb.governance import playbook_risk
+        if playbook_risk(queen_id, playbook_id) == "CRITICAL":
+            raise ColonyError(403, "CRITICAL: per Policy blockiert (destruktiv/Persistence/DoS/Exfiltration).")
         if any(token in lowered for token in FORBIDDEN_PLAYBOOK):
             raise ColonyError(
                 403,
@@ -421,6 +430,7 @@ class Store:
                 "targets": cleaned_targets,
                 "probe_name": probe_name.strip() if probe_name else None,
                 "oversight": True,
+                "risk": _risk_of(queen_id, playbook),
                 "status": "dossier",
                 "stub": True,
                 "stub_note": playbook["stub_note"],

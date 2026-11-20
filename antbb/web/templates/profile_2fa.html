@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ t('profile.title') }} · antbb{% endblock %}
+{% block content %}
+<section class="card" style="max-width:640px;margin:1.5rem auto" id="profile">
+  <h2>👤 {{ t('profile.title') }}</h2>
+  <dl class="profile-facts" style="display:grid;grid-template-columns:max-content 1fr;gap:.35rem 1rem;margin:.5rem 0 1rem">
+    <dt>{{ t('profile.username') }}</dt><dd><strong>{{ me }}</strong></dd>
+    <dt>{{ t('profile.role') }}</dt><dd>{{ t('profile.role.' ~ role) if role else '–' }} <small class="hint">({{ role }})</small></dd>
+    <dt>{{ t('profile.twofa') }}</dt><dd>{% if enabled %}<span class="ok">✔ {{ t('twofa.on') }}</span>{% else %}<span class="blocked">✘ {{ t('twofa.off') }}</span>{% endif %} · <a href="#twofa">{{ t('profile.twofa_manage') }}</a></dd>
+  </dl>
+  {% if role_is_admin %}<p><a href="/admin/users">→ {{ t('profile.admin_link') }}</a></p>{% endif %}
+</section>
+
+{% if can_change_pw %}
+<section class="card" style="max-width:640px;margin:1.5rem auto" id="password">
+  <h3>🔑 {{ t('profile.pw.title') }}</h3>
+  {% if pw_message %}<p class="ok">{{ pw_message }}</p>{% endif %}
+  {% if pw_error %}<p class="blocked">{{ pw_error }}</p>{% endif %}
+  <form method="post" action="/profile/password" autocomplete="on">
+    <input type="text" name="username" value="{{ me }}" autocomplete="username" hidden readonly>
+    <label>{{ t('profile.pw.current') }}<input type="password" name="current_password" required autocomplete="current-password"></label>
+    <label>{{ t('profile.pw.new') }}<input type="password" name="new_password" required minlength="{{ pw_min }}" autocomplete="new-password"></label>
+    <label>{{ t('profile.pw.confirm') }}<input type="password" name="new_password_confirm" required minlength="{{ pw_min }}" autocomplete="new-password"></label>
+    <p class="hint">{{ t('profile.pw.hint', n=pw_min) }}</p>
+    <button type="submit">{{ t('profile.pw.submit') }}</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="card" style="max-width:640px;margin:1.5rem auto" id="twofa">
+  <h2>🔐 {{ t('twofa.title') }} <small>{{ me }}</small></h2>
+  {% if message %}<p class="ok">{{ message }}</p>{% endif %}
+  {% if error %}<p class="blocked">{{ error }}</p>{% endif %}
+
+  {% if recovery_codes %}
+  <div class="card ok-border">
+    <h3>{{ t('twofa.rc.title') }}</h3>
+    <p class="hint">{{ t('twofa.rc.once') }}</p>
+    <pre style="font-size:1.05rem">{% for c in recovery_codes %}{{ c }}
+{% endfor %}</pre>
+  </div>
+  {% endif %}
+
+  {% if enabled %}
+    <p><span class="ok">✔ {{ t('twofa.on') }}</span> · {{ t('twofa.rc.left', n=rc_left) }}</p>
+    <form method="post" action="/profile/2fa/disable">
+      <label>{{ t('twofa.disable.code') }}<input name="code" required autocomplete="one-time-code" maxlength="16"></label>
+      <button type="submit" class="btn-danger">{{ t('twofa.disable') }}</button>
+    </form>
+  {% elif pending_secret %}
+    <p>{{ t('twofa.setup.step1') }}</p>
+    <p><strong>{{ t('twofa.secret') }}:</strong> <code style="font-size:1.1rem;letter-spacing:.08em">{{ pending_secret_grouped }}</code></p>
+    <p><strong>otpauth:</strong> <input readonly value="{{ otpauth }}" style="width:100%;font-family:monospace" onclick="this.select()"></p>
+    <p class="hint">{{ t('twofa.setup.hint') }}</p>
+    <form method="post" action="/profile/2fa/confirm">
+      <label>{{ t('twofa.setup.step2') }}<input name="code" required autocomplete="one-time-code" inputmode="numeric" maxlength="8"></label>
+      <button type="submit">{{ t('twofa.confirm') }}</button>
+    </form>
+    <form method="post" action="/profile/2fa/cancel" style="margin-top:.4rem"><button type="submit">{{ t('twofa.cancel') }}</button></form>
+  {% else %}
+    <p><span class="blocked">✘ {{ t('twofa.off') }}</span></p>
+    <p class="hint">{{ t('twofa.intro') }}</p>
+    <form method="post" action="/profile/2fa/setup"><button type="submit">{{ t('twofa.enable') }}</button></form>
+  {% endif %}
+</section>
+{% endblock %}

@@ -10,8 +10,9 @@ import { cn } from "cn";
 export default function NotFound() {
   const { t } = useI18n();
   return (
+    <>
+    <SiteHeader />
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col px-5 py-6">
-      <SiteHeader />
       <section className="py-20">
         <p className="text-[0.72rem] tracking-[0.22em] text-[var(--gold)] uppercase">
           {t("notfound.kicker")}
@@ -31,5 +32,6 @@ export default function NotFound() {
         </div>
       </section>
     </main>
+    </>
   );
 }

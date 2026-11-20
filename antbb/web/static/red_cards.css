@@ -330,3 +330,12 @@ body.red-body .card, .rq-card {
   .rq-phase, .rq-scard { animation: none; } .rq-phase::after { animation: none; }
 }
 @media (max-width: 640px) { .rq-grid { grid-template-columns: 1fr; } .rq-phase::after { display: none; } }
+
+/* „Alle anwählen" (Playbook tri-state · Soldat · global) */
+.rq-sel { display: inline-flex; align-items: center; gap: .3rem; font-size: .74rem; cursor: pointer; opacity: .9; }
+.rq-sel input { accent-color: #ff5a6a; }
+.rq-sel-pb { margin-left: auto; }
+.rq-sel-card { margin: .25rem 0 .4rem; }
+#rq-sel-status.blocked { color: #ff8a8a; }
+.gov-badges { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+.gov-badge { font-size: .62rem; font-weight: 800; letter-spacing: .12em; padding: .22rem .5rem; border-radius: .35rem; border: 1px solid rgba(255,255,255,.28); background: rgba(0,0,0,.35); color: #f5efe6; }

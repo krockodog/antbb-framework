@@ -44,7 +44,22 @@
   <a href="#blue-attacklog">{{ tr('blue.jump.attack') }}</a>
   <a href="#blue-posture">{{ tr('blue.jump.posture') }}</a>
   <a href="#blue-runs">{{ tr('idx.runs.title') }}</a>
+  <a href="#blue-reports">{{ tr('isms.nav.reports') }}</a>
 </nav>
+
+<section class="card blue-card isms-downloads-card" id="blue-reports">
+  <h3>📄 {{ tr('isms.downloads') }}</h3>
+  <p class="hint">{{ tr('isms.downloads.hint') }}</p>
+  <p class="isms-downloads">
+    <a class="isms-btn" href="/blue/report.pdf">{{ tr('isms.dl.blue') }}</a>
+    <a class="isms-btn secondary" href="/isms/report.pdf">{{ tr('isms.dl.full') }}</a>
+    <a class="isms-btn secondary" href="/isms/soa.csv">{{ tr('isms.dl.soa_csv') }}</a>
+    <a class="isms-btn secondary" href="/isms/register.csv">{{ tr('isms.dl.reg_csv') }}</a>
+    {% if request.state.user and request.state.user.role == 'admin' %}
+    <a class="isms-btn ghost" href="/isms">{{ tr('isms.nav.org') }}</a>
+    {% endif %}
+  </p>
+</section>
 
 <section class="card blue-card" id="blue-phases">
   <h3>⬡ {{ tr('idx.phases.title') }} <small>{{ tr('idx.phases.sub') }}</small></h3>
@@ -77,6 +92,7 @@
         {% endfor %}
       </select>
     </label>
+    {% if is_admin() %}
     <label class="blue-check">
       <input type="checkbox" name="apply_fixes" id="blue-apply" value="1">
       {{ tr('blue.apply') }}
@@ -85,6 +101,7 @@
       <input type="checkbox" name="oversight_ack" id="blue-ack" value="1">
       {{ t('oversight.active_steps') }}
     </label>
+    {% endif %}
     <button type="submit" class="blue-go">🐜🛡 {{ tr('idx.go') }}</button>
   </form>
   <pre id="blue-run-log" class="feed blue-feed" aria-live="polite"></pre>
@@ -160,6 +177,7 @@
   <div id="bq-skill-body" class="bq-skill-body"></div>
 </dialog>
 
+{% if is_admin() %}
 <section class="card blue-card" id="blue-greenbone">
   <h3>🌿 Greenbone / OpenVAS <small>{{ tr('blue.gb.sub') }}</small>
     <span id="gb-badge" class="gb-badge {{ 'gb-ok' if gb_status.available else 'gb-off' }}">
@@ -194,7 +212,9 @@
   </div>
   <div id="gb-result" class="gb-result" aria-live="polite" hidden></div>
 </section>
+{% endif %}
 
+{% if is_admin() %}
 <section class="card blue-card" id="blue-jobs">
   <h3>⏱ {{ tr('blue.jobs.title') }} <small>{{ tr('blue.jobs.sub') }}</small></h3>
   <p class="hint">{{ tr('blue.jobs.hint') }}</p>
@@ -252,6 +272,7 @@
   {% endfor %}
   </ul>
 </section>
+{% endif %}
 
 <section class="card blue-card" id="blue-ledger">
   <h3>🧾 {{ tr('blue.ledger.title') }} <small>{{ tr('blue.ledger.sub') }}
@@ -334,7 +355,8 @@
 </section>
 
 <script>window.ANTBB_COLONY = "blue";</script>
-<script src="/static/blue_cards.js"></script>
+<script src="/static/select-all.js?v=2026112001"></script>
+<script src="/static/blue_cards.js?v=2026112001"></script>
 <script src="/static/blue.js"></script>
 <script src="/static/blue_greenbone.js"></script>
 <script src="/static/blue_remediation.js?v=202610240245"></script>

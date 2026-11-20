@@ -125,7 +125,10 @@
 
   // --- Nodes ---------------------------------------------------------------
   var nodes = [];
-  var TRAIL_MAX = REDUCED ? 0 : 36;
+  // Fix "gelbe fliegende Aale" (Judith 2026-11-10): seit der 3D-Stadt (7ada0f5) lagen die Lauf-Knoten
+  // noch an zufälligen Bildschirmpositionen (ganze Breite) mit 36er-Schweif → glühender Kopf + Wurm-Spur
+  // außerhalb der Stadt. Jetzt: am Roten Hof verankert (projizierte 3D-Anker), kurze Spur, Reset bei Sprüngen.
+  var TRAIL_MAX = REDUCED ? 0 : 8;
   var TRAIL_MIN = 2.4;
   var FOLLOW = 5.5;       // Positions-Dämpfung (höher = enger an Bahn)
   var TURN = 7.0;         // Heading-Dämpfung
@@ -155,8 +158,9 @@
       var seed = 0;
       for (var k = 0; k < key.length; k++) seed = (seed * 31 + key.charCodeAt(k)) >>> 0;
       var hx = hash(seed + 1), hy = hash(seed + 2);
-      var baseX = 40 + hx * (W - 80);
-      var baseY = top + hy * (bot - top);
+      var ho = cityHub();
+      var baseX = ho ? ho.x + (hx * 2 - 1) * ho.rx : 40 + hx * (W - 80);
+      var baseY = ho ? ho.y + (hy * 2 - 1) * ho.ry : top + hy * (bot - top);
       try {
         r._sev = topSeverity(typeof r.severity === "string"
           ? JSON.parse(r.severity || "{}") : (r.severity || {}));
@@ -175,18 +179,29 @@
         next.push(prev);
       } else {
         next.push({
-          key: key, run: r, bx: baseX, by: baseY,
+          key: key, run: r, bx: baseX, by: baseY, hx: hx, hy: hy,
           x: baseX, y: baseY,
           tx: baseX, ty: baseY,
           heading: hash(seed + 6) * Math.PI * 2,
           phase: hash(seed + 3) * Math.PI * 2,
-          amp: 14 + hash(seed + 4) * 22,
+          amp: 5 + hash(seed + 4) * 8,
           spd: 0.22 + hash(seed + 5) * 0.35,
           trail: [], born: performance.now(), col: colorFor(r)
         });
       }
     }
     nodes = next;
+  }
+
+  // Roter Hof (Zentrum der Stadt) in Bildschirmkoordinaten; null = keine Stadt → altes Layout.
+  function cityHub() {
+    try {
+      var f = document.getElementById("kimi-city-frame");
+      var a = f && f.contentWindow && f.contentWindow.__ANCHORS__ ? f.contentWindow.__ANCHORS__() : null;
+      if (!a || !a.redRing || !a.blue || !a.yellow) return null;
+      var span = Math.max(80, Math.abs(a.yellow.x - a.blue.x));
+      return { x: a.redRing.x, y: a.redRing.y, rx: span * 0.28, ry: span * 0.11, vis: a.redRing.vis !== false };
+    } catch (e) { return null; }
   }
 
   var loaded = false;
@@ -215,13 +230,18 @@
     ctx.clearRect(0, 0, W, H);
     var hovered = null, hbd = 24 * 24;
 
+    var hub = cityHub();
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
+      if (hub) {
+        if (!hub.vis) continue;
+        n.bx = hub.x + (n.hx * 2 - 1) * hub.rx; n.by = hub.y + (n.hy * 2 - 1) * hub.ry;
+      }
       // Organische Lissajous-Bahn als ZIEL — Position folgt gedämpft (kein Snap).
       n.tx = n.bx + Math.cos(t * n.spd + n.phase) * n.amp;
       n.ty = n.by + Math.sin(t * n.spd * 1.27 + n.phase * 1.1) * n.amp * 0.72;
-      if (REDUCED) {
-        n.x = n.tx; n.y = n.ty;
+      if (REDUCED || Math.abs(n.x - n.tx) + Math.abs(n.y - n.ty) > 60) {
+        n.x = n.tx; n.y = n.ty; n.trail.length = 0;
       } else {
         n.x = damp(n.x, n.tx, FOLLOW, dt);
         n.y = damp(n.y, n.ty, FOLLOW, dt);
@@ -235,6 +255,8 @@
       var c = n.col;
 
       if (TRAIL_MAX > 0) {
+        var lt = n.trail.length ? n.trail[n.trail.length - 1] : null;
+        if (lt && Math.abs(lt.x - n.x) + Math.abs(lt.y - n.y) > 30) n.trail.length = 0; // Sprung (Orbit/Resize) → Spur neu
         pushTrail(n.trail, n.x, n.y, TRAIL_MAX, TRAIL_MIN);
         strokeTrail(n.trail, c, 0.55, 2.2);
       }
@@ -251,7 +273,8 @@
       if (spriteReady && !REDUCED) {
         ctx.save();
         ctx.translate(n.x, n.y);
-        ctx.rotate(n.heading + Math.PI / 2);
+        // 3/4-Scout-Sprite aufrecht lassen (gedreht wirkte es wie ein Drachenkopf), nur spiegeln
+        if (Math.cos(n.heading) < 0) ctx.scale(-1, 1);
         ctx.globalAlpha = 0.94;
         ctx.shadowColor = "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",0.85)";
         ctx.shadowBlur = 10;
