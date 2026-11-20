@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass, field, asdict
 from typing import Any, Optional
@@ -23,8 +24,163 @@ DEFAULT_DB_PATH = os.environ.get(
 USER_ROLES = ("admin", "member", "member_plus", "viewer", "guest_user")
 
 
+
 def _now() -> float:
     return time.time()
+
+
+# Ein Lock pro Store-Instanz: sqlite3.Connection ist auch mit
+# check_same_thread=False nicht thread-sicher. Ohne Serialisierung kommt es
+# unter parallelen Requests zu "InterfaceError: bad parameter or other API misuse".
+_RETRY_DELAY = 0.05
+
+
+def _retryable(exc: BaseException) -> bool:
+    if isinstance(exc, sqlite3.InterfaceError):
+        return True
+    if isinstance(exc, sqlite3.OperationalError):
+        msg = str(exc).lower()
+        return "locked" in msg or "busy" in msg
+    return False
+
+
+def _call_once(fn):
+    try:
+        return fn()
+    except (sqlite3.InterfaceError, sqlite3.OperationalError) as exc:
+        if not _retryable(exc):
+            raise
+        time.sleep(_RETRY_DELAY)
+        return fn()
+
+
+class _LockedCursor:
+    """Cursor-Wrapper: fetch/execute bleiben unter dem Store-RLock."""
+
+    def __init__(self, cursor, lock: threading.RLock):
+        self._cursor = cursor
+        self._lock = lock
+
+    def execute(self, *args, **kwargs):
+        with self._lock:
+            _call_once(lambda: self._cursor.execute(*args, **kwargs))
+        return self
+
+    def executemany(self, *args, **kwargs):
+        with self._lock:
+            _call_once(lambda: self._cursor.executemany(*args, **kwargs))
+        return self
+
+    def executescript(self, *args, **kwargs):
+        with self._lock:
+            _call_once(lambda: self._cursor.executescript(*args, **kwargs))
+        return self
+
+    def fetchone(self):
+        with self._lock:
+            return self._cursor.fetchone()
+
+    def fetchall(self):
+        with self._lock:
+            return self._cursor.fetchall()
+
+    def fetchmany(self, size=None):
+        with self._lock:
+            if size is None:
+                return self._cursor.fetchmany()
+            return self._cursor.fetchmany(size)
+
+    def close(self):
+        with self._lock:
+            return self._cursor.close()
+
+    def __iter__(self):
+        with self._lock:
+            rows = list(self._cursor)
+        return iter(rows)
+
+    @property
+    def lastrowid(self):
+        return self._cursor.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _LockedConnection:
+    """Serialisiert alle Connection-Aufrufe; Cursor werden mitverpackt.
+
+    Bestehende Aufrufer (auch store._conn direkt in governance/activity/brain_ops)
+    bleiben unverändert. RLock ist reentrant, verschachtelte Store-Aufrufe
+    in derselben Transaktion/Thread blockieren sich nicht.
+    """
+
+    def __init__(self, conn: sqlite3.Connection, lock: threading.RLock):
+        self._raw = conn
+        self._lock = lock
+
+    def execute(self, *args, **kwargs):
+        with self._lock:
+            cur = _call_once(lambda: self._raw.execute(*args, **kwargs))
+            return _LockedCursor(cur, self._lock)
+
+    def executemany(self, *args, **kwargs):
+        with self._lock:
+            cur = _call_once(lambda: self._raw.executemany(*args, **kwargs))
+            return _LockedCursor(cur, self._lock)
+
+    def executescript(self, sql):
+        with self._lock:
+            cur = _call_once(lambda: self._raw.executescript(sql))
+            return _LockedCursor(cur, self._lock)
+
+    def commit(self):
+        with self._lock:
+            return _call_once(self._raw.commit)
+
+    def rollback(self):
+        with self._lock:
+            return _call_once(self._raw.rollback)
+
+    def close(self):
+        with self._lock:
+            return self._raw.close()
+
+    def cursor(self, *args, **kwargs):
+        with self._lock:
+            return _LockedCursor(self._raw.cursor(*args, **kwargs), self._lock)
+
+    def backup(self, target, *args, **kwargs):
+        raw_target = getattr(target, "_raw", target)
+        with self._lock:
+            return self._raw.backup(raw_target, *args, **kwargs)
+
+    def interrupt(self):
+        # interrupt() darf den Lock nicht nehmen: sonst kann ein anderer
+        # Thread eine hängende Operation nicht abbrechen.
+        return self._raw.interrupt()
+
+    def __enter__(self):
+        self._lock.acquire()
+        self._raw.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            return self._raw.__exit__(exc_type, exc, tb)
+        finally:
+            self._lock.release()
+
+    def __getattr__(self, name):
+        return getattr(self._raw, name)
 
 
 SCHEMA = """
@@ -396,9 +552,14 @@ class Store:
     def __init__(self, db_path: str = DEFAULT_DB_PATH):
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self._conn = sqlite3.connect(db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA foreign_keys = ON;")
+        self._lock = threading.RLock()
+        raw = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
+        raw.row_factory = sqlite3.Row
+        raw.execute("PRAGMA foreign_keys = ON;")
+        raw.execute("PRAGMA journal_mode = WAL;")
+        raw.execute("PRAGMA busy_timeout = 30000;")
+        raw.execute("PRAGMA synchronous = NORMAL;")
+        self._conn = _LockedConnection(raw, self._lock)
         self._conn.executescript(SCHEMA)
         self._migrate()
         self._conn.commit()
