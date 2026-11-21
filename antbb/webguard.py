@@ -174,6 +174,7 @@ _ADMIN_ONLY_WRITES = tuple(re.compile(p) for p in (
     r"^/target/\d+/(mode|archive|restore)$",
     r"^/api/targets/\d+/mode$",
     r"^/api/blue/findings/\d+/apply$",
+    r"^/api/blue/findings/\d+/remediate-recheck$",
     r"^/remote/set$",
     r"^/api/remote(?:/|$)",
 ))

@@ -338,11 +338,19 @@ def _record_run_history(target_id: int, active: bool = False, fuzz: bool = False
     rid = None
     started = SCAN_STATE.get("started_at")
     finished = SCAN_STATE.get("finished_at") or time.time()
+    rg = ""
+    pfid = None
+    llm_status = ""
+    llm_model = ""
     if result is not None:
         try:
             sev = result.by_severity()
             fc = len(result.findings)
             rid = result.run_id
+            rg = getattr(result, "run_group_id", "") or ""
+            pfid = getattr(result, "parent_finding_id", None)
+            llm_status = getattr(result, "llm_status", "") or ""
+            llm_model = getattr(result, "llm_model", "") or ""
         except Exception:
             pass
     dur = (finished - started) if (started and finished) else None
@@ -354,6 +362,8 @@ def _record_run_history(target_id: int, active: bool = False, fuzz: bool = False
         started_at=started, finished_at=finished, duration=dur,
         started_by=started_by,
         owner_user=(SCAN_STATE.get("owner_user") or None),
+        run_group_id=rg, parent_finding_id=pfid,
+        llm_status=llm_status, llm_model=llm_model,
     )
 
 
@@ -921,6 +931,10 @@ def api_blue_run(request: Request, payload: Optional[dict] = None):
                 severity=result.by_severity(),
                 started_by=started_by,
                 owner_user=user.get("username") or None,
+                run_group_id=getattr(result, "run_group_id", "") or "",
+                parent_finding_id=getattr(result, "parent_finding_id", None),
+                llm_status=getattr(result, "llm_status", "") or "",
+                llm_model=getattr(result, "llm_model", "") or "",
             )
             if _hosted.is_guest(user.get("role")):
                 _hosted.audit_guest("blue_run", path="/api/blue/run",
@@ -943,24 +957,35 @@ def api_blue_run(request: Request, payload: Optional[dict] = None):
 
 
 @app.get("/api/blue/findings")
-def api_blue_remediation_findings():
+def api_blue_remediation_findings(
+    source_colony: str = "blue",
+    status: str = "",
+):
+    """Blue-Remediation-Funde.
+
+    Query:
+      source_colony=blue|offensive|all  (Default blue = bisheriges Verhalten)
+      status=VERIFIZIERT,ZU BESTÄTIGEN   (Komma-Liste, optional; vor allem für offensive)
+    """
     from ..remediation_apply import SUPPORTED
-    rows = []
-    for row in svc.list_findings():
-        item = _rowdict(row)
-        if not str(item.get("category", "")).startswith("blue-"):
-            continue
+    from .. import bridge as bridge_mod
+    status_filter = [s.strip() for s in (status or "").split(",") if s.strip()] or None
+    rows = bridge_mod.list_blue_visible_findings(
+        svc.store, source_colony=source_colony or "blue",
+        status_filter=status_filter, require_scope=True,
+    )
+    for item in rows:
         evidence = item.get("evidence") or {}
-        if isinstance(evidence, str):
-            import json
-            try:
-                evidence = json.loads(evidence)
-            except json.JSONDecodeError:
-                evidence = {}
-        item["evidence"] = evidence
-        item["can_apply"] = evidence.get("check_id") in SUPPORTED
-        rows.append(item)
-    return JSONResponse({"findings": rows, "supported": sorted(SUPPORTED)})
+        item["can_apply"] = (
+            str(item.get("category", "")).startswith("blue-")
+            and (evidence.get("check_id") in SUPPORTED)
+        )
+    return JSONResponse({
+        "findings": rows,
+        "supported": sorted(SUPPORTED),
+        "source_colony": source_colony or "blue",
+        "status_filter": status_filter or [],
+    })
 
 
 @app.post("/api/blue/findings/{finding_id}/apply")
@@ -988,6 +1013,34 @@ def api_blue_remediation_apply(finding_id: int, payload: dict):
         phase="remediate", agent="blue-remediation",
     )
     return JSONResponse({"finding_id": finding_id, **result})
+
+
+@app.post("/api/blue/findings/{finding_id}/remediate-recheck")
+def api_blue_remediate_recheck(finding_id: int, payload: Optional[dict] = None):
+    """Kontrollierter Fix + optional eng begrenzter Red-Verify (Korrelationskette).
+
+    Body: oversight_ack (bool, Pflicht bei apply_fix/verify),
+          apply_fix (bool, Default false),
+          trigger_red_verify (bool, Default true).
+    Gates unverändert: Scope + Oversight.
+    """
+    payload = payload or {}
+    ack = payload.get("oversight_ack")
+    if ack is not None:
+        ack = bool(ack)
+    try:
+        out = svc.remediate_and_recheck(
+            int(finding_id),
+            oversight_ack=ack,
+            apply_fix=bool(payload.get("apply_fix")),
+            trigger_red_verify=bool(payload.get("trigger_red_verify", True)),
+            payload=payload,
+        )
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": f"{type(exc).__name__}: {exc}"},
+                            status_code=400)
+    code = 200 if out.get("ok") else 409
+    return JSONResponse(out, status_code=code)
 
 
 @app.get("/api/blue/jobs")

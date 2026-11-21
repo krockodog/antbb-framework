@@ -137,7 +137,10 @@ class AntBBService:
                  offensive: Optional[bool] = None,
                  oversight_ack: Optional[bool] = None,
                  use_llm: Optional[bool] = None,
-                 force_defensive: bool = False) -> SwarmResult:
+                 force_defensive: bool = False,
+                 run_group_id: str = "",
+                 parent_finding_id: Optional[int] = None,
+                 task_params: Optional[dict] = None) -> SwarmResult:
         """Startet den Schwarm. Wirft OversightError ohne Häkchen (hartes Gate).
 
         `active=True` / `fuzz=True` werden zusätzlich gegen mode_policy geprüft:
@@ -202,7 +205,10 @@ class AntBBService:
                 "1", "true", "True", "yes",
             )
         queen = Queen(self.store, logger=self.logger, emit=emit, use_llm=use_llm)
-        return queen.run_swarm_sync(target_id, phases, active=active, fuzz=fuzz)
+        return queen.run_swarm_sync(
+            target_id, phases, active=active, fuzz=fuzz,
+            task_params=task_params,
+            run_group_id=run_group_id, parent_finding_id=parent_finding_id)
 
     def list_findings(self, target_id: Optional[int] = None, run_id: Optional[str] = None):
         return self.store.list_findings(target_id, run_id)
@@ -968,8 +974,16 @@ class AntBBService:
                  phases: Optional[tuple] = None, apply_fixes: bool = False,
                  oversight_ack: Optional[bool] = None,
                  params: Optional[dict] = None,
-                 emit: Optional[Callable[[dict], None]] = None):
-        """Startet die Verteidigungs-Kolonie (Blue Queen). Default: read-only."""
+                 emit: Optional[Callable[[dict], None]] = None,
+                 run_group_id: str = "",
+                 parent_finding_id: Optional[int] = None,
+                 use_llm: Optional[bool] = None):
+        """Startet die Verteidigungs-Kolonie (Blue Queen). Default: read-only.
+
+        use_llm: Default False (Policy). True nur für gezielte Harden/Remediate-
+        Ableitung (siehe remediation.llm_suggest_remediation) — Tool-Runner
+        bleiben Source of Truth. Env ANTBB_BLUE_LLM=1 kann Default öffnen.
+        """
         from .blue_queen import BlueQueen, PHASES as BP
         from . import hosted
         if hosted.enabled():
@@ -979,11 +993,28 @@ class AntBBService:
                     "BLOCKIERT (Hosted-Modus): Fixes anwenden braucht Oversight.")
             if target_id is not None:
                 hosted.require_scan_gates(self.store, target_id)
-        queen = BlueQueen(self.store, logger=self.logger, emit=emit, use_llm=False)
+        if use_llm is None:
+            use_llm = os.environ.get("ANTBB_BLUE_LLM", "").strip() in (
+                "1", "true", "True", "yes",
+            )
+        queen = BlueQueen(self.store, logger=self.logger, emit=emit, use_llm=bool(use_llm))
         return queen.run_colony_sync(
             target_id=target_id, phases=phases or BP,
             apply_fixes=apply_fixes, oversight_ack=oversight_ack,
-            params=params)
+            params=params, run_group_id=run_group_id,
+            parent_finding_id=parent_finding_id)
+
+    def remediate_and_recheck(self, finding_id: int, *,
+                              oversight_ack: Optional[bool] = None,
+                              apply_fix: bool = False,
+                              trigger_red_verify: bool = True,
+                              payload: Optional[dict] = None) -> dict:
+        """Red→Blue→Re-Check-Brücke (siehe antbb.bridge)."""
+        from . import bridge as bridge_mod
+        return bridge_mod.remediate_and_recheck(
+            self, finding_id, oversight_ack=oversight_ack,
+            apply_fix=apply_fix, trigger_red_verify=trigger_red_verify,
+            payload=payload)
 
     def blue_jobs_list(self, enabled_only: bool = False):
         from .jobs import JobScheduler

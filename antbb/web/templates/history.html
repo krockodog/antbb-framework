@@ -35,7 +35,7 @@
       <tr>
         <td data-ts="{{ r.created_at or 0 }}">{{ r.when }}</td>
         <td>{{ r.target_name }} <small>#{{ r.target_id }}</small></td>
-        <td>{{ r.mode }}{% if r.active %} · active{% endif %}{% if r.fuzz %} · fuzz{% endif %}{% if r.started_by == 'Gast' %} · gestartet von Gast{% elif r.started_by %} · {{ r.started_by }}{% endif %}{% if admin_view %} · <small>{% if r.owner_user %}👤 {{ r.owner_user }}{% else %}<span class="blocked">{{ t('history.owner_none') }}</span>{% endif %}</small>{% endif %}</td>
+        <td>{{ r.mode }}{% if r.active %} · active{% endif %}{% if r.fuzz %} · fuzz{% endif %}{% if r.started_by == 'Gast' %} · gestartet von Gast{% elif r.started_by %} · {{ r.started_by }}{% endif %}{% if r.llm_status %} · <small title="{{ r.llm_model or '' }}">llm:{{ r.llm_status }}{% if r.llm_model %}/{{ r.llm_model }}{% endif %}</small>{% endif %}{% if r.run_group_id %} · <small title="run_group">rg:{{ r.run_group_id }}</small>{% endif %}{% if admin_view %} · <small>{% if r.owner_user %}👤 {{ r.owner_user }}{% else %}<span class="blocked">{{ t('history.owner_none') }}</span>{% endif %}</small>{% endif %}</td>
         <td>{{ r.finding_count }}</td>
         <td>{% if r.status == 'done' %}<span class="ok">done</span>
             {% else %}<span class="blocked">{{ r.status }}</span>{% endif %}</td>

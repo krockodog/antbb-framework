@@ -25,6 +25,8 @@ nie auf der Kommandozeile übergeben (gvm-cli bekommt sie über eine flüchtige
 """
 from __future__ import annotations
 
+from .parseutil import parse_json_robust
+
 import csv
 import hashlib
 import importlib.util
@@ -483,11 +485,27 @@ def _jtext(v) -> str:
 
 
 def parse_json(text: str, include_log: bool = False) -> ParsedReport:
-    try:
-        obj = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise GvmError(f"Report-JSON nicht lesbar: {exc}")
+    obj, warn = parse_json_robust(text or "", expect=(dict, list))
+    if obj is None or (isinstance(obj, dict) and obj.get("parse_warning")):
+        # strukturierter Fallback statt hartem Abbruch ohne Inhalt
+        rep = ParsedReport(fmt="greenbone-json")
+        rep.meta["parse_warning"] = warn or "json_unreadable"
+        if isinstance(obj, dict):
+            rep.meta["raw_excerpt"] = (obj.get("raw_excerpt") or "")[:2000]
+            rep.meta["kv_guess"] = obj.get("kv_guess") or {}
+        # Regex-/Zeilen-Extraktion: CVE-artige Tokens aus Rohtext
+        import re as _re
+        cves = _re.findall(r"CVE-\d{4}-\d{4,7}", text or "", flags=_re.I)
+        if cves:
+            rep.meta["cve_guess"] = sorted(set(cves))[:50]
+        # ehrlich leer bei Results, aber Warnung erhalten
+        return _finish(rep, [], include_log)
+    if warn:
+        # Blob/NDJSON-Fallback erfolgreich — Warnung mitführen
+        pass
     rep = ParsedReport(fmt="greenbone-json")
+    if warn:
+        rep.meta["parse_warning"] = warn
     items = _find_json_results(obj)
     if items is None:
         raise GvmError("JSON enthält keine Ergebnisliste (erwartet 'results' bzw. 'result').")

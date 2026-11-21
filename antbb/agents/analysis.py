@@ -133,7 +133,12 @@ class AnalysisAnt(AntAgent):
         if high:
             self.ctx.log(f"[analysis] Priorisierung: Top '{high[0].title}' ({high[0].severity})")
 
-        # ---- Optionaler LLM-Schritt ----
+        # ---- Gezielter LLM-Einsatz: ZU BESTÄTIGEN gruppieren/priorisieren ----
+        prio = await self._llm_prioritize_to_confirm(existing)
+        if prio:
+            meta.append(prio)
+
+        # ---- Optionaler LLM-Schritt (Freitext-Zusammenfassung) ----
         llm_finding = await self._llm_summary(existing)
         if llm_finding:
             meta.append(llm_finding)
@@ -170,4 +175,102 @@ class AnalysisAnt(AntAgent):
             category="llm-analysis", severity="info", asset="",
             description=res.content.strip(),
             evidence={"provider": res.provider, "model": res.model},
+        )
+
+    async def _llm_prioritize_to_confirm(self, findings: list[AgentFinding]):
+        """Gruppiert/priorisiert ZU-BESTÄTIGEN-Funde mit striktem JSON-Schema + Retry.
+
+        Tool-Runner bleiben Source of Truth — LLM liefert nur Struktur/Priorität.
+        """
+        import json as _json
+        to_confirm = [f for f in findings
+                      if (f.status or "") in ("ZU BESTÄTIGEN", "BEDINGT", "STILL_OPEN")]
+        if not self.ctx.llm_ready or not to_confirm:
+            return None
+        schema_hint = {
+            "groups": [
+                {"name": "string", "priority": 1, "reason": "string",
+                 "finding_titles": ["string"]}
+            ],
+            "top3": [{"title": "string", "why": "string", "next_verify_step": "string"}],
+        }
+        catalog = [
+            {"title": f.title, "category": f.category, "severity": f.severity,
+             "asset": f.asset, "status": f.status}
+            for f in to_confirm[:40]
+        ]
+        messages = [
+            {"role": "system", "content":
+             "Du bist ein Security-Analyst. Gruppiere und priorisiere die "
+             "ZU-BESTÄTIGEN-Funde. Antworte NUR mit gültigem JSON exakt im Schema: "
+             + _json.dumps(schema_hint, ensure_ascii=False) +
+             " Keine erfundenen Funde — nur Titel aus der Liste verwenden."},
+            {"role": "user", "content": _json.dumps(catalog, ensure_ascii=False)},
+        ]
+        provider = None
+        model = _llm.select_model("analysis")
+        if self.ctx.route:
+            try:
+                dec = self.ctx.route("analysis", 0.7)
+                provider, model = dec.provider, dec.model
+            except Exception:
+                pass
+        parsed = None
+        last_err = ""
+        for attempt in range(2):  # 1 + 1 Retry bei ungültigem JSON
+            try:
+                res = await asyncio.to_thread(
+                    self.ctx.llm.chat, messages, model, provider, 0.1, 700)
+            except Exception as exc:
+                self.ctx.log(f"[analysis] ⚠️ LLM-Priorisierung fehlgeschlagen: {exc}")
+                return None
+            if not res.ok:
+                self.ctx.log(f"[analysis] ⚠️ LLM-Priorisierung nicht nutzbar: {res.error}")
+                return None
+            raw = (res.content or "").strip()
+            # JSON-Blob extrahieren
+            try:
+                from ..parseutil import parse_json_robust
+                obj, warn = parse_json_robust(raw, expect=dict)
+            except Exception as exc:
+                obj, warn = None, str(exc)
+            if isinstance(obj, dict) and not obj.get("parse_warning") and (
+                    "groups" in obj or "top3" in obj):
+                # Schema-Check: titles müssen aus Katalog stammen
+                known = {c["title"] for c in catalog}
+                top3 = obj.get("top3") or []
+                if isinstance(top3, list):
+                    for t in top3:
+                        if isinstance(t, dict) and t.get("title") and t["title"] not in known:
+                            t["title_unknown"] = True
+                parsed = obj
+                if warn:
+                    parsed["parse_warning"] = warn
+                parsed["_provider"] = res.provider
+                parsed["_model"] = res.model
+                break
+            last_err = warn or "schema_mismatch"
+            messages.append({"role": "assistant", "content": raw[:1500]})
+            messages.append({"role": "user", "content":
+                             "Ungültiges JSON/Schema. Antworte erneut NUR mit dem "
+                             "geforderte Schema-JSON, ohne Markdown."})
+        if not parsed:
+            self.ctx.log(f"[analysis] ⚠️ LLM-Priorisierung Schema-Check fehlgeschlagen "
+                         f"({last_err}) – Fallback ohne LLM-Gruppen.")
+            return None
+        self.ctx.log(f"[analysis] 🧠 ZU-BESTÄTIGEN priorisiert "
+                     f"({parsed.get('_provider')}/{parsed.get('_model')}), "
+                     f"{len(to_confirm)} Funde.")
+        return AgentFinding(
+            agent=self.name,
+            title="LLM: Priorisierung ZU BESTÄTIGEN",
+            category="llm-to-confirm-priority",
+            severity="info", asset="",
+            description=("Strukturierte Priorisierung der ZU-BESTÄTIGEN-Funde "
+                         f"(top3={len(parsed.get('top3') or [])}, "
+                         f"groups={len(parsed.get('groups') or [])})."),
+            evidence={"prioritization": parsed, "input_count": len(to_confirm),
+                      "provider": parsed.get("_provider"), "model": parsed.get("_model")},
+            status="REFERENZ",
+            dedup_key=f"llm-to-confirm:{getattr(self.ctx,'run_id','')}",
         )

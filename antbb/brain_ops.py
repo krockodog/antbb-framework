@@ -134,13 +134,27 @@ def _run_node_status(status: str) -> str:
     return status or "unbekannt"
 
 
-def nodes_graph(store: Store, log_cap: int = 50) -> dict:
+def nodes_graph(store: Store, log_cap: int = 50,
+                include_blue: Optional[bool] = None,
+                include_yellow: bool = True) -> dict:
     """Vollständiger Node-Graph: Targets, Runs, Findings, Soldaten, Log-Gruppen.
 
-    Reiner Lesezugriff aus dem echten Store (keine erfundenen Daten)."""
+    Reiner Lesezugriff aus dem echten Store (keine erfundenen Daten).
+
+    include_blue: None → Setting ``brain.include_blue`` (Default aus = bisheriges
+    Verhalten). True öffnet Blue-Läufe/Funde im Graph mit source_finding_id-Kanten.
+    include_yellow: Yellow-Cases aus yellow.db (read-only) einhängen.
+    """
     from . import registry as registry_mod
     nodes: list[dict] = []
     edges: list[dict] = []
+
+    if include_blue is None:
+        try:
+            include_blue = (store.get_setting("brain.include_blue", "0").strip()
+                            in ("1", "true", "True", "yes"))
+        except Exception:
+            include_blue = False
 
     targets = store.list_targets(include_archived=True)
     for t in targets:
@@ -157,19 +171,27 @@ def nodes_graph(store: Store, log_cap: int = 50) -> dict:
             "created_at": t["created_at"], "created_fmt": _fmt(t["created_at"]),
         })
 
-    # Runs (je Target) + Log-Gruppen-Node je Run — Blue-Queen-Läufe auslassen
+    # Runs (je Target) + Log-Gruppen-Node je Run — Blue optional (Schalter)
     for r in store.list_scan_runs():
         rid = str(r["run_id"])
-        if _is_blue_run_id(rid):
+        if _is_blue_run_id(rid) and not include_blue:
             continue
         nid = f"run:{rid}"
         tnid = f"target:{int(r['target_id'])}"
         steps = store.count_run_steps(rid)
+        colony = "blue" if _is_blue_run_id(rid) else "offensive"
+        rg = ""
+        try:
+            rg = r["run_group_id"] if "run_group_id" in r.keys() else ""
+        except Exception:
+            rg = ""
         nodes.append({
             "id": nid, "type": "run", "label": rid[:18],
             "status": _run_node_status(r["status"]),
             "raw_status": r["status"], "severity": None,
             "running": r["status"] in _RUNNING,
+            "colony": colony,
+            "run_group_id": rg or "",
             "counts": {"logs": steps},
             "started_at": r["started_at"], "started_fmt": _fmt(r["started_at"]),
             "finished_at": r["finished_at"], "finished_fmt": _fmt(r["finished_at"]),
@@ -179,32 +201,53 @@ def nodes_graph(store: Store, log_cap: int = 50) -> dict:
     # Findings (gekappt pro Aufruf für vernünftige Payload)
     sev_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
     soldier_seen: set[str] = set()
-    # Brain = nur offensive Kolonie. Blue-Queen-Funde/Soldaten bleiben unter /blue.
-    all_findings = [f for f in store.list_findings()
-                    if not _is_blue_agent(f["agent"])
-                    and not _is_blue_run_id(f["run_id"] if "run_id" in f.keys() else None)]
+    # Default: nur offensive Kolonie. Mit include_blue auch Blue-Funde/Runs.
+    if include_blue:
+        all_findings = list(store.list_findings())
+    else:
+        all_findings = [f for f in store.list_findings()
+                        if not _is_blue_agent(f["agent"])
+                        and not _is_blue_run_id(f["run_id"] if "run_id" in f.keys() else None)]
     for f in all_findings[:400]:
         fid = int(f["id"])
         nid = f"finding:{fid}"
         tnid = f"target:{int(f['target_id'])}"
         agent = f["agent"] or "unbekannt"
+        src_fid = None
+        try:
+            src_fid = f["source_finding_id"] if "source_finding_id" in f.keys() else None
+        except Exception:
+            src_fid = None
+        colony = "blue" if _is_blue_agent(agent) else "offensive"
+        try:
+            sc = f["source_colony"] if "source_colony" in f.keys() else ""
+            if sc:
+                colony = sc
+        except Exception:
+            pass
+        ntype = "blue_finding" if colony == "blue" else "finding"
         nodes.append({
-            "id": nid, "type": "finding", "label": (f["title"] or "")[:40],
+            "id": nid, "type": ntype, "label": (f["title"] or "")[:40],
             "status": f["status"] or "", "severity": f["severity"],
-            "agent": agent, "counts": {},
+            "agent": agent, "colony": colony,
+            "source_finding_id": src_fid,
+            "counts": {},
             "created_at": f["created_at"], "created_fmt": _fmt(f["created_at"]),
         })
         edges.append({"from": tnid, "to": nid, "kind": "target-finding"})
         snid = f"soldier:{agent}"
         edges.append({"from": snid, "to": nid, "kind": "soldier-finding"})
+        if src_fid:
+            edges.append({"from": f"finding:{int(src_fid)}", "to": nid,
+                          "kind": "source-finding"})
         soldier_seen.add(agent)
 
     # Soldaten/Capabilities aus der Registry (aktive Fähigkeiten der Königin)
     try:
-        reg = registry_mod.build_registry(include_blue=False)
+        reg = registry_mod.build_registry(include_blue=bool(include_blue))
         for s in reg.get("soldiers", []):
             name = s.get("name", "")
-            if _is_blue_agent(name) or s.get("colony") == "blue":
+            if (not include_blue) and (_is_blue_agent(name) or s.get("colony") == "blue"):
                 continue
             snid = f"soldier:{name}"
             fcount = sum(1 for f in all_findings if (f["agent"] or "") == name)
@@ -224,14 +267,32 @@ def nodes_graph(store: Store, log_cap: int = 50) -> dict:
         nodes.append({"id": f"soldier:{name}", "type": "soldier", "label": name,
                       "status": "aktiv", "severity": None, "counts": {}})
 
-    stuck = [str(r["run_id"]) for r in store.list_stuck_runs()
-             if not _is_blue_run_id(str(r["run_id"]))]
+    if include_blue:
+        stuck = [str(r["run_id"]) for r in store.list_stuck_runs()]
+    else:
+        stuck = [str(r["run_id"]) for r in store.list_stuck_runs()
+                 if not _is_blue_run_id(str(r["run_id"]))]
+
+    yellow_count = 0
+    if include_yellow:
+        try:
+            from . import yellow_bridge as _yb
+            yn, ye = _yb.yellow_graph_nodes(limit=max(10, min(log_cap, 50)))
+            nodes.extend(yn)
+            edges.extend(ye)
+            yellow_count = sum(1 for n in yn if n.get("type") == "yellow_case")
+        except Exception:
+            yellow_count = 0
+
     counts = {
         "targets": len(targets),
         "runs": len(store.list_scan_runs()),
         "findings": store.count_findings(),
         "logs": store.count_logs(),
         "stuck_runs": len(stuck),
+        "yellow_cases": yellow_count,
+        "include_blue": bool(include_blue),
+        "include_yellow": bool(include_yellow),
     }
     return {"nodes": nodes, "edges": edges, "counts": counts,
             "stuck_runs": stuck, "generated_fmt": _fmt(time.time())}
@@ -278,9 +339,16 @@ def node_detail(store: Store, ntype: str, nid: str) -> dict:
         return {"ok": True, "type": "finding", "finding": d,
                 "logs": [_log_row(l) for l in logs]}
     if ntype == "soldier":
-        if _is_blue_agent(nid):
+        allow_blue = False
+        try:
+            allow_blue = (store.get_setting("brain.include_blue", "0").strip()
+                          in ("1", "true", "True", "yes"))
+        except Exception:
+            allow_blue = False
+        if _is_blue_agent(nid) and not allow_blue:
             return {"ok": False, "reason": "blue_queen_separate",
-                    "hint": "Blue Queen hat eigene Ansicht unter /blue"}
+                    "hint": "Blue Queen hat eigene Ansicht unter /blue "
+                            "(Schalter brain.include_blue=1 öffnet Brain-Ansicht)"}
         findings = [f for f in store.list_findings()
                     if (f["agent"] or "") == nid and not _is_blue_run_id(
                         f["run_id"] if "run_id" in f.keys() else None)]

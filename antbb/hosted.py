@@ -256,6 +256,7 @@ _GUEST_DENY = tuple(re.compile(p) for p in (
     r"^/api/undo$",
     r"^/undo$",
     r"^/api/blue/findings/\d+/apply$",
+    r"^/api/blue/findings/\d+/remediate-recheck$",
     r"^/api/findings/\d+/to-blue$",
     r"^/api/blue/jobs(?:/|$)",
     r"^/api/blue/watcher$",

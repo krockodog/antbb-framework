@@ -38,6 +38,7 @@ from ..agents.base import (
 )
 from ..netutil import host_of
 from .. import wordlists as _wordlists
+from ..parseutil import parse_json_robust
 
 # ---------------------------------------------------------------------------
 # Tool-Katalog (Single Source of Truth für die Capability-Registry).
@@ -523,9 +524,11 @@ class KaliAdapter:
         if not res.ok:
             return []
         out: list[AgentFinding] = []
-        try:
-            data = json.loads(res.stdout)
-        except Exception:
+        data, warn = parse_json_robust(res.stdout or "", expect=dict)
+        if data is None or not isinstance(data, dict):
+            # strukturierter Fallback — Output nicht verwerfen
+            if warn:
+                self._log(f"[kali] wpscan parse_warning={warn}")
             return out
         version = (data.get("version") or {}).get("number") if isinstance(data, dict) else None
         if version:
@@ -711,10 +714,13 @@ class KaliAdapter:
             self._log(f"[kali] ❌ searchsploit Fehler: {exc}")
             return []
         out = []
-        try:
-            data = json.loads((proc.stdout or b"").decode("utf-8", "replace"))
-            results = data.get("RESULTS_EXPLOIT", []) if isinstance(data, dict) else []
-        except Exception:
+        raw = (proc.stdout or b"").decode("utf-8", "replace")
+        data, warn = parse_json_robust(raw, expect=(dict, list))
+        if warn:
+            self._log(f"[kali] searchsploit parse_warning={warn}")
+        if isinstance(data, dict):
+            results = data.get("RESULTS_EXPLOIT", []) or []
+        else:
             results = []
         for r in results[:10]:
             if not isinstance(r, dict):
@@ -815,14 +821,26 @@ class KaliAdapter:
 # Parser-Hilfen
 # ===========================================================================
 def _iter_jsonl(text: str):
+    """NDJSON-Iterator mit strukturiertem Fallback (kein stilles Verwerfen)."""
+    warnings = []
     for line in (text or "").splitlines():
         line = line.strip()
         if not line or not (line.startswith("{") or line.startswith("[")):
             continue
-        try:
-            yield json.loads(line)
-        except Exception:
+        obj, warn = parse_json_robust(line, expect=(dict, list))
+        if warn:
+            warnings.append(warn)
+        if obj is None:
             continue
+        if isinstance(obj, dict) and obj.get("parse_warning"):
+            # Zeilen-Fallback: als markiertes Objekt weitergeben
+            yield {"_parse_warning": True, "raw_excerpt": obj.get("raw_excerpt", line)[:500]}
+            continue
+        yield obj
+    if warnings:
+        # ein einziges Meta-Yield am Ende, falls alles fehlschlug, vermeiden wir
+        # Spam — Aufrufer sehen parse_warning in einzelnen Objekten.
+        pass
 
 
 _NMAP_PORT_RE = re.compile(
@@ -1027,16 +1045,14 @@ def _extract_oast_domain(line: str) -> str:
         return ""
     # JSON-Form: {"domain":"abcd.oast.fun", ...} o.ä.
     if line.startswith("{"):
-        try:
-            obj = json.loads(line)
+        obj, _warn = parse_json_robust(line, expect=dict)
+        if isinstance(obj, dict) and not obj.get("parse_warning"):
             for k in ("domain", "Domain", "full-id", "host"):
-                v = obj.get(k) if isinstance(obj, dict) else None
+                v = obj.get(k)
                 if isinstance(v, str) and v:
                     m = _OAST_DOMAIN_RE.search(v)
                     if m:
                         return m.group(1)
-        except Exception:
-            pass
     m = _OAST_DOMAIN_RE.search(line)
     return m.group(1) if m else ""
 
@@ -1047,16 +1063,15 @@ def _tokens_in_interaction(line: str) -> list:
     out: list = []
     full = ""
     if line.startswith("{"):
-        try:
-            obj = json.loads(line)
-            if isinstance(obj, dict):
-                full = (obj.get("full-id") or obj.get("fullId") or
-                        obj.get("host") or obj.get("unique-id") or "")
-                # Interaktionstyp vorhanden? (dns/http) – nur echte Interaktionen.
-                itype = obj.get("protocol") or obj.get("type") or ""
-                if not full and not itype:
-                    return out
-        except Exception:
+        obj, _warn = parse_json_robust(line, expect=dict)
+        if isinstance(obj, dict) and not obj.get("parse_warning"):
+            full = (obj.get("full-id") or obj.get("fullId") or
+                    obj.get("host") or obj.get("unique-id") or "")
+            # Interaktionstyp vorhanden? (dns/http) – nur echte Interaktionen.
+            itype = obj.get("protocol") or obj.get("type") or ""
+            if not full and not itype:
+                return out
+        else:
             full = ""
     if not full:
         full = line

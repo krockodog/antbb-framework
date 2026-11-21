@@ -226,6 +226,10 @@ CREATE TABLE IF NOT EXISTS findings (
     dedup_key   TEXT NOT NULL,
     status      TEXT DEFAULT '',        -- Beweis-Stufe (VERIFIZIERT/BESTÄTIGT(PASSIV)/...)
     false_positive INTEGER NOT NULL DEFAULT 0,
+    run_group_id TEXT DEFAULT '',       -- Korrelationskette Red↔Blue↔Yellow
+    parent_finding_id INTEGER,          -- optionaler Parent (Re-Check/Brücke)
+    source_colony TEXT DEFAULT '',      -- offensive|blue|yellow (additiv)
+    source_finding_id INTEGER,          -- verknüpfter Ursprungs-Fund
     created_at  REAL NOT NULL,
     FOREIGN KEY (target_id) REFERENCES targets(id) ON DELETE CASCADE
 );
@@ -320,6 +324,8 @@ CREATE TABLE IF NOT EXISTS scan_runs (
     status      TEXT NOT NULL DEFAULT 'running', -- running|paused|done|error
     phases      TEXT DEFAULT '[]',          -- JSON der geplanten Phasen
     meta        TEXT DEFAULT '{}',          -- JSON (active/fuzz/offensive etc.)
+    run_group_id TEXT DEFAULT '',           -- Korrelationskette
+    parent_finding_id INTEGER,              -- Re-Check eines Findings
     started_at  REAL NOT NULL,
     updated_at  REAL NOT NULL,
     finished_at REAL,
@@ -490,6 +496,10 @@ CREATE TABLE IF NOT EXISTS run_history (
     started_at    REAL,
     finished_at   REAL,
     duration      REAL,
+    run_group_id  TEXT DEFAULT '',
+    parent_finding_id INTEGER,
+    llm_status    TEXT DEFAULT '',          -- used|fallback_no_llm|disabled_by_policy|error
+    llm_model     TEXT DEFAULT '',
     created_at    REAL NOT NULL
 );
 
@@ -519,6 +529,8 @@ CREATE TABLE IF NOT EXISTS blue_job_runs (
     error         TEXT DEFAULT '',
     started_at    REAL,
     finished_at   REAL,
+    run_group_id  TEXT DEFAULT '',
+    parent_finding_id INTEGER,
     created_at    REAL NOT NULL,
     FOREIGN KEY(job_id) REFERENCES blue_jobs(id) ON DELETE CASCADE
 );
@@ -613,6 +625,39 @@ class Store:
         ):
             if col not in ucols:
                 self._conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+        # ---- Korrelationskette Red↔Blue↔Yellow (additiv, Bestandsdaten unberührt) ----
+        fcols2 = {r[1] for r in self._conn.execute("PRAGMA table_info(findings)").fetchall()}
+        for col, ddl in (
+            ("run_group_id", "TEXT DEFAULT ''"),
+            ("parent_finding_id", "INTEGER"),
+            ("source_colony", "TEXT DEFAULT ''"),
+            ("source_finding_id", "INTEGER"),
+        ):
+            if col not in fcols2:
+                self._conn.execute(f"ALTER TABLE findings ADD COLUMN {col} {ddl}")
+        srcols = {r[1] for r in self._conn.execute("PRAGMA table_info(scan_runs)").fetchall()}
+        for col, ddl in (
+            ("run_group_id", "TEXT DEFAULT ''"),
+            ("parent_finding_id", "INTEGER"),
+        ):
+            if col not in srcols:
+                self._conn.execute(f"ALTER TABLE scan_runs ADD COLUMN {col} {ddl}")
+        hcols2 = {r[1] for r in self._conn.execute("PRAGMA table_info(run_history)").fetchall()}
+        for col, ddl in (
+            ("run_group_id", "TEXT DEFAULT ''"),
+            ("parent_finding_id", "INTEGER"),
+            ("llm_status", "TEXT DEFAULT ''"),
+            ("llm_model", "TEXT DEFAULT ''"),
+        ):
+            if col not in hcols2:
+                self._conn.execute(f"ALTER TABLE run_history ADD COLUMN {col} {ddl}")
+        bjrcols = {r[1] for r in self._conn.execute("PRAGMA table_info(blue_job_runs)").fetchall()}
+        for col, ddl in (
+            ("run_group_id", "TEXT DEFAULT ''"),
+            ("parent_finding_id", "INTEGER"),
+        ):
+            if col not in bjrcols:
+                self._conn.execute(f"ALTER TABLE blue_job_runs ADD COLUMN {col} {ddl}")
 
     # ---------------- Targets ----------------
     def add_target(self, name: str, description: str = "",
@@ -764,7 +809,11 @@ class Store:
                     category: str, severity: str, asset: str = "",
                     description: str = "", evidence: Optional[dict] = None,
                     dedup_key: str = "", status: str = "",
-                    false_positive: bool = False) -> Optional[int]:
+                    false_positive: bool = False,
+                    run_group_id: str = "",
+                    parent_finding_id: Optional[int] = None,
+                    source_colony: str = "",
+                    source_finding_id: Optional[int] = None) -> Optional[int]:
         dedup_key = dedup_key or f"{category}:{title}:{asset}"
         # Dedup: gleiche dedup_key innerhalb desselben Targets wird verworfen
         existing = self._conn.execute(
@@ -773,17 +822,66 @@ class Store:
         ).fetchone()
         if existing:
             return None
+        # source_colony ableiten, wenn nicht gesetzt
+        sc = (source_colony or "").strip().lower()
+        if not sc:
+            ag = (agent or "").lower()
+            rid = (run_id or "").lower()
+            if ag.startswith("blue-") or ag.startswith("blue_") or rid.startswith("blue-"):
+                sc = "blue"
+            else:
+                sc = "offensive"
         cur = self._conn.execute(
             "INSERT INTO findings (target_id, run_id, agent, title, category, "
             "severity, asset, description, evidence, dedup_key, status, "
-            "false_positive, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "false_positive, run_group_id, parent_finding_id, source_colony, "
+            "source_finding_id, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (target_id, run_id, agent, title, category, severity, asset,
              description, json.dumps(evidence or {}), dedup_key, status,
-             1 if false_positive else 0, _now()),
+             1 if false_positive else 0, run_group_id or "",
+             parent_finding_id, sc, source_finding_id, _now()),
         )
         self._conn.commit()
         return cur.lastrowid
+
+    def update_finding_bridge(self, finding_id: int, *, status: Optional[str] = None,
+                              run_group_id: Optional[str] = None,
+                              parent_finding_id: Optional[int] = None,
+                              source_finding_id: Optional[int] = None,
+                              source_colony: Optional[str] = None,
+                              extra_evidence: Optional[dict] = None) -> bool:
+        """Additive Bridge-Felder an einem Finding setzen (kein Delete)."""
+        row = self.get_finding(int(finding_id))
+        if row is None:
+            return False
+        sets, args = [], []
+        if status is not None:
+            sets.append("status=?"); args.append(status)
+        if run_group_id is not None:
+            sets.append("run_group_id=?"); args.append(run_group_id)
+        if parent_finding_id is not None:
+            sets.append("parent_finding_id=?"); args.append(int(parent_finding_id))
+        if source_finding_id is not None:
+            sets.append("source_finding_id=?"); args.append(int(source_finding_id))
+        if source_colony is not None:
+            sets.append("source_colony=?"); args.append(source_colony)
+        if extra_evidence is not None:
+            try:
+                evidence = json.loads(row["evidence"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                evidence = {}
+            if not isinstance(evidence, dict):
+                evidence = {}
+            evidence.update(extra_evidence)
+            sets.append("evidence=?"); args.append(json.dumps(evidence, ensure_ascii=False))
+        if not sets:
+            return False
+        args.append(int(finding_id))
+        cur = self._conn.execute(
+            f"UPDATE findings SET {', '.join(sets)} WHERE id=?", tuple(args))
+        self._conn.commit()
+        return cur.rowcount == 1
 
     # ---------------- Capability-Registry (Königin-Gedächtnis) ----------------
     def replace_capabilities(self, registry: dict) -> None:
@@ -1115,16 +1213,23 @@ class Store:
                         finished_at: Optional[float] = None,
                         duration: Optional[float] = None,
                         started_by: str = "",
-                        owner_user: Optional[str] = None) -> int:
+                        owner_user: Optional[str] = None,
+                        run_group_id: str = "",
+                        parent_finding_id: Optional[int] = None,
+                        llm_status: str = "",
+                        llm_model: str = "") -> int:
         cur = self._conn.execute(
             "INSERT INTO run_history (run_id, target_id, target_name, mode, "
             "active, fuzz, offensive, status, finding_count, severity, error, "
-            "started_at, finished_at, duration, created_at, started_by, owner_user) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "started_at, finished_at, duration, created_at, started_by, owner_user, "
+            "run_group_id, parent_finding_id, llm_status, llm_model) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (run_id, target_id, target_name, mode, 1 if active else 0,
              1 if fuzz else 0, 1 if offensive else 0, status, int(finding_count),
              json.dumps(severity or {}), error, started_at, finished_at,
-             duration, _now(), started_by or "", (owner_user or None)))
+             duration, _now(), started_by or "", (owner_user or None),
+             run_group_id or "", parent_finding_id, llm_status or "",
+             llm_model or ""))
         self._conn.commit()
         return cur.lastrowid
 
@@ -1533,12 +1638,22 @@ class Store:
 
     # ---------------- Replay / Checkpoint (scan_runs + scan_steps) ----------------
     def create_scan_run(self, run_id: str, target_id: int, phases=None,
-                        meta: Optional[dict] = None, status: str = "running") -> str:
+                        meta: Optional[dict] = None, status: str = "running",
+                        run_group_id: str = "",
+                        parent_finding_id: Optional[int] = None) -> str:
+        meta = dict(meta or {})
+        if run_group_id and "run_group_id" not in meta:
+            meta["run_group_id"] = run_group_id
+        if parent_finding_id is not None and "parent_finding_id" not in meta:
+            meta["parent_finding_id"] = int(parent_finding_id)
         self._conn.execute(
             "INSERT OR REPLACE INTO scan_runs (run_id, target_id, status, phases, "
-            "meta, started_at, updated_at, finished_at) VALUES (?,?,?,?,?,?,?,?)",
+            "meta, run_group_id, parent_finding_id, started_at, updated_at, finished_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             (run_id, target_id, status, json.dumps(list(phases or [])),
-             json.dumps(meta or {}), _now(), _now(), None),
+             json.dumps(meta), run_group_id or meta.get("run_group_id") or "",
+             parent_finding_id if parent_finding_id is not None else meta.get("parent_finding_id"),
+             _now(), _now(), None),
         )
         self._conn.commit()
         return run_id
@@ -1847,15 +1962,19 @@ class Store:
                          finding_count: int = 0, closed_count: int = 0,
                          summary: Optional[dict] = None, error: str = "",
                          started_at: Optional[float] = None,
-                         finished_at: Optional[float] = None) -> int:
+                         finished_at: Optional[float] = None,
+                         run_group_id: str = "",
+                         parent_finding_id: Optional[int] = None) -> int:
         now = _now()
         cur = self._conn.execute(
             "INSERT INTO blue_job_runs(job_id, run_id, status, finding_count, "
-            "closed_count, summary_json, error, started_at, finished_at, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "closed_count, summary_json, error, started_at, finished_at, "
+            "run_group_id, parent_finding_id, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (job_id, run_id, status, int(finding_count), int(closed_count),
              json.dumps(summary or {}), error or "",
-             started_at or now, finished_at or now, now))
+             started_at or now, finished_at or now,
+             run_group_id or "", parent_finding_id, now))
         self._conn.commit()
         return int(cur.lastrowid)
 

@@ -45,6 +45,10 @@ class BlueResult:
     started_at: float = 0.0
     finished_at: float = 0.0
     validation: dict = field(default_factory=dict)
+    run_group_id: str = ""
+    parent_finding_id: Optional[int] = None
+    llm_status: str = ""
+    llm_model: str = ""
 
     @property
     def duration(self) -> float:
@@ -93,7 +97,9 @@ class BlueQueen:
                          phases: tuple[str, ...] = PHASES,
                          apply_fixes: bool = False,
                          oversight_ack: Optional[bool] = None,
-                         params: Optional[dict] = None) -> BlueResult:
+                         params: Optional[dict] = None,
+                         run_group_id: str = "",
+                         parent_finding_id: Optional[int] = None) -> BlueResult:
         """Startet die Verteidigungs-Kolonie.
 
         `target_id=None` → lokaler System-Modus (read-only Checks ohne Scope-
@@ -111,9 +117,32 @@ class BlueQueen:
             target_name = target["name"]
             assets = scope_mod.allowed_assets(self.store, target_id) or ["localhost"]
 
+        from .bridge import new_run_group_id
+        from . import llm_telemetry as _llmt
         run_id = "blue-" + uuid.uuid4().hex[:10]
+        rg = run_group_id or new_run_group_id()
+        # Blue: LLM standardmäßig oft aus (service use_llm=False) → disabled/fallback
+        tele = _llmt.classify(
+            use_llm_requested=bool(self.llm is not None),
+            llm_client=self.llm,
+            disabled_by_policy=(self.llm is None),
+        )
         result = BlueResult(run_id=run_id, target_id=target_id,
-                            target_name=target_name, started_at=time.time())
+                            target_name=target_name, started_at=time.time(),
+                            run_group_id=rg, parent_finding_id=parent_finding_id,
+                            llm_status=tele.get("llm_status") or "",
+                            llm_model=tele.get("llm_model") or "")
+        if target_id is not None:
+            try:
+                self.store.create_scan_run(
+                    run_id, int(target_id), phases=phases,
+                    meta={"colony": "blue", "apply_fixes": bool(apply_fixes),
+                          "run_group_id": rg, "parent_finding_id": parent_finding_id,
+                          **_llmt.as_meta(tele)},
+                    run_group_id=rg, parent_finding_id=parent_finding_id,
+                )
+            except Exception as exc:
+                self.logger.warning("blue scan_run Persistenz fehlgeschlagen: %s", exc)
 
         def _emit(ev: dict) -> None:
             ev = {**ev, "run_id": run_id, "target_id": target_id, "colony": "blue"}
@@ -191,7 +220,11 @@ class BlueQueen:
                             title=f.title, category=f.category, severity=f.severity,
                             asset=f.asset, description=f.description,
                             evidence=f.evidence, dedup_key=f.key(), status=f.status,
-                            false_positive=f.false_positive)
+                            false_positive=f.false_positive,
+                            run_group_id=rg,
+                            parent_finding_id=parent_finding_id,
+                            source_colony="blue",
+                            source_finding_id=parent_finding_id)
                     except Exception:
                         pass
             ctx.log(f"👑🛡 Phase '{phase}' fertig: +{len(new)} Finding(s) (gesamt {len(collected)}).")
@@ -201,9 +234,14 @@ class BlueQueen:
         collected.sort(key=lambda f: _SEV_RANK.get(f.severity, 0), reverse=True)
         result.findings = collected
         result.finished_at = time.time()
+        try:
+            self.store.set_scan_run_status(run_id, "done")
+        except Exception:
+            pass
         ctx.log(f"👑🛡 Verteidigungs-Kolonie fertig in {result.duration:.2f}s. "
                 f"Findings: {len(collected)} · nachweislich geschlossen: "
-                f"{result.closed_count()} · Severity: {result.by_severity()}.")
+                f"{result.closed_count()} · Severity: {result.by_severity()} "
+                f"· run_group={rg} · llm={result.llm_status}/{result.llm_model}.")
         return result
 
     @staticmethod
@@ -221,6 +259,10 @@ class BlueQueen:
     def run_colony_sync(self, target_id: Optional[int] = None,
                         phases: tuple[str, ...] = PHASES, apply_fixes: bool = False,
                         oversight_ack: Optional[bool] = None,
-                        params: Optional[dict] = None) -> BlueResult:
-        return asyncio.run(self.run_colony(target_id, phases, apply_fixes=apply_fixes,
-                                           oversight_ack=oversight_ack, params=params))
+                        params: Optional[dict] = None,
+                        run_group_id: str = "",
+                        parent_finding_id: Optional[int] = None) -> BlueResult:
+        return asyncio.run(self.run_colony(
+            target_id, phases, apply_fixes=apply_fixes,
+            oversight_ack=oversight_ack, params=params,
+            run_group_id=run_group_id, parent_finding_id=parent_finding_id))

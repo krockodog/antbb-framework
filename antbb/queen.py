@@ -43,6 +43,10 @@ class SwarmResult:
     finished_at: float = 0.0
     #: Proof-Gate-Validierungsreport (downgrades, false-positives, violations).
     validation: dict = field(default_factory=dict)
+    run_group_id: str = ""
+    parent_finding_id: Optional[int] = None
+    llm_status: str = ""
+    llm_model: str = ""
 
     @property
     def duration(self) -> float:
@@ -102,7 +106,9 @@ class Queen:
 
     async def run_swarm(self, target_id: int, phases: tuple[str, ...] = PHASES,
                          active: bool = False, fuzz: bool = False,
-                         only_agents=None, task_params=None) -> SwarmResult:
+                         only_agents=None, task_params=None,
+                         run_group_id: str = "",
+                         parent_finding_id: Optional[int] = None) -> SwarmResult:
         """Startet den Schwarm für ein Target. Erzwingt Oversight + Scope.
 
         `active` schaltet die TIEFE, aktive Verifikations-Phase frei. Default
@@ -120,10 +126,30 @@ class Queen:
         require_oversight(self.store, target_id)
 
         run_id = uuid.uuid4().hex[:12]
+        from .bridge import new_run_group_id
+        from . import llm_telemetry as _llmt
+        rg = run_group_id or new_run_group_id()
+        # ehrlich: kein Client → fallback_no_llm; sonst used (Intent/Capability)
+        tele = _llmt.classify(use_llm_requested=True, llm_client=self.llm)
         result = SwarmResult(
             run_id=run_id, target_id=target_id, target_name=target["name"],
             started_at=time.time(),
+            run_group_id=rg,
+            parent_finding_id=parent_finding_id,
+            llm_status=tele.get("llm_status") or "",
+            llm_model=tele.get("llm_model") or "",
         )
+        try:
+            self.store.create_scan_run(
+                run_id, target_id, phases=phases,
+                meta={"active": bool(active), "fuzz": bool(fuzz),
+                      "run_group_id": rg,
+                      "parent_finding_id": parent_finding_id,
+                      **_llmt.as_meta(tele)},
+                run_group_id=rg, parent_finding_id=parent_finding_id,
+            )
+        except Exception as exc:
+            self.logger.warning("scan_run Persistenz fehlgeschlagen: %s", exc)
 
         def _emit(ev: dict) -> None:
             ev = {**ev, "run_id": run_id, "target_id": target_id}
@@ -232,6 +258,10 @@ class Queen:
                     asset=f.asset, description=f.description, evidence=f.evidence,
                     dedup_key=f.key(), status=f.status,
                     false_positive=f.false_positive,
+                    run_group_id=rg,
+                    parent_finding_id=parent_finding_id,
+                    source_colony="offensive",
+                    source_finding_id=parent_finding_id,
                 )
             ctx.log(f"👑 Phase '{phase}' abgeschlossen: +{len(new)} neue Findings "
                     f"(gesamt {len(collected)}).")
@@ -262,8 +292,13 @@ class Queen:
         collected.sort(key=lambda f: _SEV_RANK.get(f.severity, 0), reverse=True)
         result.findings = collected
         result.finished_at = time.time()
+        try:
+            self.store.set_scan_run_status(run_id, "done")
+        except Exception:
+            pass
         ctx.log(f"👑 Schwarm fertig in {result.duration:.2f}s. "
-                f"Verteilung: {result.by_severity()} · Status: {result.by_status()}")
+                f"Verteilung: {result.by_severity()} · Status: {result.by_status()} "
+                f"· run_group={rg} · llm={result.llm_status}/{result.llm_model}")
         return result
 
     @staticmethod
@@ -281,8 +316,11 @@ class Queen:
 
     def run_swarm_sync(self, target_id: int, phases: tuple[str, ...] = PHASES,
                         active: bool = False, fuzz: bool = False,
-                        only_agents=None, task_params=None) -> SwarmResult:
+                        only_agents=None, task_params=None,
+                        run_group_id: str = "",
+                        parent_finding_id: Optional[int] = None) -> SwarmResult:
         """Synchroner Wrapper für CLI."""
         return asyncio.run(self.run_swarm(
             target_id, phases, active=active, fuzz=fuzz,
-            only_agents=only_agents, task_params=task_params))
+            only_agents=only_agents, task_params=task_params,
+            run_group_id=run_group_id, parent_finding_id=parent_finding_id))
