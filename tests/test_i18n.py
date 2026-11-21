@@ -99,9 +99,6 @@ def isolated_app(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTBB_ADMIN_PASSWORD_HASH", raising=False)
     monkeypatch.delenv("ANTBB_HOSTED", raising=False)
     monkeypatch.setenv("ANTBB_DATA", str(tmp_path))
-    from antbb import governance as gov
-    # governance cached "Schema bereit" per id(conn); frische Temp-DB -> frischer Cache.
-    monkeypatch.setattr(gov, "_READY", set())
     prev_store = svc.store
     svc.store = Store(str(tmp_path / "i18n.db"))
     try:

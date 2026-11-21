@@ -48,9 +48,6 @@ def test_routes(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTBB_DATA", str(tmp_path))
     monkeypatch.setenv("ANTBB_TOTP_KEY", "")
     webauth.reset_login_throttle()
-    from antbb import governance as gov
-    # governance cached "Schema bereit" per id(conn); frische Temp-DB -> frischer Cache.
-    monkeypatch.setattr(gov, "_READY", set())
     prev_store = svc.store
     svc.store = Store(str(tmp_path / "reports.db"))
     try:

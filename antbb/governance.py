@@ -153,7 +153,10 @@ def classify_scan(*, depth: str, engaged: bool, fuzz: bool = False) -> tuple[str
 # Store-Zugriff
 # ---------------------------------------------------------------------------
 _LOCK = threading.RLock()
-_READY: set[int] = set()
+# Merker-Attribut am Store-Objekt: "Governance-Schema angelegt".
+# Bewusst NICHT nach id(conn) (ids werden nach close() wiederverwendet -> stale)
+# und nicht nur nach Pfad (":memory:" bzw. neu angelegte Datei am selben Pfad).
+_READY_ATTR = "_gov_schema_ready"
 
 POLICY_COLUMNS = (
     ("target_domains", "TEXT NOT NULL DEFAULT '[]'"),
@@ -182,8 +185,7 @@ def default_store():
 
 
 def ensure_schema(store) -> None:
-    key = id(store._conn)
-    if key in _READY:
+    if getattr(store, _READY_ATTR, False):
         return
     with _LOCK:
         conn = store._conn
@@ -212,7 +214,10 @@ def ensure_schema(store) -> None:
                )""")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_gov_audit_ts ON governance_audit(ts)")
         conn.commit()
-        _READY.add(key)
+        try:
+            setattr(store, _READY_ATTR, True)
+        except (AttributeError, TypeError):
+            pass  # Store ohne Attribute: Schema-DDL ist idempotent, läuft dann erneut.
         migrate_policies(store)
 
 

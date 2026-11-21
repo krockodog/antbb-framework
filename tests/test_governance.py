@@ -35,8 +35,6 @@ def client(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTBB_ADMIN_PASSWORD_HASH", raising=False)
     monkeypatch.setenv("ANTBB_DATA", str(tmp_path))
     monkeypatch.setenv("ANTBB_TOTP_KEY", "")
-    # governance cached "Schema bereit" per id(conn); frische Temp-DB -> frischer Cache.
-    monkeypatch.setattr(gov, "_READY", set())
     webauth.reset_login_throttle()
     prev_store = webapp.svc.store
     webapp.svc.store = Store(str(tmp_path / "governance.db"))
