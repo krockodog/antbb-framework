@@ -100,6 +100,11 @@ class Queen:
 
     # ---- Phasen-Planung: welche Agenten-Klassen gehören zu welcher Phase ----
     def _agents_for_phase(self, phase: str, ctx: AgentContext, only_agents=None):
+        if phase == "recheck":
+            # Enger Befund-Re-Check der Brücke (ABPM-13): eigener Agent, kein
+            # regulärer Soldat; nicht in PHASES, läuft also nie in normalen Scans.
+            from .agents.recheck import RecheckAnt
+            return [RecheckAnt(ctx)]
         agents = [cls(ctx) for cls in WORKER_AGENTS if phase in cls.phases]
         if only_agents:
             allow = set(only_agents)
@@ -234,7 +239,12 @@ class Queen:
 
         collected: list[AgentFinding] = []
         for phase in phases:
-            if phase == "verify" and not effective_active:
+            if phase in ("verify", "recheck") and not effective_active:
+                # verify und der Brücken-Re-Check laufen nur mit freigeschalteter
+                # aktiver Verifikation (Oversight + Scope + mode_policy).
+                if phase == "recheck":
+                    ctx.log("👑 Phase 'recheck' übersprungen: aktive Verifikation nicht "
+                            "freigeschaltet (Oversight/Scope/mode_policy).")
                 continue
             agents = self._agents_for_phase(phase, ctx, only_agents=only_agents)
             if not agents:

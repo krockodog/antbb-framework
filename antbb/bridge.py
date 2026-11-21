@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import uuid
 from typing import Any, Optional
 
@@ -29,6 +30,50 @@ OFFENSIVE_VISIBLE = frozenset({
 
 #: Obergrenze für mitgeführte Parse-Ereignisse in Bridge-Antworten/Evidence.
 MAX_PARSE_EVENTS = 20
+
+#: Status, mit denen ein Fund im Re-Check-Lauf als "besteht weiter" zählt.
+OPEN_RECHECK_STATUS = frozenset({"VERIFIZIERT", "ZU BESTÄTIGEN", "BESTÄTIGT(PASSIV)"})
+#: Meta-Kategorie des engen Re-Checks (antbb.agents.recheck.RECHECK_CATEGORY).
+RECHECK_CATEGORY = "recheck-result"
+
+
+def related_open_findings(findings, finding: dict) -> list:
+    """Funde eines Re-Check-Laufs, die GENAU diesen Befund weiter belegen (ABPM-13 B).
+
+    Abgleich über den dedup_key des Ursprungs-Funds; nur wenn der fehlt, über
+    Kategorie + Asset. Andere Funde auf demselben Host zählen NICHT (früher
+    hielt jeder offene Fund auf dem Asset den Status auf STILL_OPEN).
+    Meta-Funde des Re-Checks selbst werden ignoriert.
+    """
+    key = str(finding.get("dedup_key") or "")
+    cat = str(finding.get("category") or "")
+    asset = str(finding.get("asset") or "")
+    out = []
+    for f in findings or []:
+        if getattr(f, "category", "") == RECHECK_CATEGORY:
+            continue
+        if getattr(f, "status", "") not in OPEN_RECHECK_STATUS:
+            continue
+        if key:
+            f_key = f.key() if hasattr(f, "key") else getattr(f, "dedup_key", "")
+            if f_key == key:
+                out.append(f)
+        elif getattr(f, "category", "") == cat and (not asset or getattr(f, "asset", "") == asset):
+            out.append(f)
+    return out
+
+
+def targeted_recheck_result(findings, finding: dict) -> Optional[dict]:
+    """Evidence des Meta-Funds aus dem engen Re-Check (Phase "recheck") oder None."""
+    key = str(finding.get("dedup_key") or "") or \
+        f"{finding.get('category')}:{finding.get('asset')}"
+    for f in findings or []:
+        if getattr(f, "category", "") != RECHECK_CATEGORY:
+            continue
+        ev = getattr(f, "evidence", None) or {}
+        if ev.get("recheck_of") == key:
+            return ev
+    return None
 
 
 def new_run_group_id() -> str:
@@ -215,15 +260,19 @@ def remediate_and_recheck(
             run_group_id = row["run_group_id"] or ""
     except Exception:
         run_group_id = ""
+    warnings: list[str] = []
     if not run_group_id:
         # aus scan_runs.meta des Ursprungs-Runs
         try:
             sr = store.get_scan_run(finding.get("run_id") or "")
             if sr:
                 meta = json.loads(sr["meta"] or "{}")
-                run_group_id = meta.get("run_group_id") or ""
-        except Exception:
-            pass
+                run_group_id = (meta.get("run_group_id") or "") if isinstance(meta, dict) else ""
+        except (json.JSONDecodeError, TypeError, KeyError, IndexError, sqlite3.Error) as exc:
+            msg = (f"run_group_id aus scan_runs.meta (run {finding.get('run_id')!r}) nicht "
+                   f"lesbar: {type(exc).__name__}: {exc} – neue Korrelations-ID vergeben.")
+            log.warning("%s", msg)
+            warnings.append(msg)
     if not run_group_id:
         run_group_id = new_run_group_id()
 
@@ -251,7 +300,7 @@ def remediate_and_recheck(
             return {
                 "ok": False, "error": str(exc), "finding_id": finding_id,
                 "run_group_id": run_group_id, "step": _step_dict(step),
-                "llm_plan": llm_plan,
+                "llm_plan": llm_plan, "warnings": warnings,
             }
         cat = str(finding.get("category") or "")
         if cat.startswith("blue-"):
@@ -264,7 +313,7 @@ def remediate_and_recheck(
                 return {
                     "ok": False, "error": str(exc), "finding_id": finding_id,
                     "run_group_id": run_group_id, "step": _step_dict(step),
-                    "llm_plan": llm_plan,
+                    "llm_plan": llm_plan, "warnings": warnings,
                 }
             if apply_result.get("closed") is True:
                 store.close_finding(finding_id, apply_result)
@@ -280,7 +329,7 @@ def remediate_and_recheck(
                     "run_group_id": run_group_id,
                     "outcome": STATUS_MITIGATED,
                     "apply": apply_result, "step": _step_dict(step),
-                    "llm_plan": llm_plan, "recheck": None,
+                    "llm_plan": llm_plan, "recheck": None, "warnings": warnings,
                 }
         else:
             # Offensive Funde: kein auto-apply über blue SUPPORTED-Checks —
@@ -303,19 +352,21 @@ def remediate_and_recheck(
 
     red_verify = None
     if trigger_red_verify and outcome != STATUS_MITIGATED:
-        # eng: nur verify-Phase, nur betroffenes Asset als Fokus
         asset = finding.get("asset") or ""
+        # A: Für bekannte Red-Arten genau diesen Befund erneut prüfen (Phase
+        # "recheck", RecheckAnt); sonst wie bisher die verify-Phase. Beides läuft
+        # über svc.run_scan -> Scope-/Oversight-/mode_policy-Gates unverändert.
+        spec = remediation.red_recheck_spec(finding)
         try:
             from .active_oversight import enforce_active_oversight
             enforce_active_oversight(
                 oversight_ack,
-                action="Red verify Re-Check (eng begrenzt)",
+                action="Red Re-Check (eng begrenzt)",
                 log=lambda m: log.info("%s", m),
             )
-            # Scope: Verify braucht Oversight; force nicht defensive, aber phases=verify
             swarm = svc.run_scan(
                 tid,
-                phases=("verify",),
+                phases=("recheck",) if spec else ("verify",),
                 active=True,
                 fuzz=False,
                 offensive=False,
@@ -327,20 +378,22 @@ def remediate_and_recheck(
                     "focus_asset": asset,
                     "parent_finding_id": parent_id,
                     "recheck_of": finding.get("dedup_key") or finding.get("title"),
+                    **({"recheck": spec} if spec else {}),
                 },
             )
-            # Wenn Verify neue Findings gleicher Kategorie/Asset liefert → still open
-            related = [
-                f for f in swarm.findings
-                if (not asset or f.asset == asset)
-                and f.status in ("VERIFIZIERT", "ZU BESTÄTIGEN", "BESTÄTIGT(PASSIV)")
-            ]
-            if related:
+            # B: nur Funde, die GENAU diesen Befund belegen (dedup_key).
+            related = related_open_findings(swarm.findings, finding)
+            parse_state = _red_verify_parse(swarm)
+            targeted = targeted_recheck_result(swarm.findings, finding) if spec else None
+            reproduced = targeted.get("reproduced") if targeted else None
+            # Ein "nicht mehr vorhanden" zählt nur bei sauber lesbaren Ausgaben.
+            cleanly_absent = reproduced is False and not parse_state["parse_degraded"]
+            if related or reproduced is True:
                 outcome = STATUS_STILL_OPEN
-            elif recheck.closed is True:
+            elif recheck.closed is True or cleanly_absent:
                 outcome = STATUS_MITIGATED
             else:
-                # kein neuer Beweis, alter Re-Check unklar → VERIFIED nur wenn
+                # kein neuer Beweis, Re-Check unklar → VERIFIED nur wenn
                 # ursprünglicher Status VERIFIZIERT und nichts widerspricht
                 if str(finding.get("status") or "") == "VERIFIZIERT" and recheck.closed is not True:
                     outcome = STATUS_VERIFIED
@@ -349,15 +402,22 @@ def remediate_and_recheck(
             red_verify = {
                 "run_id": swarm.run_id,
                 "run_group_id": run_group_id,
+                "mode": "targeted" if spec else "verify-phase",
+                "match": "dedup_key" if finding.get("dedup_key") else "category+asset",
                 "finding_count": len(swarm.findings),
                 "related_open": len(related),
                 "by_status": swarm.by_status(),
-                **_red_verify_parse(swarm),
+                **parse_state,
             }
-            if red_verify["parse_degraded"] and not related:
+            if spec:
+                red_verify["recheck_kind"] = spec["kind"]
+                red_verify["reproduced"] = reproduced
+                red_verify["recheck_detail"] = (targeted or {}).get("detail") or {
+                    "reason": "kein Re-Check-Ergebnis im Lauf (Gate/Fehler, siehe Lauf-Log)"}
+            if parse_state["parse_degraded"] and not related and reproduced is not True:
                 # Ausgang bleibt wie berechnet; nur ehrlich kennzeichnen.
                 red_verify["note"] = (
-                    "Red-Verify ohne Gegenbefund, aber Tool-Ausgaben waren teilweise "
+                    "Re-Check ohne Gegenbefund, aber Tool-Ausgaben waren teilweise "
                     "unlesbar (parse_warning) – fehlende Funde sind kein Nachweis.")
         except Exception as exc:
             red_verify = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
@@ -387,8 +447,11 @@ def remediate_and_recheck(
             store.close_finding(finding_id, {
                 "bridge_outcome": outcome, "recheck": _step_dict(recheck),
             })
-        except Exception:
-            pass
+        except Exception as exc:  # Status MITIGATED ist bereits persistiert
+            msg = (f"close_finding({finding_id}) fehlgeschlagen: {type(exc).__name__}: {exc} "
+                   "– Status MITIGATED gesetzt, GESCHLOSSEN-Markierung fehlt.")
+            log.warning("%s", msg)
+            warnings.append(msg)
 
     return {
         "ok": True,
@@ -401,6 +464,7 @@ def remediate_and_recheck(
         "apply": apply_result,
         "llm_plan": llm_plan,
         "source_parse": source_parse,
+        "warnings": warnings,
     }
 
 

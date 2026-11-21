@@ -31,6 +31,199 @@ class RemediationStep:
     evidence: dict = field(default_factory=dict)
 
 
+# ---------------------------------------------------------------------------
+# Red-Funde (offensive Kolonie): Fund -> Fix-Zuordnung + enger Re-Check (ABPM-13 A)
+#
+# Für die häufigsten Red-Kategorien gibt es einen konkreten Fix-Hinweis statt des
+# generischen Standardtexts und eine Re-Check-Spezifikation, die GENAU diesen
+# Befund erneut prüft (dasselbe Tool/Template bzw. dieselbe Erkennung, dasselbe
+# Asset). Ausgeführt wird der Re-Check NICHT hier, sondern über den normalen,
+# gate-geprüften Schwarm-Lauf (Phase "recheck", antbb.agents.recheck) – Scope-
+# Allowlist und Oversight bleiben dort unverändert wirksam. Kein Auto-Apply.
+# ---------------------------------------------------------------------------
+RED_KIND_HEADER = "missing-header"
+RED_KIND_TLS = "weak-tls"
+RED_KIND_PATH = "exposed-path"
+RED_KIND_NIKTO = "nikto"
+RED_KIND_VERSION = "version-disclosure"
+RED_KIND_SECRET = "secret"
+RED_KIND_NUCLEI = "nuclei"
+RED_KINDS = (RED_KIND_HEADER, RED_KIND_TLS, RED_KIND_PATH, RED_KIND_NIKTO,
+             RED_KIND_VERSION, RED_KIND_SECRET, RED_KIND_NUCLEI)
+
+#: Konkrete Header-Fixes (Werte als sichere Startpunkte; an die App anpassen).
+_HEADER_FIX = {
+    "strict-transport-security": (
+        'Strict-Transport-Security: max-age=31536000; includeSubDomains',
+        "nur über HTTPS ausliefern; vorher sicherstellen, dass alle Subdomains HTTPS können"),
+    "content-security-policy": (
+        "Content-Security-Policy: default-src 'self'; object-src 'none'; frame-ancestors 'self'",
+        "Policy an die tatsächlich geladenen Quellen anpassen (erst Report-Only testen)"),
+    "x-content-type-options": ("X-Content-Type-Options: nosniff", ""),
+    "x-frame-options": (
+        "X-Frame-Options: DENY",
+        "alternativ/zusätzlich CSP frame-ancestors setzen"),
+    "referrer-policy": ("Referrer-Policy: strict-origin-when-cross-origin", ""),
+}
+
+
+def _url_path(url: str) -> str:
+    from urllib.parse import urlparse
+    try:
+        return urlparse(url).path or "/"
+    except ValueError:
+        return "/"
+
+
+def red_recheck_spec(finding: dict) -> Optional[dict]:
+    """Re-Check-Spezifikation für einen Red-Fund, sonst ``None``.
+
+    Nur aus echten Feldern des Funds (Kategorie, Evidence, dedup_key, Asset);
+    fehlt etwas Wesentliches, gibt es KEINE Spezifikation (kein Raten).
+    """
+    cat = str(finding.get("category") or "")
+    if cat.startswith("blue-"):
+        return None
+    ev = finding.get("evidence") or {}
+    if not isinstance(ev, dict):
+        ev = {}
+    asset = str(finding.get("asset") or "")
+    dedup = str(finding.get("dedup_key") or "")
+    base = {"category": cat, "dedup_key": dedup, "asset": asset,
+            "title": str(finding.get("title") or ""),
+            "orig_status": str(finding.get("status") or "")}
+    if not asset:
+        return None
+
+    if cat == "misconfig" and ev.get("missing_header") and asset.startswith(("http://", "https://")):
+        return {**base, "kind": RED_KIND_HEADER, "header": str(ev["missing_header"]).lower(),
+                "url": asset.rstrip("/") + "/", "detector": "scanning.security-header"}
+
+    if cat == "tls" and dedup.startswith("tls-weak:") and ev.get("protocol"):
+        return {**base, "kind": RED_KIND_TLS, "detector": "infra.tls_info",
+                "protocols": [str(ev["protocol"])]}
+    if cat == "tls-scan" and ev.get("weak_protocols"):
+        return {**base, "kind": RED_KIND_TLS, "detector": "kali.sslscan",
+                "protocols": [str(x) for x in ev.get("weak_protocols") or []]}
+
+    if cat in ("info-disclosure", "exposed-artifact", "content-discovery") \
+            and asset.startswith(("http://", "https://")):
+        if cat == "info-disclosure" and not ev.get("path"):
+            return None
+        try:
+            orig_http = int(ev.get("status") or 200)
+        except (TypeError, ValueError):
+            orig_http = 200
+        sig = ""
+        if ev.get("signature") == "directory-listing" or dedup.startswith("listing:"):
+            sig = "directory-listing"
+        elif cat == "exposed-artifact":
+            sig = "artifact"
+        return {**base, "kind": RED_KIND_PATH, "url": asset, "path": _url_path(asset),
+                "orig_http_status": orig_http, "signature": sig,
+                "detector": f"http-get ({ev.get('tool') or cat})"}
+
+    if cat == "nikto-finding" and asset.startswith(("http://", "https://")):
+        return {**base, "kind": RED_KIND_NIKTO, "url": asset, "tool": "nikto",
+                "nikto_id": str(ev.get("id") or "")}
+
+    if cat == "version-disclosure" and ev.get("tool") == "wpscan" and ev.get("version"):
+        return {**base, "kind": RED_KIND_VERSION, "tool": "wpscan",
+                "package": str(ev.get("package") or "wordpress"),
+                "version": str(ev["version"])}
+    if cat == "whatweb-fingerprint" and isinstance(ev.get("tech"), dict):
+        versioned = {str(k): str(v) for k, v in ev["tech"].items() if v}
+        if not versioned:
+            return None
+        return {**base, "kind": RED_KIND_VERSION, "tool": "whatweb", "tech": versioned}
+
+    if cat == "secret-exposure":
+        tool = str(ev.get("tool") or "")
+        location = str(ev.get("location") or "")
+        cmd = str(ev.get("command") or "").split()
+        mode = cmd[1] if len(cmd) > 1 and cmd[1] in ("filesystem", "git", "github") else "filesystem"
+        return {**base, "kind": RED_KIND_SECRET, "tool": tool or "trufflehog",
+                "location": location, "mode": mode,
+                "detector": str(ev.get("detector") or ""),
+                "masked": str(ev.get("masked") or "")}
+
+    if cat == "nuclei-finding" and ev.get("template_id"):
+        tid = str(ev["template_id"])
+        matched = str(ev.get("matched_at") or asset)
+        return {**base, "kind": RED_KIND_NUCLEI, "tool": "nuclei",
+                "template_id": tid, "matched_at": matched}
+    return None
+
+
+def _red_plan(finding: dict, spec: dict) -> RemediationStep:
+    """Konkreter Fix-Hinweis je Red-Art. fix_command bleibt leer (kein Auto-Apply)."""
+    key = finding.get("dedup_key") or finding.get("title", "")
+    title = finding.get("title", "")
+    kind = spec["kind"]
+    asset = spec.get("asset", "")
+    if kind == RED_KIND_HEADER:
+        name = spec["header"]
+        value, note = _HEADER_FIX.get(name, (f"{name}: <passender Wert>", ""))
+        action = (f"Security-Header setzen auf {asset}: '{value}'. "
+                  f"nginx: add_header {value.split(':', 1)[0]} \"{value.split(':', 1)[1].strip()}\" always; "
+                  f"Apache: Header always set {value.split(':', 1)[0]} \"{value.split(':', 1)[1].strip()}\"."
+                  + (f" Hinweis: {note}." if note else ""))
+        verify = f"Re-Check: GET {spec['url']} und prüfen, ob '{name}' in der Antwort gesetzt ist."
+    elif kind == RED_KIND_TLS:
+        protos = ", ".join(spec.get("protocols") or [])
+        action = (f"Schwache TLS-Protokolle ({protos}) auf {asset} deaktivieren, nur TLSv1.2/TLSv1.3 "
+                  "erlauben. nginx: ssl_protocols TLSv1.2 TLSv1.3; "
+                  "Apache: SSLProtocol -all +TLSv1.2 +TLSv1.3; danach Dienst neu laden.")
+        verify = (f"Re-Check mit derselben Erkennung ({spec.get('detector')}) auf {asset}: "
+                  "kein schwaches Protokoll mehr aushandelbar.")
+    elif kind == RED_KIND_PATH:
+        path = spec.get("path", "/")
+        if spec.get("signature") == "directory-listing":
+            action = (f"Verzeichnisauflistung unter {asset} abschalten. nginx: autoindex off; "
+                      "Apache: Options -Indexes.")
+        else:
+            action = (f"Pfad {path} nicht mehr ausliefern: Datei/Verzeichnis aus dem Webroot entfernen "
+                      f"oder sperren (nginx: location ^~ {path} {{ deny all; return 404; }} "
+                      f"Apache: <LocationMatch \"^{path}\"> Require all denied </LocationMatch>). "
+                      "Bei .git/.env/Backups: enthaltene Zugangsdaten als kompromittiert behandeln "
+                      "und rotieren.")
+        verify = (f"Re-Check: GET {spec['url']} – geschlossen bei 404/410 bzw. (vorher 200) 401/403; "
+                  "bei 200 zählt nur, ob der ursprüngliche Inhalt (Signatur) noch da ist.")
+    elif kind == RED_KIND_NIKTO:
+        msg = finding.get("description") or title
+        action = (f"nikto-Befund{(' ' + spec['nikto_id']) if spec.get('nikto_id') else ''} auf "
+                  f"{asset} beheben: {str(msg)[:300]} – Konfiguration/Header/Datei entsprechend "
+                  "korrigieren.")
+        verify = f"Re-Check: nikto erneut nur gegen {asset}; derselbe Befund (ID/dedup) darf nicht mehr auftauchen."
+    elif kind == RED_KIND_VERSION:
+        if spec.get("tool") == "wpscan":
+            action = (f"WordPress auf {asset} (erkannt {spec.get('version')}) auf die aktuelle Version "
+                      "aktualisieren und Versionsangaben ausblenden (generator-Meta, readme.html, "
+                      "?ver=-Parameter).")
+        else:
+            techs = ", ".join(f"{k}/{v}" for k, v in (spec.get("tech") or {}).items())
+            action = (f"Offengelegte Komponenten auf {asset} ({techs}) aktualisieren und "
+                      "Versions-Banner abschalten (nginx: server_tokens off; Apache: ServerTokens Prod, "
+                      "ServerSignature Off; PHP: expose_php = Off).")
+        verify = (f"Re-Check mit {spec.get('tool')} nur gegen {asset}: dieselbe Version darf nicht mehr "
+                  "offengelegt werden (geänderte Version = nicht automatisch belegt).")
+    elif kind == RED_KIND_SECRET:
+        action = (f"Secret ({spec.get('detector') or 'unbekannter Typ'}, maskiert {spec.get('masked')}) "
+                  "SOFORT beim Anbieter widerrufen/rotieren, dann aus Code UND Historie entfernen "
+                  "(git filter-repo/BFG) und in einen Secret-Store verschieben.")
+        verify = ("Re-Check: Secret-Scan nur auf denselben Ort. Hinweis: 'nicht mehr gefunden' belegt "
+                  "NICHT die Rotation – die muss manuell bestätigt werden.")
+    else:  # RED_KIND_NUCLEI
+        action = (f"nuclei-Template '{spec.get('template_id')}' auf {spec.get('matched_at')} beheben "
+                  f"({title}): Ursache gemäß Template-Referenz korrigieren (Konfiguration/Update/Zugriff "
+                  "sperren).")
+        verify = (f"Re-Check: nuclei nur mit Template '{spec.get('template_id')}' gegen "
+                  f"{spec.get('matched_at')}.")
+    return RemediationStep(finding_key=key, title=title, fix_action=action,
+                           fix_command="", verify_method=verify,
+                           evidence={"recheck_spec": spec})
+
+
 def _is_gap(cat: str) -> bool:
     """Alle Lücken-Kategorien der Blue-Soldaten (hardening, audit, patchmgmt, …)."""
     return cat == "blue-hardening-gap" or (cat.startswith("blue-") and cat.endswith("-gap"))
@@ -88,6 +281,9 @@ def plan_fix(finding: dict) -> RemediationStep:
             finding_key=key, title=title, fix_action=act,
             verify_method="Installierte Version erneut erfassen und mit behobener Version vergleichen.",
         )
+    spec = red_recheck_spec(finding)
+    if spec is not None:
+        return _red_plan(finding, spec)
     return RemediationStep(
         finding_key=key, title=title,
         fix_action="Konfiguration/Version gemäß Finding korrigieren.",
@@ -171,6 +367,15 @@ def verify_closed(finding: dict) -> RemediationStep:
         step.evidence = {"before": old, "after": cur, "fixed_target": fixed}
         return step
 
+    spec = red_recheck_spec(finding)
+    if spec is not None:
+        # Red-Fund: lokal nicht prüfbar. Der enge Re-Check läuft gate-geprüft über
+        # die Brücke (bridge.remediate_and_recheck -> Phase "recheck").
+        step.closed = None
+        step.evidence = {"reason": "Red-Fund: Re-Check über den eng begrenzten, "
+                                   "scope-/oversight-geprüften Recheck-Lauf (Bridge).",
+                         "recheck_kind": spec["kind"], "recheck_spec": spec}
+        return step
     step.closed = None
     step.evidence = {"reason": "Kein automatischer Re-Check für diese Kategorie definiert."}
     return step

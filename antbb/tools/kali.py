@@ -147,6 +147,9 @@ class KaliAdapter:
         #: Jeder gegriffene Parse-Fallback dieses Adapters (für Aufrufer/Tests):
         #: {"context", "parse_status", "parse_warning", "parse_method"}.
         self.parse_events: list[dict] = []
+        #: Jedes ToolResult dieses Adapters (lief/verfügbar/Scope/Timeout) – damit
+        #: Aufrufer "lief sauber, nichts gefunden" von "lief nicht" unterscheiden.
+        self.tool_results: list[ToolResult] = []
 
     # ---------------- interne Helfer ----------------
     def _log(self, msg: str) -> None:
@@ -216,6 +219,18 @@ class KaliAdapter:
     async def run(self, tool: str, argv: list, *, target: str,
                   timeout: float = 120.0, offensive: bool = False,
                   input_text: Optional[str] = None) -> ToolResult:
+        """Führt ein externes Tool sicher aus (siehe :meth:`_run_tool`).
+
+        Merkt sich jedes Ergebnis in ``tool_results``; Gates unverändert.
+        """
+        res = await self._run_tool(tool, argv, target=target, timeout=timeout,
+                                   offensive=offensive, input_text=input_text)
+        self.tool_results.append(res)
+        return res
+
+    async def _run_tool(self, tool: str, argv: list, *, target: str,
+                        timeout: float = 120.0, offensive: bool = False,
+                        input_text: Optional[str] = None) -> ToolResult:
         """Führt ein externes Tool sicher aus. Gibt immer ein ToolResult zurück.
 
         `target` ist das Ziel (Host/URL/Pfad) für Scope-Check + Rate-Limit.
@@ -317,9 +332,19 @@ class KaliAdapter:
     # ---------------- nuclei ----------------
     async def nuclei(self, target: str, *, agent: str = "scanning",
                      severities: str = "low,medium,high,critical",
-                     timeout: float = 300.0) -> list[AgentFinding]:
+                     timeout: float = 300.0,
+                     template_ids: Optional[list] = None) -> list[AgentFinding]:
         argv = ["-u", target, "-silent", "-jsonl", "-severity", severities,
                 "-rate-limit", "20", "-timeout", "10"]
+        if template_ids:
+            # Enger Re-Check: nur genau diese Templates (IDs streng validiert).
+            ids = [str(i) for i in template_ids if _TEMPLATE_ID_RE.fullmatch(str(i))]
+            if not ids:
+                self._log("[kali] ⛔ nuclei: keine gültige Template-ID – übersprungen.")
+                return []
+            argv = ["-u", target, "-silent", "-jsonl", "-id", ",".join(ids),
+                    "-severity", "info,low,medium,high,critical",
+                    "-rate-limit", "20", "-timeout", "10"]
         res = await self.run("nuclei", argv, target=target, timeout=timeout, offensive=True)
         if not res.ok:
             return []
@@ -918,6 +943,8 @@ def _annotate_parse(findings: list, pr: ParseResult) -> None:
         if isinstance(getattr(f, "evidence", None), dict):
             f.evidence.update(meta)
 
+
+_TEMPLATE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-]{0,120}")
 
 _NMAP_PORT_RE = re.compile(
     r"^(\d+)/(tcp|udp)\s+open\s+(\S+)(?:\s+(.*))?$", re.MULTILINE)
