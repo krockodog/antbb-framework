@@ -25,7 +25,7 @@ nie auf der Kommandozeile übergeben (gvm-cli bekommt sie über eine flüchtige
 """
 from __future__ import annotations
 
-from .parseutil import parse_json_robust
+from .tools.parsers import PARSE_EMPTY, PARSE_OK, ParseResult, safe_parse_json
 
 import csv
 import hashlib
@@ -484,31 +484,84 @@ def _jtext(v) -> str:
     return str(v).strip() if v is not None else ""
 
 
+def _looks_like_gvm_result(d) -> bool:
+    """Erkennt ein einzelnes Greenbone-Result-Objekt (für gerettete Teilstücke)."""
+    if not isinstance(d, dict):
+        return False
+    has_host = "host" in d or "ip" in d
+    has_vuln = isinstance(d.get("nvt"), dict) or "nvt_oid" in d or "severity" in d or "threat" in d
+    return has_host and has_vuln
+
+
+def _salvaged_results(data) -> list:
+    """Result-Objekte aus eingebettet/teilweise geretteten JSON-Werten."""
+    values = data if isinstance(data, list) else [data]
+    items: list = []
+    for v in values:
+        if _looks_like_gvm_result(v):
+            items.append(v)
+            continue
+        found = _find_json_results(v) if isinstance(v, (dict, list)) else None
+        if found:
+            items.extend(x for x in found if _looks_like_gvm_result(x))
+    return items
+
+
+def _redact_excerpt(text: str, n: int) -> str:
+    """Roh-Auszug für Diagnose: Zugangsdaten maskiert, Zeilen erhalten."""
+    t = _REDACT.sub(r"\1\2***", str(text or ""))
+    t = _BEARER.sub(r"\1 ***", t)
+    return t[:n]
+
+
+def _apply_parse_meta(rep: ParsedReport, pr: ParseResult) -> None:
+    """parse_status/parse_warning in Report-Meta + Warnungsliste übernehmen."""
+    rep.meta["parse_status"] = pr.parse_status
+    if pr.parse_warning:
+        rep.meta["parse_warning"] = pr.parse_warning
+        rep.meta["parse_method"] = pr.method
+        rep.warnings.append(f"Parse-Fallback: {pr.parse_warning}")
+
+
 def parse_json(text: str, include_log: bool = False) -> ParsedReport:
-    obj, warn = parse_json_robust(text or "", expect=(dict, list))
-    if obj is None or (isinstance(obj, dict) and obj.get("parse_warning")):
-        # strukturierter Fallback statt hartem Abbruch ohne Inhalt
-        rep = ParsedReport(fmt="greenbone-json")
-        rep.meta["parse_warning"] = warn or "json_unreadable"
-        if isinstance(obj, dict):
-            rep.meta["raw_excerpt"] = (obj.get("raw_excerpt") or "")[:2000]
-            rep.meta["kv_guess"] = obj.get("kv_guess") or {}
-        # Regex-/Zeilen-Extraktion: CVE-artige Tokens aus Rohtext
-        import re as _re
-        cves = _re.findall(r"CVE-\d{4}-\d{4,7}", text or "", flags=_re.I)
-        if cves:
-            rep.meta["cve_guess"] = sorted(set(cves))[:50]
-        # ehrlich leer bei Results, aber Warnung erhalten
-        return _finish(rep, [], include_log)
-    if warn:
-        # Blob/NDJSON-Fallback erfolgreich — Warnung mitführen
-        pass
+    """Parst einen Greenbone-JSON-Report.
+
+    ``rep.meta["parse_status"]`` ist immer gesetzt (``ok`` | ``partial_fallback``
+    | ``empty``); bei jedem Fallback stehen ``parse_warning`` in ``rep.meta`` und
+    ein Eintrag in ``rep.warnings`` (beides landet in ``rep.summary()``).
+    Sauberes JSON ohne Ergebnisliste bleibt ein harter Fehler (``GvmError``).
+    """
+    pr = safe_parse_json(text, "greenbone.report", expect=(dict, list))
     rep = ParsedReport(fmt="greenbone-json")
-    if warn:
-        rep.meta["parse_warning"] = warn
-    items = _find_json_results(obj)
-    if items is None:
-        raise GvmError("JSON enthält keine Ergebnisliste (erwartet 'results' bzw. 'result').")
+    _apply_parse_meta(rep, pr)
+    if pr.parse_status == PARSE_EMPTY:
+        rep.warnings.append("Report-JSON ist leer.")
+        return _finish(rep, [], include_log)
+    obj = pr.data
+    if pr.is_line_fallback:
+        # Kein JSON rettbar: strukturierte Zeilen-/Feld-Extraktion als Diagnose,
+        # keine erfundenen Results (ehrlich leer, aber mit Warnung).
+        fb = obj if isinstance(obj, dict) else {}
+        rep.meta["raw_excerpt"] = _redact_excerpt(fb.get("raw_excerpt") or "", 2000)
+        rep.meta["kv_guess"] = {k: _redact_excerpt(f"{k}={v}", 400).split("=", 1)[1]
+                                for k, v in (fb.get("kv_guess") or {}).items()}
+        cves = re.findall(r"CVE-\d{4}-\d{4,7}", str(text or ""), flags=re.I)
+        if cves:
+            rep.meta["cve_guess"] = sorted({c.upper() for c in cves})[:50]
+        return _finish(rep, [], include_log)
+    if pr.parse_status == PARSE_OK:
+        items = _find_json_results(obj)
+        if items is None:
+            raise GvmError("JSON enthält keine Ergebnisliste (erwartet 'results' bzw. 'result').")
+    else:
+        # partial_fallback: eingebettetes (z. B. Banner + Report) oder
+        # abgeschnittenes JSON. Ein einzelnes gerettetes dict wird wie ein Report
+        # gelesen; mehrere gerettete Teilstücke werden auf Result-Objekte gefiltert.
+        items = _find_json_results(obj) if isinstance(obj, dict) else None
+        if items is None:
+            items = _salvaged_results(obj)
+        if not items:
+            rep.warnings.append("Keine vollständigen Result-Objekte rettbar.")
     if isinstance(obj, dict):
         inner = obj.get("report") if isinstance(obj.get("report"), dict) else {}
         rid = obj.get("report_id") or inner.get("id") or inner.get("@id")

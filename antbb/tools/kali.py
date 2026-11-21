@@ -22,7 +22,6 @@ Zirkular-Importe mit dem agents-Package zu vermeiden.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
 import shutil
@@ -38,7 +37,9 @@ from ..agents.base import (
 )
 from ..netutil import host_of
 from .. import wordlists as _wordlists
-from ..parseutil import parse_json_robust
+from .parsers import (
+    PARSE_OK, PARSE_PARTIAL, ParseResult, safe_parse_json, safe_parse_jsonl, unreadable,
+)
 
 # ---------------------------------------------------------------------------
 # Tool-Katalog (Single Source of Truth für die Capability-Registry).
@@ -143,6 +144,9 @@ class KaliAdapter:
 
     def __init__(self, ctx):
         self.ctx = ctx
+        #: Jeder gegriffene Parse-Fallback dieses Adapters (für Aufrufer/Tests):
+        #: {"context", "parse_status", "parse_warning", "parse_method"}.
+        self.parse_events: list[dict] = []
 
     # ---------------- interne Helfer ----------------
     def _log(self, msg: str) -> None:
@@ -150,6 +154,45 @@ class KaliAdapter:
             self.ctx.log(msg)
         except Exception:
             pass
+
+    # ---------------- Parsing (ABPM-12: kein stilles Verwerfen) ----------------
+    def _record_parse_event(self, event: dict) -> None:
+        """Adapter-Liste + Lauf-Kontext (``ctx.parse_events``, falls vorhanden)."""
+        self.parse_events.append(event)
+        ctx_events = getattr(self.ctx, "parse_events", None)
+        if isinstance(ctx_events, list):
+            ctx_events.append(dict(event))
+
+    def _note_parse(self, res: ParseResult) -> ParseResult:
+        """Macht jeden Fallback sichtbar: Scan-Log + ``parse_events``."""
+        if res.parse_warning:
+            self._record_parse_event(res.as_meta())
+            self._log(f"[kali] ⚠️ {res.context or 'parse'} parse_status={res.parse_status} "
+                      f"parse_warning={res.parse_warning}")
+        return res
+
+    def _parse_json(self, raw, context: str, *, expect=(dict, list)) -> ParseResult:
+        return self._note_parse(safe_parse_json(raw, context, expect=expect))
+
+    def _parse_jsonl(self, raw, context: str) -> ParseResult:
+        return self._note_parse(safe_parse_jsonl(raw, context))
+
+    def _read_json_file(self, path: str, context: str, *, expect=(dict, list)) -> ParseResult:
+        """Liest eine Tool-Ausgabedatei und parst sie sicher (I/O-Fehler -> Warnung)."""
+        try:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+        except OSError as exc:
+            return self._note_parse(unreadable(
+                context, f"file_read: {type(exc).__name__}: {exc}"))
+        return self._parse_json(raw, context, expect=expect)
+
+    def _eval_failed(self, context: str, exc: BaseException) -> None:
+        """Fehler bei der Auswertung geparster Daten – nie still schlucken."""
+        warning = f"{context}: auswertung: {type(exc).__name__}: {exc}"[:500]
+        self._record_parse_event({"parse_context": context, "parse_status": PARSE_PARTIAL,
+                                  "parse_method": "evaluation", "parse_warning": warning})
+        self._log(f"[kali] ⚠️ {warning}")
 
     @property
     def _offensive_engaged(self) -> bool:
@@ -281,8 +324,11 @@ class KaliAdapter:
         if not res.ok:
             return []
         out: list[AgentFinding] = []
-        for obj in _iter_jsonl(res.stdout):
-            info = obj.get("info", {}) if isinstance(obj, dict) else {}
+        pr = self._parse_jsonl(res.stdout, "kali.nuclei")
+        for obj in pr.data:
+            if not isinstance(obj, dict):
+                continue
+            info = obj.get("info", {}) if isinstance(obj.get("info"), dict) else {}
             sev = str(info.get("severity", "info")).lower()
             if sev not in ("info", "low", "medium", "high", "critical"):
                 sev = "info"
@@ -301,6 +347,7 @@ class KaliAdapter:
                 status=STATUS_TO_CONFIRM,
                 dedup_key=f"nuclei:{tid}:{matched}",
             ))
+        _annotate_parse(out, pr)
         return out
 
     # ---------------- nikto ----------------
@@ -312,10 +359,10 @@ class KaliAdapter:
         res = await self.run("nikto", argv, target=target, timeout=timeout, offensive=True)
         out: list[AgentFinding] = []
         try:
-            if res.ok and os.path.getsize(tmp.name) > 0:
-                with open(tmp.name, encoding="utf-8", errors="replace") as fh:
-                    data = json.load(fh)
-                items = data.get("vulnerabilities", []) if isinstance(data, dict) else []
+            if res.ok:
+                pr = self._read_json_file(tmp.name, "kali.nikto")
+                items = _collect_items(pr, "vulnerabilities",
+                                       lambda d: "msg" in d or "id" in d)
                 for v in items:
                     msg = v.get("msg", "") if isinstance(v, dict) else str(v)
                     url = v.get("url", target) if isinstance(v, dict) else target
@@ -329,8 +376,9 @@ class KaliAdapter:
                         status=STATUS_TO_CONFIRM,
                         dedup_key=f"nikto:{url}:{v.get('id','') if isinstance(v,dict) else msg[:20]}",
                     ))
-        except Exception:
-            pass
+                _annotate_parse(out, pr)
+        except Exception as exc:
+            self._eval_failed("kali.nikto", exc)
         finally:
             try:
                 os.unlink(tmp.name)
@@ -346,10 +394,13 @@ class KaliAdapter:
         if not res.ok:
             return []
         out: list[AgentFinding] = []
-        for obj in _iter_jsonl(res.stdout):
+        pr = self._parse_jsonl(res.stdout, "kali.whatweb")
+        for obj in pr.data:
             if not isinstance(obj, dict):
                 continue
             plugins = obj.get("plugins", {}) or {}
+            if not isinstance(plugins, dict):
+                continue
             tech = {}
             for pk, pv in plugins.items():
                 ver = ""
@@ -372,6 +423,7 @@ class KaliAdapter:
                 status=STATUS_PASSIVE,
                 dedup_key=f"whatweb:{obj.get('target', target)}",
             ))
+        _annotate_parse(out, pr)
         return out
 
     # ---------------- wafw00f ----------------
@@ -383,10 +435,9 @@ class KaliAdapter:
         res = await self.run("wafw00f", argv, target=target, timeout=timeout, offensive=False)
         out: list[AgentFinding] = []
         try:
-            if res.ok and os.path.getsize(tmp.name) > 0:
-                with open(tmp.name, encoding="utf-8", errors="replace") as fh:
-                    data = json.load(fh)
-                rows = data if isinstance(data, list) else [data]
+            if res.ok:
+                pr = self._read_json_file(tmp.name, "kali.wafw00f")
+                rows = _collect_items(pr, "", lambda d: "firewall" in d or "detected" in d)
                 for r in rows:
                     if not isinstance(r, dict):
                         continue
@@ -402,8 +453,9 @@ class KaliAdapter:
                         status=STATUS_PASSIVE,
                         dedup_key=f"wafw00f:{r.get('url', target)}",
                     ))
-        except Exception:
-            pass
+                _annotate_parse(out, pr)
+        except Exception as exc:
+            self._eval_failed("kali.wafw00f", exc)
         finally:
             try:
                 os.unlink(tmp.name)
@@ -456,10 +508,11 @@ class KaliAdapter:
         res = await self.run("ffuf", argv, target=scope_target, timeout=timeout, offensive=True)
         out: list[AgentFinding] = []
         try:
-            if res.ok and os.path.getsize(tmp.name) > 0:
-                with open(tmp.name, encoding="utf-8", errors="replace") as fh:
-                    data = json.load(fh)
-                for r in (data.get("results", []) if isinstance(data, dict) else []):
+            if res.ok:
+                pr = self._read_json_file(tmp.name, "kali.ffuf")
+                for r in _collect_items(pr, "results", lambda d: "url" in d and "status" in d):
+                    if not isinstance(r, dict):
+                        continue
                     url = r.get("url", scope_target)
                     status = r.get("status", 0)
                     out.append(AgentFinding(
@@ -471,8 +524,9 @@ class KaliAdapter:
                         status=STATUS_TO_CONFIRM,
                         dedup_key=f"content-discovery:{url}",
                     ))
-        except Exception:
-            pass
+                _annotate_parse(out, pr)
+        except Exception as exc:
+            self._eval_failed("kali.ffuf", exc)
         finally:
             try:
                 os.unlink(tmp.name)
@@ -524,13 +578,13 @@ class KaliAdapter:
         if not res.ok:
             return []
         out: list[AgentFinding] = []
-        data, warn = parse_json_robust(res.stdout or "", expect=dict)
-        if data is None or not isinstance(data, dict):
-            # strukturierter Fallback — Output nicht verwerfen
-            if warn:
-                self._log(f"[kali] wpscan parse_warning={warn}")
+        pr = self._parse_json(res.stdout, "kali.wpscan", expect=dict)
+        if pr.is_line_fallback or not isinstance(pr.data, dict):
+            # Kein verwertbares wpscan-JSON: Warnung ist bereits geloggt + in parse_events.
             return out
-        version = (data.get("version") or {}).get("number") if isinstance(data, dict) else None
+        data = pr.data
+        ver_obj = data.get("version")
+        version = ver_obj.get("number") if isinstance(ver_obj, dict) else None
         if version:
             out.append(AgentFinding(
                 agent=agent, title=f"WordPress erkannt: {version}",
@@ -541,6 +595,7 @@ class KaliAdapter:
                 status=STATUS_PASSIVE,
                 dedup_key=f"wpscan-version:{target}",
             ))
+        _annotate_parse(out, pr)
         return out
 
     # ---------------- sslscan ----------------
@@ -584,7 +639,8 @@ class KaliAdapter:
         if not res.ok:
             return []
         out: list[AgentFinding] = []
-        for obj in _iter_jsonl(res.stdout):
+        pr = self._parse_jsonl(res.stdout, "kali.trufflehog")
+        for obj in pr.data:
             if not isinstance(obj, dict):
                 continue
             detector = obj.get("DetectorName") or obj.get("DetectorType") or "secret"
@@ -616,6 +672,7 @@ class KaliAdapter:
                 status=(STATUS_VERIFIED if verified else STATUS_TO_CONFIRM),
                 dedup_key=f"secret:{detector}:{where}:{mask_secret(raw)}",
             ))
+        _annotate_parse(out, pr)
         return out
 
     # ---------------- metasploit auxiliary/scanner ----------------
@@ -714,13 +771,10 @@ class KaliAdapter:
             self._log(f"[kali] ❌ searchsploit Fehler: {exc}")
             return []
         out = []
-        raw = (proc.stdout or b"").decode("utf-8", "replace")
-        data, warn = parse_json_robust(raw, expect=(dict, list))
-        if warn:
-            self._log(f"[kali] searchsploit parse_warning={warn}")
-        if isinstance(data, dict):
-            results = data.get("RESULTS_EXPLOIT", []) or []
-        else:
+        pr = self._parse_json(proc.stdout or b"", "kali.searchsploit", expect=dict)
+        data = pr.data if isinstance(pr.data, dict) and not pr.is_line_fallback else {}
+        results = data.get("RESULTS_EXPLOIT", []) or []
+        if not isinstance(results, list):
             results = []
         for r in results[:10]:
             if not isinstance(r, dict):
@@ -735,6 +789,7 @@ class KaliAdapter:
                 status=STATUS_REFERENCE,
                 dedup_key=f"searchsploit:{term}:{r.get('Path','')}",
             ))
+        _annotate_parse(out, pr)
         return out
 
 
@@ -820,27 +875,48 @@ class KaliAdapter:
 # ===========================================================================
 # Parser-Hilfen
 # ===========================================================================
-def _iter_jsonl(text: str):
-    """NDJSON-Iterator mit strukturiertem Fallback (kein stilles Verwerfen)."""
-    warnings = []
-    for line in (text or "").splitlines():
-        line = line.strip()
-        if not line or not (line.startswith("{") or line.startswith("[")):
-            continue
-        obj, warn = parse_json_robust(line, expect=(dict, list))
-        if warn:
-            warnings.append(warn)
-        if obj is None:
-            continue
-        if isinstance(obj, dict) and obj.get("parse_warning"):
-            # Zeilen-Fallback: als markiertes Objekt weitergeben
-            yield {"_parse_warning": True, "raw_excerpt": obj.get("raw_excerpt", line)[:500]}
-            continue
-        yield obj
-    if warnings:
-        # ein einziges Meta-Yield am Ende, falls alles fehlschlug, vermeiden wir
-        # Spam — Aufrufer sehen parse_warning in einzelnen Objekten.
-        pass
+def _collect_items(pr: ParseResult, list_key: str, looks_like) -> list:
+    """Holt die Ergebnis-Einträge aus einem (ggf. teilweise geretteten) Parse.
+
+    * sauberes/eingebettetes dict mit ``list_key`` -> dessen Liste
+    * Liste (Tool-Format ODER mehrere gerettete Objekte aus abgeschnittenem
+      JSON) -> Einträge mit ``list_key`` aufklappen, sonst nur Objekte, die per
+      ``looks_like`` wie ein Eintrag aussehen (keine Fremdobjekte als Fund)
+    * Zeilen-Fallback/leer -> ``[]`` (Warnung ist bereits sichtbar)
+    """
+    data = pr.data
+    if data is None or pr.is_line_fallback:
+        return []
+    if isinstance(data, dict):
+        if list_key and isinstance(data.get(list_key), list):
+            return list(data[list_key])
+        return [data] if looks_like(data) else []
+    if isinstance(data, list):
+        out: list = []
+        for el in data:
+            if not isinstance(el, dict):
+                continue
+            if list_key and isinstance(el.get(list_key), list):
+                out.extend(el[list_key])
+            elif looks_like(el):
+                out.append(el)
+        return out
+    return []
+
+
+def _annotate_parse(findings: list, pr: ParseResult) -> None:
+    """Hängt parse_status/parse_warning an die Evidence, wenn ein Fallback griff.
+
+    Bei sauberem Parse bleibt die Evidence unverändert (kompatibel); bei
+    ``partial_fallback`` ist an JEDEM daraus entstandenen Fund sichtbar, dass
+    die Tool-Ausgabe nicht vollständig sauber war.
+    """
+    if pr.parse_status == PARSE_OK or not pr.parse_warning:
+        return
+    meta = pr.as_meta()
+    for f in findings:
+        if isinstance(getattr(f, "evidence", None), dict):
+            f.evidence.update(meta)
 
 
 _NMAP_PORT_RE = re.compile(
@@ -1045,8 +1121,10 @@ def _extract_oast_domain(line: str) -> str:
         return ""
     # JSON-Form: {"domain":"abcd.oast.fun", ...} o.ä.
     if line.startswith("{"):
-        obj, _warn = parse_json_robust(line, expect=dict)
-        if isinstance(obj, dict) and not obj.get("parse_warning"):
+        # JSON-Zeile; sonst (oder bei Zeilen-Fallback) unten Regex auf den Rohtext.
+        pr = safe_parse_json(line, "kali.interactsh", expect=dict)
+        obj = pr.data
+        if isinstance(obj, dict) and not pr.is_line_fallback:
             for k in ("domain", "Domain", "full-id", "host"):
                 v = obj.get(k)
                 if isinstance(v, str) and v:
@@ -1063,8 +1141,9 @@ def _tokens_in_interaction(line: str) -> list:
     out: list = []
     full = ""
     if line.startswith("{"):
-        obj, _warn = parse_json_robust(line, expect=dict)
-        if isinstance(obj, dict) and not obj.get("parse_warning"):
+        pr = safe_parse_json(line, "kali.interactsh", expect=dict)
+        obj = pr.data
+        if isinstance(obj, dict) and not pr.is_line_fallback:
             full = (obj.get("full-id") or obj.get("fullId") or
                     obj.get("host") or obj.get("unique-id") or "")
             # Interaktionstyp vorhanden? (dns/http) – nur echte Interaktionen.

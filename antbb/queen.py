@@ -47,6 +47,8 @@ class SwarmResult:
     parent_finding_id: Optional[int] = None
     llm_status: str = ""
     llm_model: str = ""
+    #: Parse-Fallbacks der Tool-Adapter in diesem Lauf (aus ctx.parse_events).
+    parse_events: list = field(default_factory=list)
 
     @property
     def duration(self) -> float:
@@ -291,6 +293,12 @@ class Queen:
         # Priorisierung
         collected.sort(key=lambda f: _SEV_RANK.get(f.severity, 0), reverse=True)
         result.findings = collected
+        result.parse_events = list(ctx.parse_events)
+        if result.parse_events:
+            ctxs = sorted({str(e.get("parse_context") or "?") for e in result.parse_events})
+            ctx.log(f"👑 ⚠️ Parse-Fallback in {len(result.parse_events)} Tool-Ausgabe(n) "
+                    f"({', '.join(ctxs)[:200]}) – Funde daraus tragen parse_warning; "
+                    f"fehlende Funde sind hier kein Nachweis für Abwesenheit.")
         result.finished_at = time.time()
         try:
             self.store.set_scan_run_status(run_id, "done")

@@ -153,6 +153,11 @@ class AgentContext:
     soldier_overrides: dict = field(default_factory=dict)
     #: Soldaten-Mems {soldier: [text, ...]} – als Lauf-Kontext mitgegeben.
     soldier_mems: dict = field(default_factory=dict)
+    #: Parse-Fallbacks der Tool-Adapter in diesem Lauf (ABPM-12/13), je
+    #: {"parse_context", "parse_status", "parse_method", "parse_warning"}.
+    #: Macht sichtbar, wenn Tool-Ausgaben nur teilweise lesbar waren – auch
+    #: dann, wenn daraus KEIN Fund entstand.
+    parse_events: list = field(default_factory=list)
 
     @property
     def llm_ready(self) -> bool:

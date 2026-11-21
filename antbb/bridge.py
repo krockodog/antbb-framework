@@ -27,8 +27,45 @@ OFFENSIVE_VISIBLE = frozenset({
 })
 
 
+#: Obergrenze für mitgeführte Parse-Ereignisse in Bridge-Antworten/Evidence.
+MAX_PARSE_EVENTS = 20
+
+
 def new_run_group_id() -> str:
     return "rg-" + uuid.uuid4().hex[:12]
+
+
+def parse_info(evidence: Any) -> Optional[dict]:
+    """parse_status/parse_warning aus einer Finding-Evidence (ABPM-12), sonst None.
+
+    Nur gesetzt, wenn der Fund aus einer NICHT sauber geparsten Tool-Ausgabe
+    stammt; bei sauberem Parse trägt die Evidence diese Felder nicht.
+    """
+    if not isinstance(evidence, dict):
+        return None
+    status = evidence.get("parse_status")
+    warning = evidence.get("parse_warning")
+    if not status and not warning:
+        return None
+    info = {"parse_status": str(status or ""), "parse_warning": str(warning or "")}
+    for key in ("parse_context", "parse_method"):
+        if evidence.get(key):
+            info[key] = str(evidence[key])
+    return info
+
+
+def _red_verify_parse(swarm) -> dict:
+    """Parse-Lage eines Red-Verify-Laufs: Adapter-Ereignisse + betroffene Funde."""
+    events = list(getattr(swarm, "parse_events", None) or [])
+    degraded_findings = sum(
+        1 for f in (getattr(swarm, "findings", None) or [])
+        if parse_info(getattr(f, "evidence", None)))
+    return {
+        "parse_degraded": bool(events or degraded_findings),
+        "parse_event_count": len(events),
+        "parse_events": events[:MAX_PARSE_EVENTS],
+        "parse_degraded_findings": degraded_findings,
+    }
 
 
 def colony_of_run_id(run_id: Optional[str]) -> str:
@@ -83,6 +120,11 @@ def list_blue_visible_findings(store, *, source_colony: str = "blue",
             except json.JSONDecodeError:
                 ev = {}
         item["evidence"] = ev
+        # ABPM-13: Herkunft aus teilweise unlesbarer Tool-Ausgabe sofort sichtbar.
+        pinfo = parse_info(ev)
+        if pinfo:
+            item["parse_status"] = pinfo["parse_status"]
+            item["parse_warning"] = pinfo["parse_warning"]
         cat = str(item.get("category") or "")
         is_blue = cat.startswith("blue-")
         colony = finding_source_colony(item)
@@ -162,6 +204,7 @@ def remediate_and_recheck(
         except json.JSONDecodeError:
             ev = {}
     finding["evidence"] = ev
+    source_parse = parse_info(ev)   # Fund stammt aus teilweise unlesbarer Ausgabe?
     tid = int(finding["target_id"])
     parent_id = int(finding_id)
     # Korrelationskette: bestehende run_group_id übernehmen oder neu
@@ -309,7 +352,13 @@ def remediate_and_recheck(
                 "finding_count": len(swarm.findings),
                 "related_open": len(related),
                 "by_status": swarm.by_status(),
+                **_red_verify_parse(swarm),
             }
+            if red_verify["parse_degraded"] and not related:
+                # Ausgang bleibt wie berechnet; nur ehrlich kennzeichnen.
+                red_verify["note"] = (
+                    "Red-Verify ohne Gegenbefund, aber Tool-Ausgaben waren teilweise "
+                    "unlesbar (parse_warning) – fehlende Funde sind kein Nachweis.")
         except Exception as exc:
             red_verify = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
@@ -329,6 +378,7 @@ def remediate_and_recheck(
             "bridge_outcome": outcome,
             "apply": apply_result,
             "llm_plan": llm_plan,
+            **({"source_parse": source_parse} if source_parse else {}),
         },
     )
     # Wenn mitigiert: close_finding-Pfad für blue-* (status GESCHLOSSEN parallel)
@@ -350,6 +400,7 @@ def remediate_and_recheck(
         "red_verify": red_verify,
         "apply": apply_result,
         "llm_plan": llm_plan,
+        "source_parse": source_parse,
     }
 
 
