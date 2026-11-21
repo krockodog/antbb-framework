@@ -14,13 +14,33 @@ import pytest
 from fastapi.testclient import TestClient
 
 from antbb import governance as gov
+from antbb import webauth
+from antbb.store import Store
 from antbb.web import app as webapp
+
+# Eigenes Test-Admin-Konto (nie ein echtes Secret aus der Umgebung).
+ADMIN_USER = "gov-test-admin"
+ADMIN_PW = "GovTest!Admin-1"
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTBB_HOSTED", raising=False)
     monkeypatch.setenv("ANTBB_TESTING", "1")
+    # Auth wie in Produktion: eingeloggter Admin, isolierte Temp-DB pro Test.
+    # Echte Zugangsdaten aus der Umgebung werden für den Test überschrieben.
+    monkeypatch.setenv("ANTBB_AUTH", "1")
+    monkeypatch.setenv("ANTBB_ADMIN_USER", ADMIN_USER)
+    monkeypatch.setenv("ANTBB_ADMIN_PASSWORD", ADMIN_PW)
+    monkeypatch.delenv("ANTBB_ADMIN_PASSWORD_HASH", raising=False)
+    monkeypatch.setenv("ANTBB_DATA", str(tmp_path))
+    monkeypatch.setenv("ANTBB_TOTP_KEY", "")
+    # governance cached "Schema bereit" per id(conn); frische Temp-DB -> frischer Cache.
+    monkeypatch.setattr(gov, "_READY", set())
+    webauth.reset_login_throttle()
+    prev_store = webapp.svc.store
+    webapp.svc.store = Store(str(tmp_path / "governance.db"))
+    webauth.bootstrap_admin(webapp.svc.store)
     started = threading.Event()
 
     def fake_run_scan(target_id, emit=None, **kw):
@@ -31,16 +51,24 @@ def client(monkeypatch):
         raise RuntimeError("not cancelled")
 
     monkeypatch.setattr(webapp.svc, "run_scan", fake_run_scan)
-    with TestClient(webapp.app) as c:
-        c.started = started
-        yield c
-    st = webapp.svc.store
-    gov.reset_kill(st, actor="test", role="admin")
-    for _ in range(100):
-        if webapp.SCAN_STATE.get("status") != "running":
-            break
-        webapp.SCAN_STATE["cancel_requested"] = True
-        time.sleep(0.05)
+    try:
+        with TestClient(webapp.app, headers={"origin": "http://testserver"}) as c:
+            r = c.post("/login", data={"username": ADMIN_USER, "password": ADMIN_PW,
+                                       "next": "/"}, follow_redirects=False)
+            assert r.status_code in (302, 303), r.text
+            c.started = started
+            yield c
+        st = webapp.svc.store
+        gov.reset_kill(st, actor="test", role="admin")
+        for _ in range(100):
+            if webapp.SCAN_STATE.get("status") != "running":
+                break
+            webapp.SCAN_STATE["cancel_requested"] = True
+            time.sleep(0.05)
+    finally:
+        webapp.svc.store.close()
+        webapp.svc.store = prev_store
+        webauth.reset_login_throttle()
 
 
 def _target(client, mode="auto"):

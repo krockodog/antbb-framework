@@ -1,5 +1,7 @@
 """DE/EN catalogs stay in lockstep, and converted pages have no hardcoded German."""
 import re
+
+import pytest
 from pathlib import Path
 
 from antbb.i18n import DEFAULT, catalogs, resolve_lang, t
@@ -86,9 +88,33 @@ def test_unknown_language_falls_back_to_german():
     assert german_hint != english_hint
 
 
-def test_switcher_renders_and_preserves_the_query():
+@pytest.fixture
+def isolated_app(monkeypatch, tmp_path):
+    """Web-App mit eigener Temp-DB und Test-Admin (keine geteilte DB, keine echten Secrets)."""
+    from antbb import webauth
+    from antbb.store import Store
+    from antbb.web.app import app, svc
+    monkeypatch.setenv("ANTBB_ADMIN_USER", "i18n-test-admin")
+    monkeypatch.setenv("ANTBB_ADMIN_PASSWORD", "I18nTest!Admin-1")
+    monkeypatch.delenv("ANTBB_ADMIN_PASSWORD_HASH", raising=False)
+    monkeypatch.delenv("ANTBB_HOSTED", raising=False)
+    monkeypatch.setenv("ANTBB_DATA", str(tmp_path))
+    from antbb import governance as gov
+    # governance cached "Schema bereit" per id(conn); frische Temp-DB -> frischer Cache.
+    monkeypatch.setattr(gov, "_READY", set())
+    prev_store = svc.store
+    svc.store = Store(str(tmp_path / "i18n.db"))
+    try:
+        yield app
+    finally:
+        svc.store.close()
+        svc.store = prev_store
+        webauth.reset_login_throttle()
+
+
+def test_switcher_renders_and_preserves_the_query(isolated_app):
     from fastapi.testclient import TestClient
-    from antbb.web.app import app
+    app = isolated_app
 
     with TestClient(app) as client:
         page = client.get("/login?lang=en&next=/assets")

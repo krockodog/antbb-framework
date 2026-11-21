@@ -104,15 +104,21 @@ def test_scan_gates_server_side(hosted_env):
     from antbb.oversight import OversightError
     from antbb.service import AntBBService as Service
 
-    svc = Service()
-    tid = svc.add_target("hosted-gate-test")
-    with pytest.raises(OversightError):
-        svc.run_scan(tid)
-    svc.set_oversight(tid, True)
-    with pytest.raises(OversightError, match="Scope"):
-        svc.run_scan(tid)
-    with pytest.raises(OversightError):
-        svc.run_blue(apply_fixes=True)
+    import os
+    # Eigene Temp-DB explizit übergeben: Store()-Default (DEFAULT_DB_PATH) wird
+    # beim Import fixiert und würde sonst eine geteilte DB benutzen.
+    svc = Service(db_path=os.environ["ANTBB_DB"])
+    try:
+        tid = svc.add_target("hosted-gate-test")
+        with pytest.raises(OversightError):
+            svc.run_scan(tid)
+        svc.set_oversight(tid, True)
+        with pytest.raises(OversightError, match="Scope"):
+            svc.run_scan(tid)
+        with pytest.raises(OversightError):
+            svc.run_blue(apply_fixes=True)
+    finally:
+        svc.close()
 
 
 def test_viewer_is_read_only_in_hosted_mode(hosted_env, tmp_path):
