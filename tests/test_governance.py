@@ -210,3 +210,64 @@ def test_role_permissions_scope_and_killswitch():
     assert gov.status(user={"role": "member_plus"})["viewer"]["can_kill"] is True
     assert gov.status(user={"role": "member"})["viewer"]["can_kill"] is False
     assert gov.status(user={"role": "admin"})["viewer"]["can_kill"] is True
+
+
+def test_kill_switch_blocks_remediate_recheck_then_reset(client, monkeypatch):
+    """Kill Switch aktiv -> remediate-recheck wird an der Startprüfung hart
+    geblockt (423, Service wird NICHT aufgerufen). Nach Reset läuft der Pfad
+    wieder normal durch die üblichen Gates (Oversight-Gate bleibt wirksam)."""
+    from antbb import remediation
+    monkeypatch.setattr(remediation, "llm_suggest_remediation",
+                        lambda finding, svc=None, max_retries=1: {"ok": True})
+    tid, name = _target(client)
+    st = webapp.svc.store
+    fid = st.add_finding(target_id=tid, run_id="run-ks-1", agent="scanning",
+                         title="Fehlender Security-Header: strict-transport-security",
+                         category="misconfig", severity="low", asset=f"https://{name}",
+                         evidence={"missing_header": "strict-transport-security"},
+                         dedup_key=f"hdr:https://{name}:strict-transport-security",
+                         status="ZU BESTÄTIGEN", source_colony="offensive")
+    calls = []
+    real = webapp.svc.remediate_and_recheck
+
+    def spy(*a, **kw):
+        calls.append((a, kw))
+        return real(*a, **kw)
+
+    monkeypatch.setattr(webapp.svc, "remediate_and_recheck", spy)
+    url = f"/api/blue/findings/{fid}/remediate-recheck"
+
+    assert client.post("/api/governance/kill", json={"confirm": "STOP"}).status_code == 200
+    for body in ({"oversight_ack": True, "trigger_red_verify": True},
+                 {"oversight_ack": True, "apply_fix": True},
+                 {}):
+        r = client.post(url, json=body)
+        assert r.status_code == 423 and r.json()["kill_switch"] is True
+    r = client.post(url + "/", json={"oversight_ack": True})
+    assert r.status_code == 423
+    assert calls == []                                   # kein Lauf, kein Service-Aufruf
+    assert st.get_finding(fid)["status"] == "ZU BESTÄTIGEN"
+    blocked = [e for e in client.get("/api/governance/audit?limit=10").json()["entries"]
+               if e["action"] == "Fix + Re-Check"]
+    assert blocked and all(e["result"] == "blocked" for e in blocked)
+
+    assert client.post("/api/governance/reset", json={"confirm": "RESET"}).status_code == 200
+    # Nach Reset: Startprüfung passiert, übliche Gates greifen weiter
+    # (oversight_ack=False -> Red-Re-Check durch enforce_active_oversight blockiert).
+    r = client.post(url, json={"oversight_ack": False, "trigger_red_verify": True})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert len(calls) == 1
+    assert out["red_verify"]["ok"] is False and "BLOCKIERT" in out["red_verify"]["error"]
+    assert out["outcome"] == "STILL_OPEN"
+    entries = client.get("/api/governance/audit?limit=5").json()["entries"]
+    assert entries[0]["action"] == "Fix + Re-Check" and entries[0]["result"] == "started"
+
+
+def test_run_start_covers_remediate_recheck():
+    from antbb.web import governance_routes as gr
+    for path in ("/api/blue/findings/7/remediate-recheck",
+                 "/api/blue/findings/7/remediate-recheck/"):
+        hit = gr._match_run(path)
+        assert hit is not None and hit[1] == "blue-remediation"
+    assert gr._match_run("/api/blue/findings/x/remediate-recheck") is None

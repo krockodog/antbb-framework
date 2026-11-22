@@ -59,6 +59,11 @@ RUN_START = (
     (re.compile(r"^/api/blue/jobs/tick$"), "blue-jobs", "Blue-Job-Tick", "LOW"),
     (re.compile(r"^/api/blue/greenbone/scan$"), "blue-greenbone", "Greenbone-Scan", "MEDIUM"),
     (re.compile(r"^/api/blue/findings/(\d+)/apply$"), "blue-remediation", "Fix anwenden", "HIGH"),
+    # Fix + Red-Re-Check (Brücke): startet einen eng begrenzten Lauf -> ebenfalls
+    # vom Kill Switch gesperrt. Ohne Capture-Group: die ID ist eine Finding-ID,
+    # keine Target-ID (Audit-Target bleibt leer statt falsch aufgelöst).
+    (re.compile(r"^/api/blue/findings/\d+/remediate-recheck/?$"), "blue-remediation",
+     "Fix + Re-Check", "HIGH"),
     (re.compile(r"^/(api/)?osint/run$"), "osint", "OSINT-Lauf", "SAFE"),
     (re.compile(r"^/yellow/upload$"), "yellow-queen", "RE-Analyse", "LOW"),
     (re.compile(r"^/api/wlan/offensive/[^/]+$"), "wlan", "WLAN offensiv", "HIGH"),
