@@ -6,7 +6,10 @@ api/main.py; Standalone: antbb/web/app.py).
 """
 from __future__ import annotations
 
+import json
+import logging
 import re
+import sqlite3
 import time
 from typing import Optional
 
@@ -14,6 +17,8 @@ from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from .. import governance as gov
+
+log = logging.getLogger("antbb.governance.middleware")
 
 
 def _user(request: Optional[Request]) -> dict:
@@ -76,6 +81,55 @@ OVERSIGHT_PATHS = (re.compile(r"^/api/targets/(\d+)/oversight$"),
                    re.compile(r"^/target/(\d+)/oversight$"))
 
 
+# Pfade, die die Middleware NIE blockiert (auch nicht fail-closed), damit die
+# App bei einem Store-/Governance-Fehler erreichbar und wieder anmeldbar bleibt.
+# Sie starten keine Läufe und überschneiden sich nicht mit RUN_START/OVERSIGHT.
+FAIL_CLOSED_EXEMPT = (
+    re.compile(r"^/api/health(/[^/]+)?/?$"),
+    re.compile(r"^/(login|logout)/?$"),
+    re.compile(r"^/static/"),
+)
+
+# Fehler beim Laden des Stores / Lesen des Kill-Switch-Status -> fail-closed.
+_STATE_ERRORS = (sqlite3.Error, OSError, RuntimeError, AttributeError, ImportError,
+                 json.JSONDecodeError, TypeError, ValueError)
+
+
+def _is_exempt(path: str) -> bool:
+    return any(rx.match(path or "") for rx in FAIL_CLOSED_EXEMPT)
+
+
+def _kill_active_strict(store) -> bool:
+    """Kill-Switch-Status STRIKT lesen. Anders als gov.is_halted()/kill_state()
+    (die Lesefehler zu "nicht aktiv" machen) wirft diese Funktion bei
+    unlesbarem Status, damit die Middleware fail-closed blocken kann."""
+    raw = store.get_setting(gov.KILL_KEY, "")
+    if not raw:
+        return False
+    st = json.loads(raw)
+    if not isinstance(st, dict):
+        raise ValueError("Kill-Switch-Status hat kein gültiges Format")
+    return bool(st.get("active"))
+
+
+def _fail_closed_response(request: Request, path: str, store, actor: str, role: str,
+                          kind: str, label: str, exc: BaseException):
+    """Kontrolliert blocken (503), Fehlerfall loggen + auditieren (best effort)."""
+    err = type(exc).__name__
+    log.warning("Governance fail-closed: %s %s blockiert (%s: %s)", request.method, path, kind, err)
+    gov.audit(store, actor=actor, role=role, agent="governance",
+              action=label or "Lauf/Freigabe", risk="HIGH", result="blocked",
+              detail=f"fail-closed: Governance-Status nicht lesbar ({kind}: {err})")
+    detail = ("Governance-/Kill-Switch-Status nicht lesbar: Anfrage aus Sicherheitsgründen "
+              "blockiert (fail-closed). Bitte Admin informieren.")
+    if "text/html" in (request.headers.get("accept") or "") and not path.startswith("/api"):
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(f"<h2>⛔ Blockiert</h2><pre>{detail}</pre><a href=\"/\">Zurück</a>",
+                            status_code=503)
+    return JSONResponse({"detail": detail, "fail_closed": True, "kill_switch": "unknown"},
+                        status_code=503)
+
+
 def _match_run(path: str):
     for rx, agent, label, risk in RUN_START:
         m = rx.match(path)
@@ -100,20 +154,32 @@ def install_middleware(app: FastAPI, store_getter=None) -> None:
     async def governance_guard(request: Request, call_next):
         path = request.url.path
         method = request.method.upper()
-        if method != "POST":
+        if method != "POST" or _is_exempt(path):
             return await call_next(request)
         hit = _match_run(path)
         ovs = None if hit else next((rx.match(path) for rx in OVERSIGHT_PATHS if rx.match(path)), None)
         if not hit and not ovs:
             return await call_next(request)
+        actor, role = _actor(request)
+        label = hit[2] if hit else "Oversight-Freigabe"
+        # fail-closed: Store nicht ladbar -> NICHT durchlassen. Unerwartete
+        # Fehler außerhalb _STATE_ERRORS werden nicht gefangen und enden als
+        # 500 – ebenfalls ohne den Request weiterzureichen.
         try:
             store = getter()
-        except Exception:  # noqa: BLE001
-            return await call_next(request)
-        actor, role = _actor(request)
+            if store is None:
+                raise RuntimeError("kein Store")
+        except _STATE_ERRORS as exc:
+            return _fail_closed_response(request, path, None, actor, role,
+                                         "store", label, exc)
         if hit:
             m, agent, label, risk = hit
-            if gov.is_halted(store):
+            try:
+                halted = _kill_active_strict(store)
+            except _STATE_ERRORS as exc:
+                return _fail_closed_response(request, path, store, actor, role,
+                                             "kill_switch", label, exc)
+            if halted:
                 target, tid = ("", None) if agent in ("hub-run",) else _target_name(store, m)
                 gov.audit(store, actor=actor, role=role, agent=agent,
                           action=label or f"Lauf {m.group(1)}", target=target, target_id=tid,

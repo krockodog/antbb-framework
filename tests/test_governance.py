@@ -1,5 +1,7 @@
 """Governance: Risikoklassen, Scope-Policy-Gate (nur verschärfend), Audit, Kill Switch."""
+import json
 import os
+import sqlite3
 import sys
 import threading
 import time
@@ -271,3 +273,124 @@ def test_run_start_covers_remediate_recheck():
         hit = gr._match_run(path)
         assert hit is not None and hit[1] == "blue-remediation"
     assert gr._match_run("/api/blue/findings/x/remediate-recheck") is None
+
+
+# ---------------------------------------------------------------------------
+# Kill-Switch-Middleware fail-closed (Store/Status nicht lesbar)
+# ---------------------------------------------------------------------------
+def _mini_app(getter):
+    """Kleine App mit der ECHTEN Governance-Middleware und neutralen Routen."""
+    from fastapi import FastAPI
+    from antbb.web import governance_routes as gr
+    app = FastAPI()
+    hits = []
+
+    @app.post("/api/targets/{tid}/scan")
+    def scan(tid: int):
+        hits.append(("scan", tid))
+        return {"started": True}
+
+    @app.post("/api/blue/findings/{fid}/remediate-recheck")
+    def rr(fid: int):
+        hits.append(("rr", fid))
+        return {"ok": True}
+
+    @app.post("/api/targets/{tid}/oversight")
+    def ovs(tid: int):
+        hits.append(("oversight", tid))
+        return {"ok": True}
+
+    @app.get("/api/health")
+    def health():
+        return {"ok": True}
+
+    @app.post("/login")
+    def login():
+        hits.append(("login", 0))
+        return {"ok": True}
+
+    @app.post("/api/blue/findings/{fid}/notes")
+    def other(fid: int):
+        hits.append(("other", fid))
+        return {"ok": True}
+
+    gr.install_middleware(app, store_getter=getter)
+    app.state.hits = hits
+    return app
+
+
+def _broken_getter():
+    raise sqlite3.OperationalError("unable to open database file")
+
+
+def test_middleware_fail_closed_when_store_cannot_load(caplog):
+    app = _mini_app(_broken_getter)
+    with TestClient(app) as c, caplog.at_level("WARNING", logger="antbb.governance.middleware"):
+        for path in ("/api/targets/1/scan", "/api/blue/findings/3/remediate-recheck",
+                     "/api/targets/1/oversight"):
+            r = c.post(path, json={})
+            assert r.status_code == 503, path
+            assert r.json()["fail_closed"] is True
+        assert app.state.hits == []                        # nichts durchgelassen
+        # Ausnahmen bleiben erreichbar (App nicht "aussperren")
+        assert c.get("/api/health").status_code == 200
+        assert c.post("/login").status_code == 200
+        # Nicht geschützte Routen sind unberührt
+        assert c.post("/api/blue/findings/3/notes").status_code == 200
+    assert app.state.hits == [("login", 0), ("other", 3)]
+    assert any("fail-closed" in r.getMessage() for r in caplog.records)
+
+
+def test_middleware_fail_closed_on_unreadable_kill_state(tmp_path):
+    st = Store(str(tmp_path / "ks.db"))
+    try:
+        st.set_setting(gov.KILL_KEY, "{kaputt")            # Status unlesbar
+        assert gov.is_halted(st) is False                  # alter Pfad: fail-open
+        app = _mini_app(lambda: st)
+        with TestClient(app) as c:
+            r = c.post("/api/targets/1/scan", json={})
+            assert r.status_code == 503 and r.json()["kill_switch"] == "unknown"
+            assert c.post("/api/blue/findings/3/remediate-recheck", json={}).status_code == 503
+            assert app.state.hits == []
+            entries = gov.list_audit(st, limit=5, full=True)
+            assert entries and entries[0]["result"] == "blocked"
+            assert "fail-closed" in entries[0]["detail"]
+            # Status wieder gültig -> normaler Ablauf durch die Middleware
+            st.set_setting(gov.KILL_KEY, json.dumps({"active": False}))
+            assert c.post("/api/targets/1/scan", json={}).status_code == 200
+            st.set_setting(gov.KILL_KEY, json.dumps({"active": True}))
+            assert c.post("/api/targets/1/scan", json={}).status_code == 423
+        assert app.state.hits == [("scan", 1)]
+    finally:
+        st.close()
+
+
+def test_middleware_fail_closed_real_app_unreadable_kill_state(client):
+    """Echte App (Auth + Middleware): Kill-Switch-Status unlesbar -> Scan-Start
+    und remediate-recheck 503, kein Lauf; Health und Login bleiben erreichbar."""
+    tid, _ = _target(client)
+    st = webapp.svc.store
+    st.set_setting(gov.KILL_KEY, "[kein-dict]")
+    try:
+        r = client.post(f"/api/targets/{tid}/scan", json={})
+        assert r.status_code == 503 and r.json()["fail_closed"] is True
+        assert client.post("/api/blue/findings/1/remediate-recheck",
+                           json={}).status_code == 503
+        assert not client.started.is_set()
+        assert client.get("/api/health").status_code == 200
+        r = client.post("/login", data={"username": ADMIN_USER, "password": ADMIN_PW,
+                                        "next": "/"}, follow_redirects=False)
+        assert r.status_code in (302, 303)
+    finally:
+        st.set_setting(gov.KILL_KEY, json.dumps({"active": False}))
+    assert client.post(f"/api/targets/{tid}/scan", json={}).status_code == 200
+
+
+def test_fail_closed_exemptions_do_not_overlap_protected_paths():
+    from antbb.web import governance_routes as gr
+    for p in ("/api/health", "/api/health/red", "/login", "/logout", "/static/app.js"):
+        assert gr._is_exempt(p)
+        assert gr._match_run(p) is None
+    for p in ("/api/targets/1/scan", "/api/blue/findings/1/remediate-recheck",
+              "/api/governance/kill", "/api/targets/1/oversight"):
+        assert not gr._is_exempt(p)
