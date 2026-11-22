@@ -6,10 +6,8 @@ api/main.py; Standalone: antbb/web/app.py).
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
-import sqlite3
 import time
 from typing import Optional
 
@@ -91,8 +89,8 @@ FAIL_CLOSED_EXEMPT = (
 )
 
 # Fehler beim Laden des Stores / Lesen des Kill-Switch-Status -> fail-closed.
-_STATE_ERRORS = (sqlite3.Error, OSError, RuntimeError, AttributeError, ImportError,
-                 json.JSONDecodeError, TypeError, ValueError)
+# Gemeinsame Definition mit governance.py (identische Fehlerklassen).
+_STATE_ERRORS = gov.KILL_STATE_ERRORS
 
 
 def _is_exempt(path: str) -> bool:
@@ -100,16 +98,10 @@ def _is_exempt(path: str) -> bool:
 
 
 def _kill_active_strict(store) -> bool:
-    """Kill-Switch-Status STRIKT lesen. Anders als gov.is_halted()/kill_state()
-    (die Lesefehler zu "nicht aktiv" machen) wirft diese Funktion bei
-    unlesbarem Status, damit die Middleware fail-closed blocken kann."""
-    raw = store.get_setting(gov.KILL_KEY, "")
-    if not raw:
-        return False
-    st = json.loads(raw)
-    if not isinstance(st, dict):
-        raise ValueError("Kill-Switch-Status hat kein gültiges Format")
-    return bool(st.get("active"))
+    """Kill-Switch-Status STRIKT lesen (gemeinsame Hilfe gov.read_kill_state_strict).
+    Wirft bei unlesbarem Status, damit die Middleware mit 503 fail-closed blockt
+    (gov.kill_state() würde stattdessen "halted/unknown" liefern -> 423)."""
+    return bool(gov.read_kill_state_strict(store).get("active"))
 
 
 def _fail_closed_response(request: Request, path: str, store, actor: str, role: str,

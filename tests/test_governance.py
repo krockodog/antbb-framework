@@ -345,7 +345,7 @@ def test_middleware_fail_closed_on_unreadable_kill_state(tmp_path):
     st = Store(str(tmp_path / "ks.db"))
     try:
         st.set_setting(gov.KILL_KEY, "{kaputt")            # Status unlesbar
-        assert gov.is_halted(st) is False                  # alter Pfad: fail-open
+        assert gov.is_halted(st) is True                   # governance.py ebenfalls fail-closed
         app = _mini_app(lambda: st)
         with TestClient(app) as c:
             r = c.post("/api/targets/1/scan", json={})
@@ -394,3 +394,106 @@ def test_fail_closed_exemptions_do_not_overlap_protected_paths():
     for p in ("/api/targets/1/scan", "/api/blue/findings/1/remediate-recheck",
               "/api/governance/kill", "/api/targets/1/oversight"):
         assert not gr._is_exempt(p)
+
+
+# ---------------------------------------------------------------------------
+# governance.py fail-closed: is_halted / kill_state / enforce_scan
+# ---------------------------------------------------------------------------
+def _gov_store(tmp_path):
+    st = Store(str(tmp_path / "govks.db"))
+    gov.ensure_schema(st)
+    tid = st.add_target("ks-test.example")
+    st.add_scope(tid, "domain", "ks-test.example")
+    return st, tid
+
+
+def _enforce(st, tid):
+    return gov.enforce_scan(st, tid, risk="MEDIUM",
+                            techniques=list(gov.DEFAULT_TECHNIQUES_DEFENSIVE), approved=True)
+
+
+@pytest.mark.parametrize("raw", ["{kaputt", "[1, 2]", '"aktiv"', "42"])
+def test_unreadable_kill_state_is_fail_closed(tmp_path, caplog, raw):
+    st, tid = _gov_store(tmp_path)
+    try:
+        st.set_setting(gov.KILL_KEY, raw)
+        with caplog.at_level("WARNING", logger="antbb.governance"):
+            ks = gov.kill_state(st)
+            assert ks["active"] is True and ks["unknown"] is True and ks["error"]
+            assert gov.is_halted(st) is True
+            with pytest.raises(gov.GovernanceBlocked) as ei:
+                _enforce(st, tid)
+        assert ei.value.status == 503 and "nicht lesbar" in ei.value.detail
+        assert any("nicht lesbar" in r.getMessage() for r in caplog.records)
+        s = gov.status(st, user={"role": "admin"})
+        assert s["kill_switch"]["state"] == "active" and s["kill_switch"]["unknown"] is True
+        assert s["kill_switch"]["error"]
+        assert s["scope"]["state"] == "halted"
+        # Nicht-Admin sieht den Fehlertext nicht, aber den Zustand
+        s2 = gov.status(st, user={"role": "member"})
+        assert s2["kill_switch"]["unknown"] is True and "error" not in s2["kill_switch"]
+    finally:
+        st.close()
+
+
+def test_db_error_on_kill_state_is_fail_closed(tmp_path):
+    st, tid = _gov_store(tmp_path)
+    st.close()                                   # Verbindung zu -> sqlite3.ProgrammingError
+    ks = gov.kill_state(st)
+    assert ks["unknown"] is True and "ProgrammingError" in ks["error"]
+    assert gov.is_halted(st) is True
+    with pytest.raises(gov.GovernanceBlocked) as ei:
+        gov.enforce_scan(st, tid, risk="MEDIUM", techniques=["dns"], approved=True)
+    assert ei.value.status == 503
+
+
+def test_readable_kill_state_unchanged(tmp_path):
+    st, tid = _gov_store(tmp_path)
+    try:
+        # nie gesetzt -> nicht aktiv, Scan-Policy greift normal
+        assert gov.kill_state(st) == {"active": False}
+        assert gov.is_halted(st) is False
+        _enforce(st, tid)
+        gov.activate_kill(st, actor="t", role="admin")
+        ks = gov.kill_state(st)
+        assert ks["active"] is True and "unknown" not in ks
+        with pytest.raises(gov.GovernanceBlocked) as ei:
+            _enforce(st, tid)
+        assert ei.value.status == 423
+        assert gov.status(st, user={"role": "admin"})["kill_switch"]["unknown"] is False
+        gov.reset_kill(st, actor="t", role="admin")
+        assert gov.is_halted(st) is False and "unknown" not in gov.kill_state(st)
+        _enforce(st, tid)
+    finally:
+        st.close()
+
+
+def test_reset_recovers_from_unreadable_state(tmp_path):
+    st, tid = _gov_store(tmp_path)
+    try:
+        st.set_setting(gov.KILL_KEY, "{kaputt")
+        assert gov.is_halted(st) is True
+        out = gov.reset_kill(st, actor="t", role="admin")
+        assert out["active"] is False
+        assert gov.is_halted(st) is False
+        _enforce(st, tid)
+    finally:
+        st.close()
+
+
+def test_middleware_shares_strict_reader():
+    from antbb.web import governance_routes as gr
+    assert gr._STATE_ERRORS is gov.KILL_STATE_ERRORS
+
+
+def test_target_page_shows_halted_when_state_unreadable(client):
+    tid, _ = _target(client)
+    st = webapp.svc.store
+    st.set_setting(gov.KILL_KEY, "{kaputt")
+    try:
+        r = client.get(f"/target/{tid}")
+        assert r.status_code == 200 and "HALTED" in r.text
+        s = client.get("/api/governance/status").json()
+        assert s["kill_switch"]["state"] == "active" and s["kill_switch"]["unknown"] is True
+    finally:
+        st.set_setting(gov.KILL_KEY, json.dumps({"active": False}))

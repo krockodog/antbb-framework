@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
@@ -468,22 +469,42 @@ def _flag_path(store) -> str:
     return os.path.join(os.path.dirname(os.path.abspath(store.db_path)), "governance_HALTED")
 
 
-def kill_state(store=None) -> dict:
-    store = store or default_store()
-    try:
-        raw = store.get_setting(KILL_KEY, "")
-        st = json.loads(raw) if raw else {}
-    except Exception:
-        st = {}
-    st.setdefault("active", False)
+# Fehler beim Laden des Stores / Lesen des Kill-Switch-Status. Gemeinsam mit
+# der Middleware (governance_routes) genutzt -> überall dieselbe fail-closed-Grenze.
+KILL_STATE_ERRORS = (sqlite3.Error, OSError, RuntimeError, AttributeError, ImportError,
+                     json.JSONDecodeError, TypeError, ValueError)
+
+
+def read_kill_state_strict(store) -> dict:
+    """Kill-Switch-Status STRIKT lesen. Wirft bei DB-Fehler, kaputtem JSON oder
+    falschem Format (siehe KILL_STATE_ERRORS) statt "nicht aktiv" anzunehmen.
+    Kein gesetzter Wert = nie ausgelöst = nicht aktiv."""
+    if store is None:
+        raise RuntimeError("kein Store")
+    raw = store.get_setting(KILL_KEY, "")
+    if not raw:
+        return {"active": False}
+    st = json.loads(raw)
+    if not isinstance(st, dict):
+        raise ValueError("Kill-Switch-Status hat kein gültiges Format")
+    st["active"] = bool(st.get("active", False))
     return st
 
 
-def is_halted(store=None) -> bool:
+def kill_state(store=None) -> dict:
+    """Kill-Switch-Status. fail-closed: Ist der Status nicht lesbar, wird er als
+    aktiv (halted) gemeldet und kenntlich gemacht: unknown=True + error."""
     try:
-        return bool(kill_state(store).get("active"))
-    except Exception:
-        return False
+        return read_kill_state_strict(store or default_store())
+    except KILL_STATE_ERRORS as exc:
+        reason = f"{type(exc).__name__}: {str(exc)[:160]}"
+        log.warning("Kill-Switch-Status nicht lesbar -> fail-closed (halted): %s", reason)
+        return {"active": True, "unknown": True, "error": reason}
+
+
+def is_halted(store=None) -> bool:
+    """True bei aktivem Kill Switch UND bei unlesbarem Status (fail-closed)."""
+    return bool(kill_state(store).get("active"))
 
 
 def halted_flag_file_exists(data_dir: Optional[str] = None) -> bool:
@@ -589,7 +610,12 @@ def _parse_window(value: str) -> Optional[datetime]:
 def enforce_scan(store, target_id: int, *, risk: str, techniques: list[str],
                  approved: bool) -> dict:
     """Zusätzliche Policy-Prüfung. Wirft GovernanceBlocked. Gibt die Policy zurück."""
-    if is_halted(store):
+    ks = kill_state(store)
+    if ks.get("unknown"):
+        log.warning("enforce_scan blockiert: Kill-Switch-Status nicht lesbar (%s)", ks.get("error"))
+        raise GovernanceBlocked(503, "Kill-Switch-Status nicht lesbar → blockiert (fail-closed). "
+                                     "Bitte Admin informieren.", risk)
+    if ks.get("active"):
         raise GovernanceBlocked(423, "KILL SWITCH aktiv: alle Agenten gestoppt, keine neuen "
                                      "Läufe bis zum Reset durch den Admin.", risk)
     if risk == "CRITICAL":
@@ -693,9 +719,13 @@ def status(store=None, *, user: Optional[dict] = None, visible_targets=None,
         "approval": {"state": "pending" if pending else "enabled", "pending": pending,
                      "rule": "HIGH → explizite Freigabe; CRITICAL → blockiert"},
         "audit": {"state": "active" if audit_ok else "inactive", "entries_24h": n24},
+        # Unlesbarer Status: state "active" (Leiste zeigt blockiert + Reset) und
+        # ehrlich gekennzeichnet über unknown/error – nie "ready".
         "kill_switch": {"state": "active" if ks.get("active") else "ready",
                         "since": ks.get("at") if ks.get("active") else None,
-                        "by": (ks.get("by") if full else None) if ks.get("active") else None},
+                        "by": (ks.get("by") if full else None) if ks.get("active") else None,
+                        "unknown": bool(ks.get("unknown")),
+                        **({"error": ks.get("error")} if ks.get("unknown") and full else {})},
         "runs": {"active": runs_active},
         "risk_table": RISK_TABLE,
         "techniques": {k: v for k, v in TECHNIQUES.items()},
