@@ -2875,10 +2875,14 @@ def _human_confirm_flag(request: Request, payload: Optional[dict],
 
 # ---------------- LESEN: Nodes / Node-Detail / Logs ----------------
 @app.get("/api/brain/nodes")
-def api_brain_nodes():
-    """Vollständiger Node-Graph (Targets/Runs/Findings/Soldaten/Logs) aus dem
-    echten Store. Reiner Lesezugriff."""
-    return JSONResponse(_brain_ops.nodes_graph(svc.store))
+def api_brain_nodes(request: Request):
+    """Vollständiger Node-Graph (Targets/Runs/Findings/Soldaten/Logs, Blue-
+    Läufe/-Funde/-Aktionen, Yellow-Cases) aus dem echten Store. Reiner
+    Lesezugriff. Optional ``?colonies=offensive,blue,yellow`` zum Filtern
+    (Default: alle drei)."""
+    raw = (request.query_params.get("colonies") or "").strip()
+    colonies = tuple(c for c in raw.split(",") if c.strip()) if raw else None
+    return JSONResponse(_brain_ops.nodes_graph(svc.store, colonies=colonies))
 
 
 @app.get("/api/brain/node/{ntype}/{nid}")
